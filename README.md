@@ -22,7 +22,7 @@ Leave this terminal running and launch the RC sim of your choice. Your device sh
 If you encounter any issues:
 - [please create an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
 - I need help verifying other Futaba products - [please create an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new) if you think you can help with this!
-- I will respond as soon as I am able>
+- I will respond as soon as I am able
 
 ## Known Compatability Chart
 | Futaba Device                                 | Game                                                          | Supported | 
