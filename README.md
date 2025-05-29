@@ -19,9 +19,8 @@ sudo python3 main.py                                                     # start
 Leave this terminal running and launch the RC sim of your choice. Your device should show up as `Virtual {futaba_device_name}`
 
 ## Issues and Contributing
-If you encounter any issues:
+If you encounter any issues or would like to contribute:
 - [please create an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
-- I need help verifying other Futaba products - [please create an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new) if you think you can help with this!
 - I will respond as soon as I am able
 
 ## Known Compatability Chart

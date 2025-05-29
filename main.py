@@ -1,6 +1,9 @@
-# import re, usb, uinput, time, subprocess
+import asyncio
 from driver import FutabaUsbDeviceDriver
 
-if __name__ == '__main__':
+async def main():
     driver = FutabaUsbDeviceDriver()
-    driver.start()
+    await driver.start()
+
+if __name__ == '__main__':
+    asyncio.run( main() )

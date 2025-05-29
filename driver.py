@@ -1,3 +1,4 @@
+import asyncio
 import               \
     os,              \
     re,              \
@@ -8,29 +9,117 @@ import               \
     subprocess,      \
     logging,         \
     logging.handlers \
+    
+def generateLogger(
+        name,
+        maxSize = 5 * 1024 * 1024, # 5 megabytes
+        backupCount = 5,
+        level = logging.WARNING
+    ):
+        """Generates a logger
+
+        Args:
+            name (str): _description_
+            maxSize (int, optional): Max file size of log files. Defaults to 5*1024*1024.
+            backupCount (int, optional): Number of backup logs to keep in rotation. Defaults to 5
+            level (loglevel, optional): The level the logger should output. Defaults to logging.WARNING.
+
+        Returns:
+            logger: The generated logger
+        """
+        handler = logging.handlers.RotatingFileHandler (
+            f"{name}.log",
+            maxBytes=maxSize,
+            backupCount=backupCount
+        )
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        logger.addHandler(handler)
+        return logger
+    
 
 class FutabaUsbDeviceDriver():
+
     def __init__(self):
 
-        self.state  = "init"
-        self.logger = self._generateLogger( "init" )
-        self.config = self._loadConfig()
-        self.state  = "config-loaded"
-        info        = self.getDeviceInfo()
+        self.logger             = generateLogger( name="driver" )
+        self.runningDevices     = None
+        self.stoppingDevices    = None
+        self.coroutines         = []
+        self.devices            = []
 
-        if info is None:
-            self.state = "critical-no-device-detected"
+        try:
+            lsusb               = "/usr/bin/lsusb"
+            subproc             = subprocess.run( lsusb, capture_output = True, text = True )
+            lsusb_output        = subproc.stdout.strip()
+            futaba_device_regex = r"Bus ([0-9]{3}).*Device ([0-9]{3}):.*ID ([0-9a-fA-F]{4}):([0-9a-fA-F]{4}) ((?i)futaba.*)"
+            matches             = re.findall( futaba_device_regex, lsusb_output )
+
+            if len( matches ) == 0:
+                raise Exception( "No Futaba USB device detected!" )         
+        except Exception as e:
+            self.logger.critical( e )
+            exit( 1 )
+
+
+        for device in matches:
+            [ # Destructure our regex groups into what they actually are
+                bus,
+                device,
+                vendorId,
+                productId,
+                name
+            ] = device
+
+            # Map local variables to a dictionary to be returned later
+            deviceInfo = {
+                "bus"       : bus.strip(),
+                "device"    : device.strip(),
+                "name"      : name.strip(),
+                "productId" : productId.strip(),
+                "vendorId"  : vendorId.strip()
+            }
+
+            self.devices.append( FutabaUsbDevice( deviceInfo ) )
+
+    def __str__(self):
+        return f"Devices: {self.devices}"
+
+    def __repr__(self):
+        return f"Devices: {self.devices}"
+    
+
+    async def start(self):
+        for device in self.devices:
+            self.coroutines.append( await device.start() )
+        self.runningDevices = asyncio.gather( self.coroutines )
+    
+    async def stop(self):
+        self.runningDevices.cancel()
+
+        for device in self.devices:
+            self.coroutines.append( device.stop() )
+        self.stoppingDevices = asyncio.gather( self.coroutines )
+            
+
+
+
+class FutabaUsbDevice():
+    def __init__(self, deviceInfo = None):
+        # We want to give the user a more friendly failure message
+        if deviceInfo is None:
             self.logger.critical( "No Futaba USB device detected" )
             exit( 1 )
 
-        # At this point, we know that a Futaba branded USB device is connected
-        self.state         = "usb-device-detected"
-        self.bus           = info["bus"]
-        self.device        = info["device"]
-        self.name          = info["name"]
-        self.logFile       = info["name"].replace( " ", "_" )
-        self.productId     = int( info['productId'], 16 )
-        self.vendorId      = int( info['vendorId'], 16 )
+        self.state         = "initializing"
+        self.bus           = deviceInfo["bus"]
+        self.device        = deviceInfo["device"]
+        self.name          = deviceInfo["name"]
+        self.logFile       = deviceInfo["name"].replace( " ", "_" )
+        self.logger        = generateLogger( self.logFile )
+        self.productId     = int( deviceInfo['productId'], 16 )
+        self.vendorId      = int( deviceInfo['vendorId'], 16 )
+        self.config        = self._loadConfig()
         self.frameSize     = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
         self.eventList     = [ # 8 channels
@@ -44,15 +133,12 @@ class FutabaUsbDeviceDriver():
             uinput.ABS_TILT_Y
         ]
         self.eventReverseFlag = [False] * len( self.eventList ) # Default to no reversed inputs
+
         self.usbHandle = usb.core.find( idVendor=self.vendorId, idProduct=self.productId )
         if self.usbHandle is None:
-            self.logger.critical( f"Failed to create a usb handle for device {self.vendorId}:{self.productId}" )
+            self.logger.critical( f"Failed to create a usb handle for device {self.vendorId}:{self.productId} ({self.name})" )
             exit(1)
         
-        self.state = "usb-device-hooked"
-
-        # Now that we have detected a device stop logging to init.log
-        self.logger = self._generateLogger( self.logFile )
         self.logger.info( f"Found {self.name}" )
 
         events = tuple( map(
@@ -129,72 +215,7 @@ class FutabaUsbDeviceDriver():
         with open(FILE_NAME, "w") as cfgFile:
             cfgFile.write( json.dumps( DEFAULT_CONFIG, indent=4 ) )
 
-    def _generateLogger(
-        self,
-        name,
-        maxSize = 5 * 1024 * 1024, # 5 megabytes
-        backupCount = 5,
-        level = logging.WARNING
-    ):
-        """Generates a logger
-
-        Args:
-            name (str): _description_
-            maxSize (int, optional): Max file size of log files. Defaults to 5*1024*1024.
-            backupCount (int, optional): Number of backup logs to keep in rotation. Defaults to 5
-            level (loglevel, optional): The level the logger should output. Defaults to logging.WARNING.
-
-        Returns:
-            logger: The generated logger
-        """
-        handler = logging.handlers.RotatingFileHandler (
-            f"{name}.log",
-            maxBytes=maxSize,
-            backupCount=backupCount
-        )
-        logger = logging.getLogger(name)
-        logger.setLevel(level)
-        logger.addHandler(handler)
-        return logger
-
-    def getDeviceInfo(self):
-        """Loads basic information about any connected Futaba USB devices
-
-        Returns:
-            dict: dict containing the bus, device, name, product id and vendor id
-        """
-        self.logger.info("Attempting to import device information via >lsusb<")
-        lsusb = "/usr/bin/lsusb"
-        futaba_device_regex = r"Bus ([0-9]{3}).*Device ([0-9]{3}):.*ID ([0-9a-fA-F]{4}):([0-9a-fA-F]{4}) ((?i)futaba.*)"
-        subproc = subprocess.run( lsusb, capture_output = True, text = True )
-        lsusb_output = subproc.stdout.strip()
-        match = re.search( futaba_device_regex, lsusb_output )
-
-        if match is None:
-            self.logger.critical( "No Futaba USB device detected!" )
-            return None
-
-        [ # Destructure our regex groups into what they actually are
-            bus,
-            device,
-            vendorId,
-            productId,
-            name
-        ] = match.groups()
-
-        # Map local variables to a dictionary to be returned later
-        deviceInfo = {
-            "bus"       : bus.strip(),
-            "device"    : device.strip(),
-            "name"      : name.strip(),
-            "productId" : productId.strip(),
-            "vendorId"  : vendorId.strip()
-        }
-
-        self.logger.info( f"Imported device info:>{deviceInfo}<" )
-        return deviceInfo
-
-    def getInterruptEndpoint(self, device):
+    async def getInterruptEndpoint(self, device):
         """Finds the interrupt endpoint of the physical device
 
         Example:
@@ -255,7 +276,7 @@ class FutabaUsbDeviceDriver():
         self.logger.critical( "No interrupt endpoint found!" )
         exit(1)
 
-    def parseDataFrame(self, data):
+    async def parseDataFrame(self, data):
         """Parses the provided data frame into an ordered list of channel data frames
 
         Args:
@@ -275,7 +296,7 @@ class FutabaUsbDeviceDriver():
         self.logger.info( f"Parsed data frame >{parsed}<" )
         return parsed
 
-    def sendDataFrame(self, data):
+    async def sendDataFrame(self, data):
         """Sends the provided list of data packets to our virutal device
 
         Args:
@@ -293,7 +314,7 @@ class FutabaUsbDeviceDriver():
         # Synchronize (fire all queued events)
         self.virtualDevice.syn() 
 
-    def start(self):
+    async def start(self):
         """Start the driver
         """
         try:
@@ -305,12 +326,11 @@ class FutabaUsbDeviceDriver():
             self.usbHandle.set_configuration() 
 
             self.logger.info( "Finding the interrupt endpoint..." )
-            endpoint = self.getInterruptEndpoint( self.usbHandle )
+            endpoint = await self.getInterruptEndpoint( self.usbHandle )
 
             if endpoint is None:
                 self.logger.critical( f"Unable to find usb endpoint using the handle >{self.usbHandle}<" )
-                self.state = "critical-no-endpoint"
-                exit( 1 )
+                await self.stop( 1 )
 
             self.logger.info( f"Remapped {endpoint} -> {self.name}" )
 
@@ -321,10 +341,10 @@ class FutabaUsbDeviceDriver():
                     hwFrame = self.usbHandle.read( endpoint, self.frameSize, timeout=20 )
 
                     # Parse channel data from HW frame
-                    channelData = self.parseDataFrame( hwFrame )
+                    channelData = await self.parseDataFrame( hwFrame )
 
                     # Send channel data to virtual device
-                    self.sendDataFrame( channelData )
+                    await self.sendDataFrame( channelData )
 
                     # If we reach this point the transmitter must be detected
                     if self.state != "running":
@@ -346,18 +366,18 @@ class FutabaUsbDeviceDriver():
                         # Yes Rico, kaboom.
                         self.state = "critical-usb-error"
                         self.logger.critical( e )
-                        exit( 1 )
+                        await self.stop( 1 )
         except usb.core.USBError as e:
             if e.errno == 13: # Access denied - permissions issue
                 self.state = "critical-insufficient-permissions"
                 self.logger.critical( "Insufficient permissions to hook USB interface" )
                 self._stdout( "Drivers must be run as root" )
-                exit( 1 )
+                await self.stop( 1 )
         finally:
-            self.stop()
+            await self.stop()
             self.logger.info("...Done!")
 
-    def stop(self):
+    async def stop(self, exitCode=None):
         """Stop the driver
         """
         try:
@@ -383,3 +403,6 @@ class FutabaUsbDeviceDriver():
             self.logger.warning( "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)" )
             self.logger.warning( e )
             pass
+    
+        if exitCode is not None:
+            exit( exitCode )
