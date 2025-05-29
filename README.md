@@ -7,14 +7,14 @@ Python script that will remap the native hardware inputs to a virtual joystick d
 This repo is inspired by [dji-mini-controller-linux-driver](https://github.com/catrielmuller/dji-mini-controller-linux-driver).
 
 ## Installation and Use
-Because usb operations require root privileges, you need to run the script under `root`. Open a terminal and type the following commands.
 
+### Commands
+NOTE: The driver requires root level access which means you must be a sudoer!
 ```
 git clone https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver.git # Clone this repo
 cd futaba-usb-rc-linux-driver                                            # Change working directory to the repo you just cloned
-sudo su                                                                  # switch to root
-pip3 install -r requirements.txt                                         # install dependencies
-python3 main.py                                                          # start the driver
+sudo pip3 install -r requirements.txt                                    # install dependencies
+sudo python3 main.py                                                     # start the driver
 ```
 Leave this terminal running and launch the RC sim of your choice. Your device should show up as `Virtual {futaba_device_name}`
 
