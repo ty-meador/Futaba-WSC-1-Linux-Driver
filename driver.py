@@ -42,13 +42,15 @@ class FutabaUsbDeviceDriver():
 
     def __init__(self):
 
+        self.config             = self._loadConfig()
+        self.coroutines         = []
+        self.devices            = []
         self.logger             = generateLogger( name="driver" )
         self.runningDevices     = None
         self.stoppingDevices    = None
-        self.coroutines         = []
-        self.devices            = []
-
+        
         try:
+            self._loadConfig()
             lsusb               = "/usr/bin/lsusb"
             subproc             = subprocess.run( lsusb, capture_output = True, text = True )
             lsusb_output        = subproc.stdout.strip()
@@ -80,7 +82,7 @@ class FutabaUsbDeviceDriver():
                 "vendorId"  : vendorId.strip()
             }
 
-            self.devices.append( FutabaUsbDevice( deviceInfo ) )
+            self.devices.append( FutabaUsbDevice( deviceInfo, self.config ) )
 
     def __str__(self):
         return f"Devices: {self.devices}"
@@ -88,82 +90,6 @@ class FutabaUsbDeviceDriver():
     def __repr__(self):
         return f"Devices: {self.devices}"
     
-
-    async def start(self):
-        for device in self.devices:
-            self.coroutines.append( await device.start() )
-        self.runningDevices = asyncio.gather( self.coroutines )
-    
-    async def stop(self):
-        self.runningDevices.cancel()
-
-        for device in self.devices:
-            self.coroutines.append( device.stop() )
-        self.stoppingDevices = asyncio.gather( self.coroutines )
-            
-
-
-
-class FutabaUsbDevice():
-    def __init__(self, deviceInfo = None):
-        # We want to give the user a more friendly failure message
-        if deviceInfo is None:
-            self.logger.critical( "No Futaba USB device detected" )
-            exit( 1 )
-
-        self.state         = "initializing"
-        self.bus           = deviceInfo["bus"]
-        self.device        = deviceInfo["device"]
-        self.name          = deviceInfo["name"]
-        self.logFile       = deviceInfo["name"].replace( " ", "_" )
-        self.logger        = generateLogger( self.logFile )
-        self.productId     = int( deviceInfo['productId'], 16 )
-        self.vendorId      = int( deviceInfo['vendorId'], 16 )
-        self.config        = self._loadConfig()
-        self.frameSize     = self.config["frame_size"]
-        self.eventMaxValue = self.config["event_max_value"]
-        self.eventList     = [ # 8 channels
-            uinput.ABS_X,
-            uinput.ABS_Y,
-            uinput.ABS_RX,
-            uinput.ABS_RY,
-            uinput.ABS_THROTTLE,
-            uinput.ABS_RUDDER,
-            uinput.ABS_TILT_X,
-            uinput.ABS_TILT_Y
-        ]
-        self.eventReverseFlag = [False] * len( self.eventList ) # Default to no reversed inputs
-
-        self.usbHandle = usb.core.find( idVendor=self.vendorId, idProduct=self.productId )
-        if self.usbHandle is None:
-            self.logger.critical( f"Failed to create a usb handle for device {self.vendorId}:{self.productId} ({self.name})" )
-            exit(1)
-        
-        self.logger.info( f"Found {self.name}" )
-
-        events = tuple( map(
-            lambda event: event + ( 0, self.eventMaxValue, 0, 0 ),
-            self.eventList
-        ))
-
-        self.virtualDevice = uinput.Device( events, f"Virtual {self.name}", vendor=self.vendorId )
-        self.logger.info( f"Virtual {self.name} created" )
-        self.state = "ready"
-    
-    def __str__(self):
-        return f"Virtual {self.name} driver"
-    
-    def __repr__(self):
-        return f"bus={self.bus}, device={self.device}, name={self.name}, productId={self.productId}, vendorId={self.vendorId}, config={self.config}, frameSize={self.frameSize}, eventMaxValue={self.eventMaxValue}, eventList={self.eventList}"
-
-    def _stdout(self, msg):
-        """prints a message to stdout with an identifying banner
-
-        Args:
-            msg (str): The message to output
-        """
-        print( f"{self.name}: {msg}" )
-
     def _loadConfig(self):
         """Loads the settings from config.json
 
@@ -208,12 +134,98 @@ class FutabaUsbDevice():
         # A dict with a 1:1 representation of the JSON file that will be generated...
         DEFAULT_CONFIG = {
             "frame_size": 16,
-            "event_max_value": 32768
+            "event_max_value": 32768,
+            "futaba-wsc-1": {
+                "channels": 2
+            }
         }
 
         # ...told ya
         with open(FILE_NAME, "w") as cfgFile:
             cfgFile.write( json.dumps( DEFAULT_CONFIG, indent=4 ) )
+
+    async def start(self):
+        for device in self.devices:
+            self.coroutines.append( await device.start() )
+        self.runningDevices = asyncio.gather( self.coroutines )
+    
+    async def stop(self):
+        self.runningDevices.cancel()
+
+        for device in self.devices:
+            self.coroutines.append( device.stop() )
+        self.stoppingDevices = asyncio.gather( self.coroutines )
+
+
+
+
+
+
+class FutabaUsbDevice():
+    def __init__(self, deviceInfo = None, config = None):
+        # We want to give the user a more friendly failure message
+        if deviceInfo is None:
+            self.logger.critical( "No Futaba USB device detected" )
+            exit( 1 )
+
+        self.logFile       = deviceInfo["name"].replace( " ", "_" )
+        self.logger        = generateLogger( self.logFile )
+
+        if config is None:
+            self.logger.critical( "No config provided to device instance!" )
+            exit( 1 )
+
+        self.state         = "initializing"
+        self.bus           = deviceInfo["bus"]
+        self.device        = deviceInfo["device"]
+        self.name          = deviceInfo["name"]
+        self.productId     = int( deviceInfo['productId'], 16 )
+        self.vendorId      = int( deviceInfo['vendorId'], 16 )
+        self.config        = config
+        self.frameSize     = config["frame_size"]
+        self.eventMaxValue = config["event_max_value"]
+        self.eventList     = [ # 8 channels
+            uinput.ABS_X,
+            uinput.ABS_Y,
+            uinput.ABS_RX,
+            uinput.ABS_RY,
+            uinput.ABS_THROTTLE,
+            uinput.ABS_RUDDER,
+            uinput.ABS_TILT_X,
+            uinput.ABS_TILT_Y
+        ]
+        
+        self.eventReverseFlag = [False] * len( self.eventList ) # Default to no reversed inputs
+
+        self.usbHandle = usb.core.find( idVendor=self.vendorId, idProduct=self.productId )
+        if self.usbHandle is None:
+            self.logger.critical( f"Failed to create a usb handle for device {self.vendorId}:{self.productId} ({self.name})" )
+            exit(1)
+        
+        self.logger.info( f"Found {self.name}" )
+
+        events = tuple( map(
+            lambda event: event + ( 0, self.eventMaxValue, 0, 0 ),
+            self.eventList
+        ))
+
+        self.virtualDevice = uinput.Device( events, f"Virtual {self.name}", vendor=self.vendorId )
+        self.logger.info( f"Virtual {self.name} created" )
+        self.state = "ready"
+    
+    def __str__(self):
+        return f"Virtual {self.name} driver"
+    
+    def __repr__(self):
+        return f"bus={self.bus}, device={self.device}, name={self.name}, productId={self.productId}, vendorId={self.vendorId}, config={self.config}, frameSize={self.frameSize}, eventMaxValue={self.eventMaxValue}, eventList={self.eventList}"
+
+    def _stdout(self, msg):
+        """prints a message to stdout with an identifying banner
+
+        Args:
+            msg (str): The message to output
+        """
+        print( f"{self.name}: {msg}" )
 
     async def getInterruptEndpoint(self, device):
         """Finds the interrupt endpoint of the physical device
