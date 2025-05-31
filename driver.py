@@ -4,12 +4,10 @@ https://github.com/pyusb/pyusb/blob/master/docs/tutorial.rst
 import asyncio
 import               \
     os,              \
-    re,              \
     json,            \
     usb,             \
     uinput,          \
     time,            \
-    subprocess,      \
     logging,         \
     logging.handlers \
     
