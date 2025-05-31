@@ -1,8 +1,8 @@
 import asyncio
-from driver import FutabaUsbDeviceDriver
+from driver import FutabaUsbController
 
 async def main():
-    driver = FutabaUsbDeviceDriver()
+    driver = FutabaUsbController()
     await driver.startAll()
 
 if __name__ == '__main__':

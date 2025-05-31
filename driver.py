@@ -38,13 +38,14 @@ def generateLogger(
         logger.addHandler( handler )
         return logger
 
-class FutabaUsbDeviceDriver():
+class FutabaUsbController():
 
     def __init__(self):
         self.logger     = generateLogger( "driver" )
         self.coroutines = []
         self.devices    = []
         self.startQueue = []
+        self.stopQueue  = []
         futabaDevices   = []
         usbDevices      = usb.core.find( find_all=True )
 
@@ -111,11 +112,9 @@ class FutabaUsbDeviceDriver():
     
     async def stopAll(self):
         self.runningDevices.cancel()
-
         for device in self.devices:
-            self.coroutines.append( device.stop() )
-        return asyncio.gather( self.coroutines )
-
+            self.stopQueue.append( await device.stop() )
+        self.stoppingDevices = asyncio.gather( self.coroutines )
 
 class FutabaUsbDevice():
     """
@@ -163,7 +162,7 @@ class FutabaUsbDevice():
                             bInterval        :    0x1
 
     """
-    def __init__(self, device = None, defaultConfig = "default_config.json"):
+    def __init__(self, device, defaultConfig = "default_config.json"):
         if not isinstance( device, usb.core.Device ) :
             raise ValueError( f"Invalid device object provided to the FutabaUsbDevice class" )
 
