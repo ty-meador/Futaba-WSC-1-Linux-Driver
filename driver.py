@@ -1,73 +1,65 @@
 """
 https://github.com/pyusb/pyusb/blob/master/docs/tutorial.rst
 """
+
 import asyncio
-import               \
-    os,              \
-    json,            \
-    usb,             \
-    uinput,          \
-    time,            \
-    logging,         \
-    logging.handlers \
-    
+import concurrent.futures
+import json
+import logging
+import logging.handlers
+import os
+import threading
+import time
+from multiprocessing import Process
+
+import uinput
+import usb
+
+
 def generateLogger(
-        name,
-        maxSize = 5 * 1024 * 1024, # 5 megabytes
-        backupCount = 5,
-        level = logging.WARNING
-    ):
-        """Generates a logger
+    name,
+    maxSize=5 * 1024 * 1024,  # 5 megabytes
+    backupCount=5,
+    level=logging.WARNING,
+):
+    """Generates a logger
 
-        Args:
-            name (str): _description_
-            maxSize (int, optional): Max file size of log files. Defaults to 5*1024*1024.
-            backupCount (int, optional): Number of backup logs to keep in rotation. Defaults to 5
-            level (loglevel, optional): The level the logger should output. Defaults to logging.WARNING.
+    Args:
+        name (str): _description_
+        maxSize (int, optional): Max file size of log files. Defaults to 5*1024*1024.
+        backupCount (int, optional): Number of backup logs to keep in rotation. Defaults to 5
+        level (loglevel, optional): The level the logger should output. Defaults to logging.WARNING.
 
-        Returns:
-            logger: The generated logger
-        """
-        handler = logging.handlers.RotatingFileHandler (
-            f"{name}.log",
-            maxBytes=maxSize,
-            backupCount=backupCount
-        )
-        logger = logging.getLogger( name )
-        logger.setLevel( level )
-        logger.addHandler( handler )
-        return logger
+    Returns:
+        logger: The generated logger
+    """
+    handler = logging.handlers.RotatingFileHandler(
+        f"{name}.log", maxBytes=maxSize, backupCount=backupCount
+    )
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+    return logger
 
-class FutabaUsbController():
+
+class FutabaUsbController:
+    """_summary_"""
 
     def __init__(self):
-        self.logger     = generateLogger( "driver" )
-        self.coroutines = []
-        self.devices    = []
-        self.startQueue = []
-        self.stopQueue  = []
-        futabaDevices   = []
-        usbDevices      = usb.core.find( find_all=True )
+        self.logger = generateLogger("driver")
+        self.eventLoop = asyncio.get_running_loop()
+        self.killswitch = threading.Event()
+        self.processPool = []
+        self.devices = []
+        self._sanityChecks()
 
-        # Ensure default config file exists
-        if not os.path.exists( "default_config.json" ):
-            self.generateDefaultConfigFile()
-        else: # Is the default file sane?
-            try:
-                with open( "default_config.json", 'r' ) as cfgFile:
-                    json.loads( cfgFile )
-            except Exception:
-                # Delete the existing default config and regenerate it
-                self.generateDefaultConfigFile( forceRegenerate=True )
-
+        usbDevices = usb.core.find(find_all=True)
         for device in usbDevices:
             if device.manufacturer.lower() == "futaba":
-                futabaDevices.append( FutabaUsbDevice( device ) )
+                self.devices.append(FutabaUsbDevice(device))
 
-        if len( futabaDevices ) == 0:
-            raise Exception( "No Futaba USB device detected!" )
-        
-        self.devices = futabaDevices
+        if len(self.devices) == 0:
+            raise RuntimeError("No Futaba USB device detected!")
 
     def __str__(self):
         return f"Devices: {self.devices}"
@@ -75,7 +67,19 @@ class FutabaUsbController():
     def __repr__(self):
         return f"Devices: {self.devices}"
 
-    def generateDefaultConfigFile(self, forceRegenerate=False):
+    def _sanityChecks(self):
+        # Ensure default config file exists
+        if not os.path.exists("default_config.json"):
+            self._generateDefaultConfigFile()
+        else:  # Is the default file sane?
+            try:
+                with open("default_config.json", "r", encoding="utf-8") as cfgFile:
+                    json.loads(cfgFile)
+            except Exception:
+                # Delete the existing default config and regenerate it
+                self._generateDefaultConfigFile(forceRegenerate=True)
+
+    def _generateDefaultConfigFile(self, forceRegenerate=False):
         """Regenerates the default config file
 
         Args:
@@ -84,39 +88,36 @@ class FutabaUsbController():
         FILE_NAME = "default_config.json"
         BACKUP_FILE_NAME = f"{FILE_NAME}.{time.time()}.BACKUP"
 
-        self.logger.info( "Attempting to generate the default config file..." )
-        if os.path.exists( FILE_NAME ):
-            self.logger.warning( "Default config file already exists..." )
+        self.logger.info("Attempting to generate the default config file...")
+        if os.path.exists(FILE_NAME):
+            self.logger.warning("Default config file already exists...")
             # Force regenerate will delete the existing file and generate a
             # new one from scratch
             if forceRegenerate is True:
-                os.rename( FILE_NAME, BACKUP_FILE_NAME )
-                self.logger.warning( f"-> Force regnerating default config file: your config file was backed up to {BACKUP_FILE_NAME}" )
-            else: # file exists, not force regenerating - do nothing
+                os.rename(FILE_NAME, BACKUP_FILE_NAME)
+                self.logger.warning(
+                    f"-> Force regnerating default config file: your config file was backed up to {BACKUP_FILE_NAME}"
+                )
+            else:  # file exists, not force regenerating - do nothing
                 return
-        
+
         # A dict with a 1:1 representation of the JSON file that will be generated...
-        DEFAULT_CONFIG = {
-            "frame_size": 16,
-            "event_max_value": 32768
-        }
+        DEFAULT_CONFIG = {"frame_size": 16, "event_max_value": 32768}
 
         # ...told ya
-        with open(FILE_NAME, "w") as cfgFile:
-            cfgFile.write( json.dumps( DEFAULT_CONFIG, indent=4 ) )
+        with open(FILE_NAME, "w", encoding="utf-8") as cfgFile:
+            cfgFile.write(json.dumps(DEFAULT_CONFIG, indent=4))
 
     async def startAll(self):
+        """_summary_"""
         for device in self.devices:
-            self.startQueue.append( await device.start() )
-        self.runningDevices = asyncio.gather( self.startQueue )
-    
-    async def stopAll(self):
-        self.runningDevices.cancel()
-        for device in self.devices:
-            self.stopQueue.append( await device.stop() )
-        self.stoppingDevices = asyncio.gather( self.coroutines )
+            self.processPool.append(Process(target=device.start))
 
-class FutabaUsbDevice():
+    async def stopAll(self):
+        """_summary_"""
+
+
+class FutabaUsbDevice:
     """
     Example:
             DEVICE ID 1008:000a on Bus 001 Address 002 =================
@@ -140,7 +141,7 @@ class FutabaUsbDevice():
                     wTotalLength         :   0x22 (34 bytes)
                     bNumInterfaces       :    0x1
                     bConfigurationValue  :    0x1
-                    iConfiguration       :    0x0 
+                    iConfiguration       :    0x0
                     bmAttributes         :   0x80 Bus Powered
                     bMaxPower            :   0xfa (500 mA)
                         INTERFACE 0: Human Interface Device ====================
@@ -152,7 +153,7 @@ class FutabaUsbDevice():
                         bInterfaceClass    :    0x3 Human Interface Device
                         bInterfaceSubClass :    0x0
                         bInterfaceProtocol :    0x0
-                        iInterface         :    0x0 
+                        iInterface         :    0x0
                             ENDPOINT 0x87: Interrupt IN ==========================
                             bLength          :    0x7 (7 bytes)
                             bDescriptorType  :    0x5 Endpoint
@@ -162,20 +163,35 @@ class FutabaUsbDevice():
                             bInterval        :    0x1
 
     """
-    def __init__(self, device, defaultConfig = "default_config.json"):
-        if not isinstance( device, usb.core.Device ) :
-            raise ValueError( f"Invalid device object provided to the FutabaUsbDevice class" )
 
-        self.state         = "initializing"
-        self.name          = f"{device.manufacturer}-{device.product}"
-        self.fsSafeName    = self.name.replace( " ", "_" ) # name that is safe for the file system. Used for logs and config files
-        self.logger        = generateLogger( self.fsSafeName )
-        self.usbHandle     = device
-        self.usbEndpoint   = self.getInterruptEndpoint( device )
-        self.config        = self._loadConfig( defaultConfig=defaultConfig )
-        self.frameSize     = self.config["frame_size"]
+    def __init__(
+        self, usbDevice, processPool=None, defaultConfig="default_config.json"
+    ):
+        if not isinstance(usbDevice, usb.core.Device):
+            raise ValueError(
+                f"`usbDevice` is expected to be of type `usb.core.Device`, found {type(usbDevice).__name__}"
+            )
+        if not isinstance(processPool, concurrent.futures.ProcessPoolExecutor):
+            raise ValueError(
+                f"`processPool` is expected to be of type `concurrent.futures.ProcessPoolExecutor`, found {type(processPool).__name__}"
+            )
+        if not isinstance(defaultConfig, str):
+            raise ValueError(
+                f"`defaultConfig` is expected to be of type `str`, found {type(defaultConfig).__name__}"
+            )
+
+        self.state = "initializing"
+        self.name = f"{usbDevice.manufacturer.strip()}-{usbDevice.product.strip()}"
+        self.fsSafeName = self.name.replace(
+            " ", "_"
+        )  # name that is safe for the file system. Used for logs and config files
+        self.logger = generateLogger(self.fsSafeName)
+        self.usbHandle = usbDevice
+        self.usbEndpoint = self.getInterruptEndpoint(usbDevice)
+        self.config = self._loadConfig(defaultConfig=defaultConfig)
+        self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
-        self.eventList     = [ # 8 channels
+        self.eventList = [  # 8 channels
             uinput.ABS_X,
             uinput.ABS_Y,
             uinput.ABS_RX,
@@ -183,26 +199,25 @@ class FutabaUsbDevice():
             uinput.ABS_THROTTLE,
             uinput.ABS_RUDDER,
             uinput.ABS_TILT_X,
-            uinput.ABS_TILT_Y
+            uinput.ABS_TILT_Y,
         ]
-        self.eventReverseFlag = [False] * len( self.eventList ) # Default to no reversed inputs
-        
-        self.logger.info( f"Found {self.name}" )
-
-        events = tuple( map(
-            lambda event: event + ( 0, self.eventMaxValue, 0, 0 ),
+        self.eventReverseFlag = [False] * len(
             self.eventList
-        ))
-
-        self.virtualDevice = uinput.Device( events, f"Virtual {self.name}", vendor=self.usbHandle.idVendor )
-        self.logger.info( f"Virtual {self.name} created" )
+        )  # Default to no reversed inputs
+        usbDeviceEvents = tuple(
+            map(lambda event: event + (0, self.eventMaxValue, 0, 0), self.eventList)
+        )
+        self.virtualDevice = uinput.Device(
+            usbDeviceEvents, f"Virtual {self.name}", vendor=self.usbHandle.idVendor
+        )
+        self.logger.info(f"Virtual {self.name} created")
         self.state = "ready"
-    
+
     def __str__(self):
         return f"Virtual {self.name} driver"
-    
+
     def __repr__(self):
-        return f"bus={self.bus}, device={self.device}, name={self.name}, fsSafeName={self.fsSafeName} config={self.config}, eventList={self.eventList}"
+        return f"name={self.name}, fsSafeName={self.fsSafeName} config={self.config}, eventList={self.eventList}"
 
     def _stdout(self, msg):
         """prints a message to stdout with an identifying banner
@@ -210,9 +225,9 @@ class FutabaUsbDevice():
         Args:
             msg (str): The message to output
         """
-        print( f"{self.name} -> {msg}" )
+        print(f"{self.name} -> {msg}")
 
-    def _loadConfig(self, defaultConfig = "default_config.json"):
+    def _loadConfig(self, defaultConfig="default_config.json"):
         """Loads the settings for this particular device and falls back
         to the default config file if one doesn't exist
 
@@ -222,27 +237,29 @@ class FutabaUsbDevice():
 
         config = None
         try:
-            self.logger.debug( "Attempting to load config file..." )
-            with open( f"{self.fsSafeName}.json", 'r' ) as cfgFile:
-                config = json.load( cfgFile )
-            self.logger.debug ( f"...{self.fsSafeName}.json loaded!" )
+            self.logger.debug("Attempting to load config file...")
+            with open(f"{self.fsSafeName}.json", "r") as cfgFile:
+                config = json.load(cfgFile)
+            self.logger.debug(f"...{self.fsSafeName}.json loaded!")
         except FileNotFoundError:
-            self.logger.debug( f"-> No config found for {self.fsSafeName}...")
-            self.logger.debug( f"-> Loading default config...")
+            self.logger.debug(f"-> No config found for {self.fsSafeName}...")
+            self.logger.debug("-> Loading default config...")
             try:
-                with open( defaultConfig, 'r' ) as cfgFile:
-                    config = json.load( cfgFile )
+                with open(defaultConfig, "r") as cfgFile:
+                    config = json.load(cfgFile)
             except:
-                pass # config will still be "None", so we just let the finally block catch this one 
+                pass  # config will still be "None", so we just let the finally block catch this one
         finally:
             if config is None:
-                raise FileNotFoundError( f"Unable to load {self.fsSafeName}.json or default_config.json!" )
+                raise FileNotFoundError(
+                    f"Unable to load {self.fsSafeName}.json or default_config.json!"
+                )
         return config
 
     def _loadDefaultConfig(self):
         config = None
-        with open( "default_config.json", 'r' ) as cfgFile:
-            config = json.load( cfgFile )
+        with open("default_config.json", "r") as cfgFile:
+            config = json.load(cfgFile)
         return config
 
     def getState(self):
@@ -266,19 +283,22 @@ class FutabaUsbDevice():
         Returns:
             : The endpoint object used to capture frames from the physical device
         """
-        if not isinstance( device, usb.core.Device ):
-            raise ValueError( "The device provided to getInterruptEndpoint is not of type usb.core.Device" )
+        if not isinstance(device, usb.core.Device):
+            raise ValueError(
+                "The device provided to getInterruptEndpoint is not of type usb.core.Device"
+            )
         for config in device:
             for interface in config:
                 for endpoint in interface:
-                    if(
-                        usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
+                    if (
+                        usb.util.endpoint_direction(endpoint.bEndpointAddress)
+                        == usb.util.ENDPOINT_IN
                         and endpoint.bmAttributes == 0x3
                     ):
                         return endpoint.bEndpointAddress
-        raise RuntimeError( "No interrupt endpoint found!" )
+        raise RuntimeError("No interrupt endpoint found!")
 
-    async def parseDataFrame(self, data):
+    def parseDataFrame(self, data):
         """Parses the provided data frame into an ordered list of channel data frames
 
         Args:
@@ -289,18 +309,18 @@ class FutabaUsbDevice():
         """
         try:
             parsed = []
-            for i in range( 0, len( data ), 2 ):
+            for i in range(0, len(data), 2):
                 # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
-                channelData = int.from_bytes( data[i:i+2], byteorder="little" )
-                channelData =  ( channelData - 704 ) * 256 // 21
-                parsed.append( channelData )
+                channelData = int.from_bytes(data[i : i + 2], byteorder="little")
+                channelData = (channelData - 704) * 256 // 21
+                parsed.append(channelData)
             parsed.reverse()
         except:
-            raise ValueError( f"Unable to parse data frame {data}")
-        self.logger.debug( f"Parsed data frame >{parsed}<" )
+            raise ValueError(f"Unable to parse data frame {data}")
+        self.logger.debug(f"Parsed data frame >{parsed}<")
         return parsed
 
-    async def sendDataFrame(self, data):
+    def sendDataFrame(self, data):
         """Sends the provided list of data packets to our virutal device
 
         Args:
@@ -308,46 +328,55 @@ class FutabaUsbDevice():
             packet from the physical device
         """
         # Queue one event for each channel
-        for i in range( 0, len( self.eventList ) ):
+        for i in range(0, len(self.eventList)):
             channelData = data[i]
             # Reverse the input if necessary
             if self.eventReverseFlag[i]:
                 channelData = self.eventMaxValue - data[i]
             # queue channel event
-            self.virtualDevice.emit( self.eventList[i], channelData, syn=False )
+            self.virtualDevice.emit(self.eventList[i], channelData, syn=False)
         # Synchronize (fire all queued events)
-        self.virtualDevice.syn() 
+        self.virtualDevice.syn()
 
-    async def start(self):
-        """Start the driver
-        """
+    def _start(self, killswitch):
+        pass
+
+    def start(self, killswitch):
+        """Start the driver"""
+        print(killswitch)
         try:
-            self.logger.info( f"Attempting to start virtual {self.name}" )
+            self.logger.info(f"Attempting to start virtual {self.name}")
             if self.state != "ready":
-                raise Exception( "Attempted to start a FutabaUSBDevice before the driver was in the ready state" )
-            
-            self.logger.info( "-> Detaching kernel driver..." )
-            if self.usbHandle.is_kernel_driver_active( 0 ): 
-                self.usbHandle.detach_kernel_driver( 0 ) 
+                raise Exception(
+                    "Attempted to start a FutabaUSBDevice before the driver was in the ready state"
+                )
 
-            self.logger.info( "-> Using default configuration..." )
-            self.usbHandle.set_configuration() 
+            self.logger.info("-> Detaching kernel driver...")
+            if self.usbHandle.is_kernel_driver_active(0):
+                self.usbHandle.detach_kernel_driver(0)
+
+            self.logger.info("-> Using default configuration...")
+            self.usbHandle.set_configuration()
 
             if self.usbEndpoint is None:
-                self.logger.critical( f"Unable to find usb endpoint using the handle >{self.usbHandle}<" )
-                await self.stop( 1 )
+                self.logger.critical(
+                    f"Unable to find usb endpoint using the handle >{self.usbHandle}<"
+                )
+                self.stop(1)
 
-            self.logger.info( f"Driver started: {self.usbEndpoint} -> {self.name}" )
+            self.logger.info(f"Driver started: {self.usbEndpoint} -> {self.name}")
 
             # Main loop
-            while True:
+            while not killswitch.is_set():
                 try:
                     # read HW frame
-                    hwFrame = self.usbHandle.read( self.usbEndpoint, self.frameSize, timeout=20 )
+                    hwFrame = self.usbHandle.read(
+                        self.usbEndpoint, self.frameSize, timeout=20
+                    )
                     # Parse channel data from HW frame
-                    channelData = await self.parseDataFrame( hwFrame )
+                    channelData = self.parseDataFrame(hwFrame)
                     # Send channel data to virtual device
-                    await self.sendDataFrame( channelData )
+                    self.sendDataFrame(channelData)
                 except usb.core.USBError as e:
                     expectedErrors = [
                         # dongle doesn't detect transmitter - Expected if the batteries die,
@@ -359,44 +388,48 @@ class FutabaUsbDevice():
                     if e.errno not in expectedErrors:
                         # Yes Rico, kaboom.
                         self.state = "critical-usb-error"
-                        self.logger.critical( e )
-                        await self.stop( 1 )
+                        self.logger.critical(e)
+                        self.stop(1)
         except usb.core.USBError as e:
-            if e.errno == 13: # Access denied - permissions issue
+            if e.errno == 13:  # Access denied - permissions issue
                 self.state = "critical-insufficient-permissions"
-                self.logger.critical( "Insufficient permissions to hook USB interface" )
-                self._stdout( "Drivers must be run as root" )
-                raise RuntimeError( "Insufficient permissions to hook USB interface" )
+                self.logger.critical("Insufficient permissions to hook USB interface")
+                self._stdout("Drivers must be run as root")
+                raise RuntimeError(
+                    "Insufficient permissions to hook USB interface"
+                ) from e
         finally:
-            await self.stop()
+            self.stop()
             self.logger.info("...Done!")
 
-    async def stop(self, exitCode=None):
-        """Stop the driver
-        """
+    def stop(self, exitCode=None):
+        """Stop the driver"""
         try:
             self.logger.info("Releasing the USB interface...")
-            usb.util.release_interface( self.usbHandle, 0 )
-        except Exception as e: 
-            self.logger.warning( "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)" )
-            self.logger.warning( e )
-            pass
+            usb.util.release_interface(self.usbHandle, 0)
+        except Exception as e:
+            self.logger.warning(
+                "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+            )
+            self.logger.warning(e)
 
         try:
             self.logger.info("Reattaching the kernel driver...")
-            self.usbHandle.attach_kernel_driver( 0 )
-        except Exception as e: 
-            self.logger.warning( "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)" )
-            self.logger.warning( e )
-            pass
+            self.usbHandle.attach_kernel_driver(0)
+        except Exception as e:
+            self.logger.warning(
+                "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
+            )
+            self.logger.warning(e)
 
         try:
             self.logger.info("Resetting device...")
             self.usbHandle.reset()
-        except Exception as e: 
-            self.logger.warning( "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)" )
-            self.logger.warning( e )
-            pass
-    
+        except Exception as e:
+            self.logger.warning(
+                "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+            )
+            self.logger.warning(e)
+
         if exitCode is not None:
-            exit( exitCode )
+            exit(exitCode)
