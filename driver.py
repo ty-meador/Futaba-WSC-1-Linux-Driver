@@ -170,7 +170,8 @@ class FutabaUsbDevice:
             )
 
         self.state = "initializing"
-        self.name = f"{device.manufacturer}-{device.product}"
+        self.usbEndpoint = self.getInterruptEndpoint(device)
+        self.name = f"{device.manufacturer}-{device.product}({self.usbEndpoint})"
         self.fsSafeName = self.name.replace(
             " ", "_"
         )  # name that is safe for the file system. Used for logs and config files
@@ -201,13 +202,13 @@ class FutabaUsbDevice:
         )
 
         self.virtualDevice = uinput.Device(
-            events, f"Virtual {self.name}", vendor=self.usbHandle.idVendor
+            events, self.name, vendor=self.usbHandle.idVendor
         )
-        self.logger.info(f"Virtual {self.name} created")
+        self.logger.info(f"created on usb endpoint {self.usbEndpoint}")
         self.state = "ready"
 
     def __str__(self):
-        return f"Virtual {self.name} driver"
+        return f"{self.name} driver"
 
     def __repr__(self):
         return f"name={self.name}, fsSafeName={self.fsSafeName} config={self.config}, eventList={self.eventList}"
@@ -319,7 +320,6 @@ class FutabaUsbDevice:
         """
         # Queue one event for each channel
         for i, event in enumerate(self.eventList):
-            # for i in range(0, len(self.eventList)):
             channelData = data[i]
             # Reverse the input if necessary
             if self.eventReverseFlag[i]:
@@ -332,6 +332,7 @@ class FutabaUsbDevice:
     def start(self):
         """Start the driver"""
         try:
+            self._stdout("Starting driver")
             self.logger.info(f"Attempting to start virtual {self.name}")
             if self.state != "ready":
                 raise Exception(

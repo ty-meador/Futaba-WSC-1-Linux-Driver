@@ -1,5 +1,7 @@
 import asyncio
+
 from driver import FutabaUsbController
+
 
 async def main():
     driver = FutabaUsbController()
@@ -8,5 +10,6 @@ async def main():
     except KeyboardInterrupt:
         await driver.stopAll()
 
-if __name__ == '__main__':
-    asyncio.run( main() )
+
+if __name__ == "__main__":
+    asyncio.run(main())
