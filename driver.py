@@ -33,6 +33,7 @@ def generateLogger(
     handler = logging.handlers.RotatingFileHandler(
         f"{name}.log", maxBytes=maxSize, backupCount=backupCount
     )
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
@@ -204,7 +205,7 @@ class FutabaUsbDevice:
         self.virtualDevice = uinput.Device(
             events, self.name, vendor=self.usbHandle.idVendor
         )
-        self.logger.info(f"created on usb endpoint {self.usbEndpoint}")
+        self.logger.debug(f"created on usb endpoint {self.usbEndpoint}")
         self.state = "ready"
 
     def __str__(self):
@@ -333,17 +334,17 @@ class FutabaUsbDevice:
         """Start the driver"""
         try:
             self._stdout("Starting driver")
-            self.logger.info(f"Attempting to start virtual {self.name}")
+            self.logger.debug(f"Attempting to start virtual {self.name}")
             if self.state != "ready":
                 raise Exception(
                     "Attempted to start a FutabaUSBDevice before the driver was in the ready state"
                 )
 
-            self.logger.info("-> Detaching kernel driver...")
+            self.logger.debug("-> Detaching kernel driver...")
             if self.usbHandle.is_kernel_driver_active(0):
                 self.usbHandle.detach_kernel_driver(0)
 
-            self.logger.info("-> Using default configuration...")
+            self.logger.debug("-> Using default configuration...")
             self.usbHandle.set_configuration()
 
             if self.usbEndpoint is None:
@@ -393,7 +394,7 @@ class FutabaUsbDevice:
     def stop(self, exitCode=None):
         """Stop the driver"""
         try:
-            self.logger.info("Releasing the USB interface...")
+            self.logger.debug("Releasing the USB interface...")
             usb.util.release_interface(self.usbHandle, 0)
         except Exception as e:
             self.logger.warning(
@@ -402,7 +403,7 @@ class FutabaUsbDevice:
             self.logger.warning(e)
 
         try:
-            self.logger.info("Reattaching the kernel driver...")
+            self.logger.debug("Reattaching the kernel driver...")
             self.usbHandle.attach_kernel_driver(0)
         except Exception as e:
             self.logger.warning(
@@ -411,7 +412,7 @@ class FutabaUsbDevice:
             self.logger.warning(e)
 
         try:
-            self.logger.info("Resetting device...")
+            self.logger.debug("Resetting device...")
             self.usbHandle.reset()
         except Exception as e:
             self.logger.warning(
