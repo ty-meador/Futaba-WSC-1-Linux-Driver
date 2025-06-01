@@ -3,14 +3,11 @@ https://github.com/pyusb/pyusb/blob/master/docs/tutorial.rst
 """
 
 import asyncio
-import concurrent.futures
 import json
 import logging
 import logging.handlers
 import os
-import threading
 import time
-from multiprocessing import Process
 
 import uinput
 import usb
@@ -42,24 +39,35 @@ def generateLogger(
     return logger
 
 
-class FutabaUsbController:
-    """_summary_"""
-
+class FutabaUsbDeviceDriver:
     def __init__(self):
         self.logger = generateLogger("driver")
-        self.eventLoop = asyncio.get_running_loop()
-        self.killswitch = threading.Event()
-        self.processPool = []
+        self.eventLoop = asyncio.get_event_loop()
+        self.coroutines = []
         self.devices = []
-        self._sanityChecks()
-
+        self.startQueue = []
+        futabaDevices = []
         usbDevices = usb.core.find(find_all=True)
+
+        # Ensure default config file exists
+        if not os.path.exists("default_config.json"):
+            self.generateDefaultConfigFile()
+        else:  # Is the default file sane?
+            try:
+                with open("default_config.json", "r", encoding="utf-8") as cfgFile:
+                    json.load(cfgFile)
+            except Exception:
+                # Delete the existing default config and regenerate it
+                self.generateDefaultConfigFile(forceRegenerate=True)
+
         for device in usbDevices:
             if device.manufacturer.lower() == "futaba":
-                self.devices.append(FutabaUsbDevice(device))
+                futabaDevices.append(FutabaUsbDevice(device))
 
-        if len(self.devices) == 0:
-            raise RuntimeError("No Futaba USB device detected!")
+        if len(futabaDevices) == 0:
+            raise Exception("No Futaba USB device detected!")
+
+        self.devices = futabaDevices
 
     def __str__(self):
         return f"Devices: {self.devices}"
@@ -85,36 +93,40 @@ class FutabaUsbController:
         Args:
             forceRegenerate (bool, optional): If true the existing configuration file will be deleted and a new one will be created using default values. Defaults to False.
         """
-        FILE_NAME = "default_config.json"
-        BACKUP_FILE_NAME = f"{FILE_NAME}.{time.time()}.BACKUP"
+        fileName = "default_config.json"
+        backupFileName = f"{fileName}.{time.time()}.BACKUP"
 
         self.logger.info("Attempting to generate the default config file...")
-        if os.path.exists(FILE_NAME):
+        if os.path.exists(fileName):
             self.logger.warning("Default config file already exists...")
             # Force regenerate will delete the existing file and generate a
             # new one from scratch
             if forceRegenerate is True:
-                os.rename(FILE_NAME, BACKUP_FILE_NAME)
+                os.rename(fileName, backupFileName)
                 self.logger.warning(
-                    f"-> Force regnerating default config file: your config file was backed up to {BACKUP_FILE_NAME}"
+                    f"-> Force regnerating default config file: your config file was backed up to {backupFileName}"
                 )
             else:  # file exists, not force regenerating - do nothing
                 return
 
         # A dict with a 1:1 representation of the JSON file that will be generated...
-        DEFAULT_CONFIG = {"frame_size": 16, "event_max_value": 32768}
+        defaultConfig = {"frame_size": 16, "event_max_value": 32768}
 
         # ...told ya
-        with open(FILE_NAME, "w", encoding="utf-8") as cfgFile:
-            cfgFile.write(json.dumps(DEFAULT_CONFIG, indent=4))
+        with open(fileName, "w", encoding="utf-8") as cfgFile:
+            cfgFile.write(json.dumps(defaultConfig, indent=4))
 
     async def startAll(self):
         """_summary_"""
         for device in self.devices:
-            self.processPool.append(Process(target=device.start))
+            self.startQueue.append(
+                await self.eventLoop.run_in_executor(None, device.start)
+            )
 
     async def stopAll(self):
-        """_summary_"""
+        for device in self.devices:
+            self.coroutines.append(device.stop())
+        return asyncio.gather(self.coroutines)
 
 
 class FutabaUsbDevice:
@@ -164,30 +176,20 @@ class FutabaUsbDevice:
 
     """
 
-    def __init__(
-        self, usbDevice, processPool=None, defaultConfig="default_config.json"
-    ):
-        if not isinstance(usbDevice, usb.core.Device):
+    def __init__(self, device=None, defaultConfig="default_config.json"):
+        if not isinstance(device, usb.core.Device):
             raise ValueError(
-                f"`usbDevice` is expected to be of type `usb.core.Device`, found {type(usbDevice).__name__}"
-            )
-        if not isinstance(processPool, concurrent.futures.ProcessPoolExecutor):
-            raise ValueError(
-                f"`processPool` is expected to be of type `concurrent.futures.ProcessPoolExecutor`, found {type(processPool).__name__}"
-            )
-        if not isinstance(defaultConfig, str):
-            raise ValueError(
-                f"`defaultConfig` is expected to be of type `str`, found {type(defaultConfig).__name__}"
+                "Invalid device object provided to the FutabaUsbDevice class"
             )
 
         self.state = "initializing"
-        self.name = f"{usbDevice.manufacturer.strip()}-{usbDevice.product.strip()}"
+        self.name = f"{device.manufacturer}-{device.product}"
         self.fsSafeName = self.name.replace(
             " ", "_"
         )  # name that is safe for the file system. Used for logs and config files
         self.logger = generateLogger(self.fsSafeName)
-        self.usbHandle = usbDevice
-        self.usbEndpoint = self.getInterruptEndpoint(usbDevice)
+        self.usbHandle = device
+        self.usbEndpoint = self.getInterruptEndpoint(device)
         self.config = self._loadConfig(defaultConfig=defaultConfig)
         self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
@@ -204,11 +206,15 @@ class FutabaUsbDevice:
         self.eventReverseFlag = [False] * len(
             self.eventList
         )  # Default to no reversed inputs
-        usbDeviceEvents = tuple(
+
+        self.logger.info(f"Found {self.name}")
+
+        events = tuple(
             map(lambda event: event + (0, self.eventMaxValue, 0, 0), self.eventList)
         )
+
         self.virtualDevice = uinput.Device(
-            usbDeviceEvents, f"Virtual {self.name}", vendor=self.usbHandle.idVendor
+            events, f"Virtual {self.name}", vendor=self.usbHandle.idVendor
         )
         self.logger.info(f"Virtual {self.name} created")
         self.state = "ready"
@@ -238,17 +244,14 @@ class FutabaUsbDevice:
         config = None
         try:
             self.logger.debug("Attempting to load config file...")
-            with open(f"{self.fsSafeName}.json", "r") as cfgFile:
+            with open(f"{self.fsSafeName}.json", "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
             self.logger.debug(f"...{self.fsSafeName}.json loaded!")
         except FileNotFoundError:
             self.logger.debug(f"-> No config found for {self.fsSafeName}...")
             self.logger.debug("-> Loading default config...")
-            try:
-                with open(defaultConfig, "r") as cfgFile:
-                    config = json.load(cfgFile)
-            except:
-                pass  # config will still be "None", so we just let the finally block catch this one
+            with open(defaultConfig, "r", encoding="utf-8") as cfgFile:
+                config = json.load(cfgFile)
         finally:
             if config is None:
                 raise FileNotFoundError(
@@ -258,7 +261,7 @@ class FutabaUsbDevice:
 
     def _loadDefaultConfig(self):
         config = None
-        with open("default_config.json", "r") as cfgFile:
+        with open("default_config.json", "r", encoding="utf-8") as cfgFile:
             config = json.load(cfgFile)
         return config
 
@@ -315,8 +318,8 @@ class FutabaUsbDevice:
                 channelData = (channelData - 704) * 256 // 21
                 parsed.append(channelData)
             parsed.reverse()
-        except:
-            raise ValueError(f"Unable to parse data frame {data}")
+        except Exception as e:
+            raise ValueError(f"Unable to parse data frame {data}") from e
         self.logger.debug(f"Parsed data frame >{parsed}<")
         return parsed
 
@@ -328,22 +331,19 @@ class FutabaUsbDevice:
             packet from the physical device
         """
         # Queue one event for each channel
-        for i in range(0, len(self.eventList)):
+        for i, event in enumerate(self.eventList):
+            # for i in range(0, len(self.eventList)):
             channelData = data[i]
             # Reverse the input if necessary
             if self.eventReverseFlag[i]:
                 channelData = self.eventMaxValue - data[i]
             # queue channel event
-            self.virtualDevice.emit(self.eventList[i], channelData, syn=False)
+            self.virtualDevice.emit(event, channelData, syn=False)
         # Synchronize (fire all queued events)
         self.virtualDevice.syn()
 
-    def _start(self, killswitch):
-        pass
-
-    def start(self, killswitch):
+    def start(self):
         """Start the driver"""
-        print(killswitch)
         try:
             self.logger.info(f"Attempting to start virtual {self.name}")
             if self.state != "ready":
@@ -389,7 +389,7 @@ class FutabaUsbDevice:
                         # Yes Rico, kaboom.
                         self.state = "critical-usb-error"
                         self.logger.critical(e)
-                        self.stop(1)
+                        raise e
         except usb.core.USBError as e:
             if e.errno == 13:  # Access denied - permissions issue
                 self.state = "critical-insufficient-permissions"
