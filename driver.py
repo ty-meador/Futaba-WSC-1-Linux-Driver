@@ -110,6 +110,7 @@ class FutabaUsbController:
             self.startQueue.append(
                 await self.eventLoop.run_in_executor(None, device.start)
             )
+        return asyncio.gather(self.startQueue)
 
     async def stopAll(self):
         for device in self.devices:

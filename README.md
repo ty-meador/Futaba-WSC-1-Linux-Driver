@@ -27,3 +27,7 @@ If you encounter any issues or would like to contribute:
 | Futaba Device                                 | Game                                                          | Supported | 
 | --------------------------------------------- | ------------------------------------------------------------- | --------- |
 | [WSC-1](https://futabausa.com/product/wsc-1/) | [VRC-Pro](https://store.steampowered.com/app/335070/VRC_PRO/) |  &check;  |
+
+## Known issues
+- Segementation fault upon keyboard interrupt/Multiple keyboard interrupts required to kill driver
+  - The cause of this issue is that each Futaba device that we find we start in its own thread with `run_in_executor`. The solution is simply to create a killswitch event and pass it to the thread. When the event is fired we stop our inifinite loop in the driver class and exit gracefully
