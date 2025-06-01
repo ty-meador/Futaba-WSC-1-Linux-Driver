@@ -39,7 +39,7 @@ def generateLogger(
     return logger
 
 
-class FutabaUsbDeviceDriver:
+class FutabaUsbController:
     def __init__(self):
         self.logger = generateLogger("driver")
         self.eventLoop = asyncio.get_event_loop()
@@ -75,19 +75,7 @@ class FutabaUsbDeviceDriver:
     def __repr__(self):
         return f"Devices: {self.devices}"
 
-    def _sanityChecks(self):
-        # Ensure default config file exists
-        if not os.path.exists("default_config.json"):
-            self._generateDefaultConfigFile()
-        else:  # Is the default file sane?
-            try:
-                with open("default_config.json", "r", encoding="utf-8") as cfgFile:
-                    json.loads(cfgFile)
-            except Exception:
-                # Delete the existing default config and regenerate it
-                self._generateDefaultConfigFile(forceRegenerate=True)
-
-    def _generateDefaultConfigFile(self, forceRegenerate=False):
+    def generateDefaultConfigFile(self, forceRegenerate=False):
         """Regenerates the default config file
 
         Args:
@@ -117,7 +105,6 @@ class FutabaUsbDeviceDriver:
             cfgFile.write(json.dumps(defaultConfig, indent=4))
 
     async def startAll(self):
-        """_summary_"""
         for device in self.devices:
             self.startQueue.append(
                 await self.eventLoop.run_in_executor(None, device.start)
@@ -367,7 +354,7 @@ class FutabaUsbDevice:
             self.logger.info(f"Driver started: {self.usbEndpoint} -> {self.name}")
 
             # Main loop
-            while not killswitch.is_set():
+            while True:
                 try:
                     # read HW frame
                     hwFrame = self.usbHandle.read(
