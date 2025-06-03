@@ -8,6 +8,7 @@ import logging
 import logging.handlers
 import os
 import time
+from multiprocessing import Process
 
 import uinput
 import usb
@@ -47,6 +48,7 @@ class FutabaUsbController:
         self.coroutines = []
         self.devices = []
         self.startQueue = []
+        self.run = False
         futabaDevices = []
         usbDevices = usb.core.find(find_all=True)
 
@@ -107,18 +109,14 @@ class FutabaUsbController:
 
     async def startAll(self):
         for device in self.devices:
-            self.startQueue.append(
-                await self.eventLoop.run_in_executor(None, device.start)
-            )
-        return asyncio.gather(self.startQueue)
+            device.run()
 
     async def stopAll(self):
         for device in self.devices:
-            self.coroutines.append(device.stop())
-        return asyncio.gather(self.coroutines)
+            device.start()
 
 
-class FutabaUsbDevice:
+class FutabaUsbDevice(Process):
     """
     Example:
             DEVICE ID 1008:000a on Bus 001 Address 002 =================
@@ -165,21 +163,26 @@ class FutabaUsbDevice:
 
     """
 
-    def __init__(self, device=None, defaultConfig="default_config.json"):
+    def __init__(
+        self,
+        device=None,
+        defaultConfig="default_config.json",
+    ):
         if not isinstance(device, usb.core.Device):
             raise ValueError(
                 "Invalid device object provided to the FutabaUsbDevice class"
             )
 
+        Process.__init__(self)  # Super constructor
         self.state = "initializing"
-        self.usbEndpoint = self.getInterruptEndpoint(device)
+        self.usbEndpoint = self._getInterruptEndpoint(device)
         self.name = f"{device.manufacturer}-{device.product}({self.usbEndpoint})"
         self.fsSafeName = self.name.replace(
             " ", "_"
         )  # name that is safe for the file system. Used for logs and config files
         self.logger = generateLogger(self.fsSafeName)
         self.usbHandle = device
-        self.usbEndpoint = self.getInterruptEndpoint(device)
+        self.usbEndpoint = self._getInterruptEndpoint(device)
         self.config = self._loadConfig(defaultConfig=defaultConfig)
         self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
@@ -255,15 +258,7 @@ class FutabaUsbDevice:
             config = json.load(cfgFile)
         return config
 
-    def getState(self):
-        """_summary_
-
-        Returns:
-            _type_: _description_
-        """
-        return self.state
-
-    def getInterruptEndpoint(self, device):
+    def _getInterruptEndpoint(self, device):
         """_summary_
 
         Args:
@@ -278,7 +273,7 @@ class FutabaUsbDevice:
         """
         if not isinstance(device, usb.core.Device):
             raise ValueError(
-                "The device provided to getInterruptEndpoint is not of type usb.core.Device"
+                "The device provided to _getInterruptEndpoint is not of type usb.core.Device"
             )
         for config in device:
             for interface in config:
@@ -291,7 +286,7 @@ class FutabaUsbDevice:
                         return endpoint.bEndpointAddress
         raise RuntimeError("No interrupt endpoint found!")
 
-    def parseDataFrame(self, data):
+    def _parseDataFrame(self, data):
         """Parses the provided data frame into an ordered list of channel data frames
 
         Args:
@@ -313,7 +308,7 @@ class FutabaUsbDevice:
         self.logger.debug(f"Parsed data frame >{parsed}<")
         return parsed
 
-    def sendDataFrame(self, data):
+    def _sendDataFrame(self, data):
         """Sends the provided list of data packets to our virutal device
 
         Args:
@@ -331,7 +326,7 @@ class FutabaUsbDevice:
         # Synchronize (fire all queued events)
         self.virtualDevice.syn()
 
-    def start(self):
+    def run(self):
         """Start the driver"""
         try:
             self._stdout("Starting driver")
@@ -354,19 +349,22 @@ class FutabaUsbDevice:
                 )
                 self.stop(1)
 
+            self.run = True
             self.logger.info(f"Driver started: {self.usbEndpoint} -> {self.name}")
 
             # Main loop
-            while True:
+            while self.run:
                 try:
                     # read HW frame
                     hwFrame = self.usbHandle.read(
                         self.usbEndpoint, self.frameSize, timeout=20
                     )
                     # Parse channel data from HW frame
-                    channelData = self.parseDataFrame(hwFrame)
+                    channelData = self._parseDataFrame(hwFrame)
                     # Send channel data to virtual device
-                    self.sendDataFrame(channelData)
+                    self._sendDataFrame(channelData)
+                except KeyboardInterrupt:
+                    self.run = False
                 except usb.core.USBError as e:
                     expectedErrors = [
                         # dongle doesn't detect transmitter - Expected if the batteries die,
@@ -390,10 +388,12 @@ class FutabaUsbDevice:
                 ) from e
         finally:
             self.stop()
-            self.logger.info("...Done!")
 
     def stop(self, exitCode=None):
         """Stop the driver"""
+
+        self.run = False
+
         try:
             self.logger.debug("Releasing the USB interface...")
             usb.util.release_interface(self.usbHandle, 0)
