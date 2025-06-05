@@ -1,7 +1,7 @@
 """Creates a driver with the given arguments and starts it. This script is meant to be called from main.py"""
 
+import signal
 from argparse import ArgumentParser
-from signal import signal
 
 from FutabaUsbDevice import FutabaUsbDevice
 
@@ -26,10 +26,10 @@ def main():
     """Creates the driver, sets up signal kill listeners and starts the driver"""
     try:
         driver = FutabaUsbDevice(productID=args.productID, vendorID=args.vendorID)
-        print(driver)
+
         stopSignals = [signal.SIGINT, signal.SIGTERM]
         for stopSignal in stopSignals:
-            signal(stopSignal, driver.stop)
+            signal.signal(stopSignal, driver.stop)
 
         # Blocks the main thread - That's OK because this should be run as a subprocess anyway
         driver.start()

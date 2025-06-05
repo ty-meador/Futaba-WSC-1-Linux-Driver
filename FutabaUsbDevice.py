@@ -273,7 +273,7 @@ class FutabaUsbDevice:
                     ]
 
                     # kaboom?
-                    if e.errno in expectedErrors:
+                    if e.errno not in expectedErrors:
                         # Yes Rico, kaboom.
                         self.state = "critical-usb-error"
                         self.logger.critical(e)
@@ -291,7 +291,7 @@ class FutabaUsbDevice:
 
     def stop(self, exitCode=None):
         """Stop the driver"""
-
+        self._stdout("Stopping driver")
         try:
             self.logger.debug("Releasing the USB interface...")
             usb.util.release_interface(self.usbHandle, 0)
