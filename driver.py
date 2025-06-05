@@ -26,7 +26,6 @@ def main():
     """Creates the driver, sets up signal kill listeners and starts the driver"""
     try:
         driver = FutabaUsbDevice(productID=args.productID, vendorID=args.vendorID)
-
         stopSignals = [signal.SIGINT, signal.SIGTERM]
         for stopSignal in stopSignals:
             signal.signal(stopSignal, driver.stop)

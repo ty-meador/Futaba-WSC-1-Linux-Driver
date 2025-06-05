@@ -11,6 +11,11 @@ logger = generateLogger("main")
 
 
 def main():
+    """Starts a driver in a subprocess for each Futaba USB device found
+
+    Raises:
+        Exception: If not Futaba USB devices are detected
+    """
     try:
         futabaDevices = []
         subprocs = []
