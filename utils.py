@@ -6,7 +6,7 @@ def generateLogger(
     name,
     maxSize=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
-    level=logging.DEBUG,
+    level=logging.WARNING,
 ):
     """Generates a logger
 

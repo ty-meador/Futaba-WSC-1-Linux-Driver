@@ -25,7 +25,6 @@ def main():
         driversRunning = False
         for device in futabaDevices:
             driverCmd = ["python3", "driver.py", "--product-id", hex(device.idProduct)]
-            print(driverCmd)
             subprocs.append(subprocess.Popen(driverCmd))
         driversRunning = True
 
