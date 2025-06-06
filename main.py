@@ -1,13 +1,11 @@
-import json
-import os
+"""The main program - run with `sudo python3 main.py`"""
+
 import subprocess
 import time
 
 import usb
 
-from utils import generateLogger
-
-logger = generateLogger("main")
+import utils
 
 
 def main():
@@ -17,83 +15,66 @@ def main():
         Exception: If not Futaba USB devices are detected
     """
     try:
-        futabaDevices = []
-        subprocs = []
-
-        for device in usb.core.find(find_all=True):
-            if device.manufacturer.lower() == "futaba":
-                futabaDevices.append(device)
-
+        futabaDevices = findFutabaDevices()
         if len(futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
-
-        driversRunning = False
-        for device in futabaDevices:
-            driverCmd = ["python3", "driver.py", "--product-id", hex(device.idProduct)]
-            subprocs.append(subprocess.Popen(driverCmd))
-        driversRunning = True
-
-        while driversRunning:
-            running = 0
-            stopped = 0
-            total = len(subprocs)
-            time.sleep(1)
-            for subproc in subprocs:
-                if subproc.poll() is None:
-                    running += 1
-                else:
-                    stopped += 1
-                if stopped == total:
-                    driversRunning = False
-
+        subprocs = startDrivers(futabaDevices)
+        monitorDrivers(subprocs)
     except KeyboardInterrupt:
         pass
 
 
-def configSanityCheck():
-    """Ensures that the default config file exists with default values"""
-    # Ensure default config file exists
-    if not os.path.exists("default_config.json"):
-        generateDefaultConfigFile()
-    else:  # Is the default file sane?
-        try:
-            with open("default_config.json", "r", encoding="utf-8") as cfgFile:
-                json.load(cfgFile)
-        except Exception:
-            # Delete the existing default config and regenerate it
-            generateDefaultConfigFile(forceRegenerate=True)
-
-
-def generateDefaultConfigFile(forceRegenerate=False):
-    """Regenerates the default config file
+def monitorDrivers(subprocs):
+    """A blocking function that infinitely monitors the provided subprocesses until they all exit
 
     Args:
-        forceRegenerate (bool, optional): If true the existing configuration file will be deleted and a new one will be created using default values. Defaults to False.
+        subprocs (list of subprocess): A list of subprocesses
     """
-    fileName = "default_config.json"
-    backupFileName = f"{fileName}.{time.time()}.BACKUP"
+    running = len(subprocs)
+    while running > 0:
+        running = 0
+        stopped = 0
+        time.sleep(1)
+        for subproc in subprocs:
+            if subproc.poll() is None:
+                running += 1
+            else:
+                stopped += 1
 
-    logger.info("Attempting to generate the default config file...")
-    if os.path.exists(fileName):
-        logger.warning("Default config file already exists...")
-        # Force regenerate will delete the existing file and generate a
-        # new one from scratch
-        if forceRegenerate is True:
-            os.rename(fileName, backupFileName)
-            logger.warning(
-                f"-> Force regnerating default config file: your config file was backed up to {backupFileName}"
-            )
-        else:  # file exists, not force regenerating - do nothing
-            return
 
-    # A dict with a 1:1 representation of the JSON file that will be generated...
-    defaultConfig = {"frame_size": 16, "event_max_value": 32768}
+def findFutabaDevices():
+    """Finds all Futaba USB devices that are currently connected
 
-    # ...told ya
-    with open(fileName, "w", encoding="utf-8") as cfgFile:
-        cfgFile.write(json.dumps(defaultConfig, indent=4))
+    Returns:
+        list of usb.core.Device: A list of Futaba usb device handles
+    """
+    devices = []
+    for device in usb.core.find(find_all=True):
+        if device.manufacturer.lower() == "futaba":
+            devices.append(device)
+    return devices
+
+
+def startDrivers(futabaDevices):
+    """Starts all Futaba devices provided
+
+    Args:
+        futabaDevices (list of usb.core.Device): A list of Futaba USB device handles
+
+    Returns:
+        list of subprocess: A list of subprocesses each of which is responsable for
+        a single device driver
+    """
+    subprocs = []
+    try:
+        for device in futabaDevices:
+            driverCmd = ["python3", "driver.py", "--product-id", hex(device.idProduct)]
+            subprocs.append(subprocess.Popen(driverCmd))
+    except Exception as e:
+        raise RuntimeError("Unable to start device drivers!") from e
+    return subprocs
 
 
 if __name__ == "__main__":
-    configSanityCheck()
+    utils.configSanityCheck()
     main()

@@ -1,4 +1,4 @@
-"""Creates a driver with the given arguments and starts it. This script is meant to be called from main.py"""
+"""Runs a single driver in a subprocess"""
 
 import signal
 from argparse import ArgumentParser
@@ -26,6 +26,7 @@ def main():
     """Creates the driver, sets up signal kill listeners and starts the driver"""
     try:
         driver = FutabaUsbDevice(productID=args.productID, vendorID=args.vendorID)
+        # Set up sigkill listeners so we can exit gracefully
         stopSignals = [signal.SIGINT, signal.SIGTERM]
         for stopSignal in stopSignals:
             signal.signal(stopSignal, driver.stop)
