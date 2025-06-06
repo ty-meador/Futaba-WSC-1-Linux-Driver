@@ -1,11 +1,13 @@
 """Utility functions for the project"""
 
+import inspect
 import json
 import logging
 import os
 import time
+from logging import handlers
 
-HANDLER = logging.handlers.RotatingFileHandler(
+HANDLER = handlers.RotatingFileHandler(
     "logs.txt",
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
@@ -13,8 +15,8 @@ HANDLER = logging.handlers.RotatingFileHandler(
 
 
 def generateLogger(
-    name="logs",
-    level=logging.WARNING,
+    name=inspect.stack()[1].function,
+    level=logging.INFO,
 ):
     """Generates a logger
 
@@ -40,7 +42,7 @@ def generateLogger(
 
 def configSanityCheck():
     """Ensures that the default config file exists with default values"""
-    logger = generateLogger("configSanityCheck")
+    logger = generateLogger()
     # Ensure default config file exists
     if not os.path.exists("default_config.json"):
         logger.warning("default_config.json does not exist")
@@ -61,7 +63,7 @@ def generateDefaultConfigFile(forceRegenerate=False):
     Args:
         forceRegenerate (bool, optional): If true the existing configuration file will be deleted and a new one will be created using default values. Defaults to False.
     """
-    logger = generateLogger("generateDefaultConfigFile")
+    logger = generateLogger()
     fileName = "default_config.json"
     backupFileName = f"{fileName}.{time.time()}.BACKUP"
 

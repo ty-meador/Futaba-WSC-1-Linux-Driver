@@ -29,4 +29,4 @@ If you encounter any issues or would like to contribute:
 | [WSC-1](https://futabausa.com/product/wsc-1/) | [VRC-Pro](https://store.steampowered.com/app/335070/VRC_PRO/) |  &check;  |
 
 ## Known issues
- - none at this time
+ - If you restart the driver while VRC-Pro is running, you MUST go into the settings and select the Futaba adapter again!

@@ -5,7 +5,7 @@ import time
 
 import usb
 
-import utils
+import driver.utils as utils
 
 
 def main():
@@ -22,6 +22,19 @@ def main():
         monitorDrivers(subprocs)
     except KeyboardInterrupt:
         pass
+
+
+def findFutabaDevices():
+    """Finds all Futaba USB devices that are currently connected
+
+    Returns:
+        list of usb.core.Device: A list of Futaba usb device handles
+    """
+    devices = []
+    for device in usb.core.find(find_all=True):
+        if device.manufacturer.lower() == "futaba":
+            devices.append(device)
+    return devices
 
 
 def monitorDrivers(subprocs):
@@ -42,19 +55,6 @@ def monitorDrivers(subprocs):
                 stopped += 1
 
 
-def findFutabaDevices():
-    """Finds all Futaba USB devices that are currently connected
-
-    Returns:
-        list of usb.core.Device: A list of Futaba usb device handles
-    """
-    devices = []
-    for device in usb.core.find(find_all=True):
-        if device.manufacturer.lower() == "futaba":
-            devices.append(device)
-    return devices
-
-
 def startDrivers(futabaDevices):
     """Starts all Futaba devices provided
 
@@ -68,7 +68,12 @@ def startDrivers(futabaDevices):
     subprocs = []
     try:
         for device in futabaDevices:
-            driverCmd = ["python3", "driver.py", "--product-id", hex(device.idProduct)]
+            driverCmd = [
+                "python3",
+                "driver/start",
+                "--product-id",
+                hex(device.idProduct),
+            ]
             subprocs.append(subprocess.Popen(driverCmd))
     except Exception as e:
         raise RuntimeError("Unable to start device drivers!") from e
