@@ -1,12 +1,9 @@
-"""
-https://github.com/pyusb/pyusb/blob/master/docs/tutorial.rst
-"""
+"""Class representing a single Futaba USB adapater"""
 
 import json
 
 import uinput
 import usb
-
 from utils import generateLogger
 
 
@@ -63,6 +60,8 @@ class FutabaUsbDevice:
         productID=None,
         configFile="default_config.json",
     ):
+        self.state = "initializing"
+
         if vendorID is None:
             vendorID = "0x1008"  # Futaba
         if productID is None:
@@ -76,14 +75,12 @@ class FutabaUsbDevice:
         if device is None:
             self.stop(1)
 
-        self.state = "initializing"
+        self.usbHandle = device
         self.usbEndpoint = self._getInterruptEndpoint(device)
         self.vendorID = vendorID
         self.name = f"{device.manufacturer}-{device.product}({self.usbEndpoint})"
         self.fsSafeName = self.name.replace(" ", "_")  # file-system safe name
         self.logger = generateLogger(self.fsSafeName)
-        self.usbHandle = device
-        self.usbEndpoint = self._getInterruptEndpoint(device)
         self.config = self._loadConfig(configFile)
         self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
