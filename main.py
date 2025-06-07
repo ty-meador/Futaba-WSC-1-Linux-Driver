@@ -31,7 +31,7 @@ class DriverUI(App):
         for device in usb.core.find(find_all=True):
             if device.manufacturer.lower() != "futaba":
                 continue
-            name = f"{device.manufacturer} {device.product}"
+            name = f"{device.manufacturer} {device.product} (bus-{device.bus}, port-{device.port_number})"
 
             self.futabaDevices.append(device)
             self.startCmds.append(
@@ -70,13 +70,13 @@ class DriverUI(App):
         prettier = []
         selected = self.query_one(SelectionList).selected
         for num in selected:
-            name = self.selectionENUM[str(num)]
             num = int(num)
+            name = self.selectionENUM[str(num)]
             device = self.futabaDevices[num - 1]
-            subprocs = self.startDrivers([device])
-            for subproc in subprocs:
+            started = self.startDrivers([device])
+            for subproc in started:
                 self.subprocs.append(subproc)
-                prettier.append(f"{name}({num}) -> running")
+                prettier.append(f"{name} -> running")
         self.query_one(Pretty).update(prettier)
 
     def findFutabaDevices(self):
