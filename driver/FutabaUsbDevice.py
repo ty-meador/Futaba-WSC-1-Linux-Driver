@@ -58,27 +58,40 @@ class FutabaUsbDevice:
         self,
         vendorID=None,
         productID=None,
+        bus=None,
+        port=None,
         configFile="default_config.json",
     ):
         self.state = "initializing"
-
+        self.name = "FutabaUsbDevice - Initializing"
         if vendorID is None:
-            vendorID = "0x1008"  # Futaba
+            vendorID = 4104  # Futaba
         if productID is None:
-            productID = ("0x000A",)  # WSC-1
+            productID = 10  # WSC-1
+        if bus is None:
+            raise TypeError("You must specify the bus of the device")
+        if port is None:
+            raise TypeError("You must specify the port of the device")
 
-        device = usb.core.find(
-            idVendor=int(vendorID, 16),
-            idProduct=int(productID, 16),
+        devices = usb.core.find(
+            find_all=True,
+            idVendor=vendorID,
+            idProduct=productID,
         )
 
-        if device is None:
+        if devices is None:
             self.stop(1)
 
-        self.usbHandle = device
-        self.usbEndpoint = self._getInterruptEndpoint(device)
-        self.vendorID = vendorID
-        self.name = f"{device.manufacturer}-{device.product}({self.usbEndpoint})"
+        self.usbHandle = None
+        for device in devices:
+            if int(device.bus) == int(bus) and int(device.port_number) == int(port):
+                self.usbHandle = device
+
+        if self.usbHandle is None:
+            raise RuntimeError("Could not locate the specified device!")
+
+        self.usbEndpoint = self._getInterruptEndpoint(self.usbHandle)
+        self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
         self.fsSafeName = self.name.replace(" ", "_")  # file-system safe name
         self.logger = generateLogger(self.fsSafeName)
         self.config = self._loadConfig(configFile)
@@ -118,13 +131,13 @@ class FutabaUsbDevice:
     def __repr__(self):
         return self.usbHandle
 
-    def _stdout(self, msg):
-        """prints a message to stdout with an identifying banner
+    # def _stdout(self, msg):
+    #     """prints a message to stdout with an identifying banner
 
-        Args:
-            msg (str): The message to output
-        """
-        print(f"{self.name} -> {msg}")
+    #     Args:
+    #         msg (str): The message to output
+    #     """
+    #     print(f"{self.name} -> {msg}")
 
     def _loadConfig(self, defaultConfig="default_config.json"):
         """Loads the settings for this particular device and falls back
@@ -229,7 +242,7 @@ class FutabaUsbDevice:
     def start(self):
         """Start the driver"""
         try:
-            self._stdout("Starting driver")
+            # self._stdout("Starting driver")
             self.logger.debug(f"Attempting to start virtual {self.name}")
             if self.state != "ready":
                 raise Exception(
@@ -254,19 +267,19 @@ class FutabaUsbDevice:
             # Main loop
             while True:
                 try:
-                    # read HW frame
-                    hwFrame = self.usbHandle.read(
-                        self.usbEndpoint, self.frameSize, timeout=20
+                    # read frame from HW device
+                    dataFrame = self.usbHandle.read(
+                        self.usbEndpoint,
+                        self.frameSize,
+                        timeout=20,
                     )
                     # Parse channel data from HW frame
-                    channelData = self._parseDataFrame(hwFrame)
+                    channelData = self._parseDataFrame(dataFrame)
                     # Send channel data to virtual device
                     self._sendDataFrame(channelData)
                 except usb.core.USBError as e:
                     expectedErrors = [
-                        # dongle doesn't detect transmitter - Expected if the batteries die,
-                        # it isn't paired to the dongle, isn't on, etc
-                        110
+                        110  # Transmitter not connected to dongle
                     ]
 
                     # kaboom?
@@ -279,7 +292,7 @@ class FutabaUsbDevice:
             if e.errno == 13:  # Access denied - permissions issue
                 self.state = "critical-insufficient-permissions"
                 self.logger.critical("Insufficient permissions to hook USB interface")
-                self._stdout("Drivers must be run as root")
+                # self._stdout("Drivers must be run as root")
                 raise RuntimeError(
                     "Insufficient permissions to hook USB interface"
                 ) from e
@@ -288,7 +301,7 @@ class FutabaUsbDevice:
 
     def stop(self, exitCode=None):
         """Stop the driver"""
-        self._stdout("Stopping driver")
+        # self._stdout("Stopping driver")
         try:
             self.logger.debug("Releasing the USB interface...")
             usb.util.release_interface(self.usbHandle, 0)

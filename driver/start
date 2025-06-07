@@ -6,6 +6,29 @@ from argparse import ArgumentParser
 from FutabaUsbDevice import FutabaUsbDevice
 
 parser = ArgumentParser()
+
+parser.add_argument(
+    "--bus",
+    dest="bus",
+    type=str,
+    help="Specify which bus the Futaba device is on",
+)
+
+parser.add_argument(
+    "--port",
+    dest="port",
+    type=str,
+    help="Specify which port the Futaba device is on",
+)
+
+parser.add_argument(
+    "--vendor-id",
+    dest="vendorID",
+    type=str,
+    help="(optional) Specify the vendor id of the Futaba USB device you want to start a driver for",
+)
+
+
 parser.add_argument(
     "--product-id",
     dest="productID",
@@ -13,19 +36,19 @@ parser.add_argument(
     help="Specify the product id of the Futaba USB device you want to start a driver for",
 )
 
-parser.add_argument(
-    "--vendor-id",
-    dest="vendorID",
-    type=str,
-    help="Specify the vendor id of the Futaba USB device you want to start a driver for",
-)
+
 args = parser.parse_args()
 
 
 def main():
     """Creates the driver, sets up signal kill listeners and starts the driver"""
     try:
-        driver = FutabaUsbDevice(productID=args.productID, vendorID=args.vendorID)
+        driver = FutabaUsbDevice(
+            productID=args.productID,
+            vendorID=args.vendorID,
+            bus=args.bus,
+            port=args.port,
+        )
         # Set up sigkill listeners so we can exit gracefully
         stopSignals = [signal.SIGINT, signal.SIGTERM]
         for stopSignal in stopSignals:
