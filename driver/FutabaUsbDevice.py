@@ -60,7 +60,6 @@ class FutabaUsbDevice:
         productID=None,
         bus=None,
         port=None,
-        configFile="default_config.json",
     ):
         self.state = "initializing"
         self.name = "FutabaUsbDevice - Initializing"
@@ -92,9 +91,10 @@ class FutabaUsbDevice:
 
         self.usbEndpoint = self._getInterruptEndpoint(self.usbHandle)
         self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
-        self.fsSafeName = self.name.replace(" ", "_")  # file-system safe name
-        self.logger = generateLogger(self.fsSafeName)
-        self.config = self._loadConfig(configFile)
+        self.configFile = ()
+        self.logName = self.name.replace(" ", "-").strip().upper()
+        self.logger = generateLogger(self.logName)
+        self.config = self._loadConfig()
         self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
         # 8 channels
@@ -139,29 +139,30 @@ class FutabaUsbDevice:
     #     """
     #     print(f"{self.name} -> {msg}")
 
-    def _loadConfig(self, defaultConfig="default_config.json"):
+    def _loadConfig(self):
         """Loads the settings for this particular device and falls back
         to the default config file if one doesn't exist
 
         Returns:
             dict: A dictionary containing the driver settings
         """
+        productName = self.usbHandle.product.strip().upper().replace(" ", "-")
+        configFile = f"configs/{productName}.json"
 
         config = None
         try:
             self.logger.debug("Attempting to load config file...")
-            with open(f"{self.fsSafeName}.json", "r", encoding="utf-8") as cfgFile:
+            with open(configFile, "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
-            self.logger.debug(f"...{self.fsSafeName}.json loaded!")
+            self.logger.debug(f"...{configFile} loaded!")
         except FileNotFoundError:
-            self.logger.debug(f"-> No config found for {self.fsSafeName}...")
-            self.logger.debug("-> Loading default config...")
-            with open(defaultConfig, "r", encoding="utf-8") as cfgFile:
+            self.logger.debug(f"-> {configFile} not found, loading default config...")
+            with open("default_config.json", "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
         finally:
             if config is None:
                 raise FileNotFoundError(
-                    f"Unable to load {self.fsSafeName}.json or default_config.json!"
+                    f"Unable to load {configFile}.json or default_config.json!"
                 )
         return config
 

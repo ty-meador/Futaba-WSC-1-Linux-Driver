@@ -17,7 +17,7 @@ driverCmds = []
 
 
 class DriverUI(App):
-    CSS_PATH = "ui/selection_list.tcss"
+    CSS_PATH = "selection_list.tcss"
 
     def __init__(self):
         super().__init__()
@@ -26,36 +26,43 @@ class DriverUI(App):
         self.options = []
         self.startCmds = []
         self.selectionENUM = {}
-        self.subprocs = []
+        self.subprocs = {}
 
+        deviceIndex = 0
         for device in usb.core.find(find_all=True):
             if device.manufacturer.lower() != "futaba":
                 continue
-            name = f"{device.manufacturer} {device.product} (bus-{device.bus}, port-{device.port_number})"
+            selectionKey = str(deviceIndex)
+            device.name = f"{device.manufacturer} {device.product} (bus-{device.bus}, port-{device.port_number})"
 
-            self.futabaDevices.append(device)
-            self.startCmds.append(
-                (
-                    "python3",
-                    "driver/start",
-                    "--bus",
-                    str(device.bus),
-                    "--port",
-                    str(device.port_number),
-                )
+            device.subproc = None
+            device.startCmd = (
+                "python3",
+                "driver/start",
+                "--bus",
+                str(device.bus),
+                "--port",
+                str(device.port_number),
             )
-            nextValue = str(len(self.futabaDevices))
-            self.options.append(Selection(name, nextValue))
-            self.selectionENUM[name] = nextValue
-            self.selectionENUM[nextValue] = name
+            device.selectItem = Selection(device.name, selectionKey)
+            device.enum = {
+                f"{device.name}": selectionKey,
+                f"{selectionKey}": device.name,
+            }
+            self.selectionENUM.update(device.enum)
+            self.futabaDevices.append(device)
+            deviceIndex = len(self.futabaDevices)
 
         if len(self.futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
 
     def compose(self):
+        sList = []
+        for device in self.futabaDevices:
+            sList.append(device.selectItem)
         yield Header()
         with Horizontal():
-            yield SelectionList(*self.options)
+            yield SelectionList(*sList)
             yield Pretty([])
         yield Footer()
 
@@ -63,20 +70,29 @@ class DriverUI(App):
         self.query_one(
             SelectionList
         ).border_title = "Driver for Futaba R/C -> USB Receivers"
+        self.query_one(Pretty).border_title = "Running Drivers"
 
     @on(Mount)
     @on(SelectionList.SelectedChanged)
     def update_selected_view(self):
-        prettier = []
         selected = self.query_one(SelectionList).selected
-        for num in selected:
-            num = int(num)
-            name = self.selectionENUM[str(num)]
-            device = self.futabaDevices[num - 1]
-            started = self.startDrivers([device])
-            for subproc in started:
-                self.subprocs.append(subproc)
-                prettier.append(f"{name} -> running")
+        prettier = []
+        for enum in selected:
+            deviceIndex = int(enum)
+            name = self.selectionENUM[enum]
+            device = self.futabaDevices[deviceIndex]
+            if device.subproc is None:
+                subproc = self.startDriver(device)
+                device.subproc = subproc
+            prettier.append(f"{name}")
+
+        # Kill drivers for deselected devices
+        for device in self.futabaDevices:
+            if device.enum[device.name] not in selected and device.subproc is not None:
+                device.subproc.terminate()
+                device.subproc.wait()
+                device.subproc = None
+
         self.query_one(Pretty).update(prettier)
 
     def findFutabaDevices(self):
@@ -107,6 +123,9 @@ class DriverUI(App):
                     running += 1
                 else:
                     stopped += 1
+
+    def startDriver(self, futabaDevice):
+        return self.startDrivers([futabaDevice])[0]
 
     def startDrivers(self, futabaDevices):
         """Starts all Futaba devices provided
