@@ -19,7 +19,7 @@ driverCmds = []
 class DriverUI(App):
     """UI for managing the drivers built with textualize"""
 
-    CSS_PATH = "main.tcss"
+    CSS_PATH = "styles/main.tcss"
 
     def __init__(self):
         super().__init__()
