@@ -62,10 +62,11 @@ class FutabaUsbDevice:
         productID=None,
         bus=None,
         port=None,
+        name=None,
     ):
-        atexit.register(self.stop)
         self.state = "initializing"
-        self.name = "FutabaUsbDevice - Initializing"
+        atexit.register(self.stop)
+
         if vendorID is None:
             vendorID = 4104  # Futaba
         if productID is None:
@@ -92,12 +93,14 @@ class FutabaUsbDevice:
         if self.usbHandle is None:
             raise RuntimeError("Could not locate the specified device!")
 
-        self.usbEndpoint = self._getInterruptEndpoint(self.usbHandle)
-        self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
+        self.usbEndpoint = self.findEndpoint(self.usbHandle)
+        self.name = name
+        if self.name is None:
+            self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
         self.configFile = ()
         self.logName = self.name.replace(" ", "-").strip().upper()
         self.logger = utils.generateLogger(self.logName)
-        self.config = self._loadConfig()
+        self.config = self.loadConfig()
         self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
         # 8 channels
@@ -134,7 +137,7 @@ class FutabaUsbDevice:
     def __repr__(self):
         return self.usbHandle
 
-    # def _stdout(self, msg):
+    # def stdout(self, msg):
     #     """prints a message to stdout with an identifying banner
 
     #     Args:
@@ -142,7 +145,7 @@ class FutabaUsbDevice:
     #     """
     #     print(f"{self.name} -> {msg}")
 
-    def _loadConfig(self):
+    def loadConfig(self):
         """Loads the settings for this particular device and falls back
         to the default config file if one doesn't exist
 
@@ -169,13 +172,13 @@ class FutabaUsbDevice:
                 )
         return config
 
-    def _loadDefaultConfig(self):
+    def loadDefaultConfig(self):
         config = None
         with open("default_config.json", "r", encoding="utf-8") as cfgFile:
             config = json.load(cfgFile)
         return config
 
-    def _getInterruptEndpoint(self, device):
+    def findEndpoint(self, device):
         """_summary_
 
         Args:
@@ -190,7 +193,7 @@ class FutabaUsbDevice:
         """
         if not isinstance(device, usb.core.Device):
             raise ValueError(
-                "The device provided to _getInterruptEndpoint is not of type usb.core.Device"
+                "The device provided to _findEndpoint is not of type usb.core.Device"
             )
         for config in device:
             for interface in config:
@@ -198,12 +201,13 @@ class FutabaUsbDevice:
                     if (
                         usb.util.endpoint_direction(endpoint.bEndpointAddress)
                         == usb.util.ENDPOINT_IN
+                        # 0x3 indicates interrupt endpoint
                         and endpoint.bmAttributes == 0x3
                     ):
                         return endpoint.bEndpointAddress
         raise RuntimeError("No interrupt endpoint found!")
 
-    def _parseDataFrame(self, data):
+    def parseDataFrame(self, data):
         """Parses the provided data frame into an ordered list of channel data frames
 
         Args:
@@ -228,7 +232,7 @@ class FutabaUsbDevice:
         self.logger.debug(f"Parsed data frame >{channelData}<")
         return channelData
 
-    def _sendDataFrame(self, data):
+    def sendDataFrame(self, data):
         """Sends the provided list of data packets to our virutal device
 
         Args:
@@ -259,7 +263,7 @@ class FutabaUsbDevice:
     def start(self):
         """Start the driver"""
         try:
-            # self._stdout("Starting driver")
+            # self.stdout("Starting driver")
             self.logger.debug(f"Attempting to start virtual {self.name}")
             if self.state != "ready":
                 raise Exception(
@@ -301,9 +305,9 @@ class FutabaUsbDevice:
                         timeout=1000,  # typically timeouts are caused by the transmitter not being connected to the dongle though an idle transmitter may also cause a timeout
                     )
                     # Parse channel data from HW frame
-                    channelData = self._parseDataFrame(dataFrame)
+                    channelData = self.parseDataFrame(dataFrame)
                     # Send channel data to virtual device
-                    self._sendDataFrame(channelData)
+                    self.sendDataFrame(channelData)
                     # frameCount += 1
                     # end = time.time()
                 except usb.core.USBError as e:
@@ -321,7 +325,7 @@ class FutabaUsbDevice:
             if e.errno == 13:  # Access denied - permissions issue
                 self.state = "critical-insufficient-permissions"
                 self.logger.critical("Insufficient permissions to hook USB interface")
-                # self._stdout("Drivers must be run as root")
+                # self.stdout("Drivers must be run as root")
                 raise RuntimeError(
                     "Insufficient permissions to hook USB interface"
                 ) from e
@@ -330,7 +334,7 @@ class FutabaUsbDevice:
 
     def stop(self, exitCode=None):
         """Stop the driver"""
-        # self._stdout("Stopping driver")
+        # self.stdout("Stopping driver")
         try:
             self.logger.debug("Releasing the USB interface...")
             usb.util.release_interface(self.usbHandle, 0)

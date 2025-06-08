@@ -38,6 +38,13 @@ parser.add_argument(
 )
 
 
+parser.add_argument(
+    "--name",
+    dest="name",
+    type=str,
+    help="The name that you want to use for the process - optional",
+)
+
 args = parser.parse_args()
 
 

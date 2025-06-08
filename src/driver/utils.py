@@ -18,7 +18,7 @@ HANDLER = handlers.RotatingFileHandler(
 
 def getConfigsPath():
     """Gets the abs path to the config files directory"""
-    return os.path.abspath(os.path.join(getProjectRoot(), "driver", "configs"))
+    return os.path.abspath(os.path.join(getProjectRoot(), "src", "driver", "configs"))
 
 
 def getProjectRoot():
