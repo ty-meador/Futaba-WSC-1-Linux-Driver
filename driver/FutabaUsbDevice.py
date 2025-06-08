@@ -1,5 +1,6 @@
 """Class representing a single Futaba USB adapater"""
 
+import atexit
 import json
 import os
 
@@ -62,6 +63,7 @@ class FutabaUsbDevice:
         bus=None,
         port=None,
     ):
+        atexit.register(self.stop)
         self.state = "initializing"
         self.name = "FutabaUsbDevice - Initializing"
         if vendorID is None:
@@ -234,7 +236,7 @@ class FutabaUsbDevice:
             packet from the physical device
         """
         # Queue one event for each channel
-        for index, (
+        for _, (
             event,
             channelData,
             eventReverseFlag,

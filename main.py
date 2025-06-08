@@ -2,7 +2,6 @@
 
 import atexit
 import subprocess
-import time
 
 import usb
 from textual import on
@@ -12,18 +11,21 @@ from textual.events import Mount
 from textual.widgets import Footer, Header, Pretty, SelectionList
 from textual.widgets.selection_list import Selection
 
+from driver import utils
+
 driverCmds = []
 
 
 class DriverUI(App):
     """UI for managing the drivers built with textualize"""
 
-    CSS_PATH = "selection_list.tcss"
+    CSS_PATH = "main.tcss"
 
     def __init__(self):
         super().__init__()
         self.futabaDevices = []
         atexit.register(self.stopAllDrivers)
+        self.logger = utils.generateLogger()
         self.startCmds = []
         self.selectionENUM = {}
 
@@ -65,7 +67,7 @@ class DriverUI(App):
             yield Pretty([])
         yield Footer()
 
-    def on_mount(self):
+    def on_mount(self):  # noqa: C0103
         """on mount event callback"""
         self.query_one(
             SelectionList
@@ -74,7 +76,7 @@ class DriverUI(App):
 
     @on(Mount)
     @on(SelectionList.SelectedChanged)
-    def update_selected_view(self):
+    def update_selected_view(self):  # noqa: C0103
         """callback"""
         selected = self.query_one(SelectionList).selected
         prettier = []
@@ -82,48 +84,17 @@ class DriverUI(App):
             deviceIndex = int(enum)
             name = self.selectionENUM[enum]
             device = self.futabaDevices[deviceIndex]
-            if device.subproc is None:
+            if not hasattr(device, "subproc") or device.subproc is None:
                 subproc = self.startDriver(device)
                 device.subproc = subproc
             prettier.append(f"{name}")
 
         # Kill drivers for deselected devices
-        for device in self.futabaDevices:
-            if device.enum[device.name] not in selected and device.subproc is not None:
-                device.subproc.terminate()
-                device.subproc.wait()
-                device.subproc = None
-
+        deviceList = filter(
+            lambda device: device.enum[device.name] not in selected, self.futabaDevices
+        )
+        self.stopDrivers(deviceList)
         self.query_one(Pretty).update(prettier)
-
-    def findFutabaDevices(self):
-        """Finds all Futaba USB devices that are currently connected
-
-        Returns:
-            list of usb.core.Device: A list of Futaba usb device handles
-        """
-        devices = []
-        for device in usb.core.find(find_all=True):
-            if device.manufacturer.lower() == "futaba":
-                devices.append(device)
-        return devices
-
-    def monitorDrivers(self, subprocs):
-        """A blocking function that infinitely monitors the provided subprocesses until they all exit
-
-        Args:
-            subprocs (list of subprocess): A list of subprocesses
-        """
-        running = len(subprocs)
-        while running > 0:
-            running = 0
-            stopped = 0
-            time.sleep(1)
-            for subproc in subprocs:
-                if subproc.poll() is None:
-                    running += 1
-                else:
-                    stopped += 1
 
     def startDriver(self, futabaDevice):
         """start a single device"""
@@ -156,27 +127,41 @@ class DriverUI(App):
             # raise RuntimeError("Unable to start device drivers!") from e
         return subprocs
 
-    def stopAllDrivers(self):
-        """Cleanup function to stop any running drivers"""
+    def startAllDrivers(self):
+        """Starts a driver for all found futaba devices"""
+        return self.startDrivers(self.futabaDevices)
+
+    def stopDriver(self, futabaDevice):
+        """Stops a single device driver
+
+        Args:
+            futabaDevice (usb.core.Device): a futaba device
+        """
+        self.stopDriver([futabaDevice])
+
+    def stopDrivers(self, futabaDevices):
+        """Takes a list of futaba devices and stops any driver subprocesses that are attached to them
+
+        Args:
+            futabaDevices (list of usb.core.Device): List of Futaba devices
+        """
         deviceList = filter(
-            lambda device: (hasattr(device, "subproc") and device.subproc is not None),
-            self.futabaDevices,
+            lambda device: hasattr(device, "subproc") and device.subproc is not None,
+            futabaDevices,
         )
 
+        # Request graceful termination of all processes
         for device in deviceList:
-            # First send terminate signal to all running subprocs
             try:
                 device.subproc.terminate()
-            except Exception:
-                pass
-
-        for device in deviceList:
-            # Next check each subproc and wait for it if it hasn't yet finished terminating
-            try:
                 device.subproc.wait()
                 device.subproc = None
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.warning(e)
+
+    def stopAllDrivers(self):
+        """Stops all running drivers"""
+        return self.stopDrivers(self.futabaDevices)
 
 
 if __name__ == "__main__":
