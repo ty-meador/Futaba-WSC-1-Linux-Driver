@@ -282,18 +282,30 @@ class FutabaUsbDevice:
             self.logger.info(f"Driver started: {self.usbEndpoint} -> {self.name}")
 
             # Main loop
+            # start = time.time()
+            # end = time.time()
+            # frameCount = 0
             while True:
                 try:
+                    # if end - start > 1:  # second
+                    #     self.logger.info(
+                    #         f"Avg framrate of {frameCount} over the last {end - start} seconds"
+                    #     )
+                    #     frameCount = 0
+                    #     start = time.time()
+
                     # read frame from HW device
                     dataFrame = self.usbHandle.read(
                         self.usbEndpoint,
                         self.frameSize,
-                        timeout=20,
+                        timeout=1000,
                     )
                     # Parse channel data from HW frame
                     channelData = self._parseDataFrame(dataFrame)
                     # Send channel data to virtual device
                     self._sendDataFrame(channelData)
+                    # frameCount += 1
+                    # end = time.time()
                 except usb.core.USBError as e:
                     expectedErrors = [
                         110  # Transmitter not connected to dongle
