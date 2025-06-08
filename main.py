@@ -1,5 +1,6 @@
 """The main program - run with `sudo python3 main.py`"""
 
+import atexit
 import subprocess
 import time
 
@@ -11,22 +12,20 @@ from textual.events import Mount
 from textual.widgets import Footer, Header, Pretty, SelectionList
 from textual.widgets.selection_list import Selection
 
-import driver.utils as utils
-
 driverCmds = []
 
 
 class DriverUI(App):
+    """UI for managing the drivers built with textualize"""
+
     CSS_PATH = "selection_list.tcss"
 
     def __init__(self):
         super().__init__()
-        utils.configSanityCheck()
         self.futabaDevices = []
-        self.options = []
+        atexit.register(self.stopAllDrivers)
         self.startCmds = []
         self.selectionENUM = {}
-        self.subprocs = {}
 
         deviceIndex = 0
         for device in usb.core.find(find_all=True):
@@ -67,6 +66,7 @@ class DriverUI(App):
         yield Footer()
 
     def on_mount(self):
+        """on mount event callback"""
         self.query_one(
             SelectionList
         ).border_title = "Driver for Futaba R/C -> USB Receivers"
@@ -75,6 +75,7 @@ class DriverUI(App):
     @on(Mount)
     @on(SelectionList.SelectedChanged)
     def update_selected_view(self):
+        """callback"""
         selected = self.query_one(SelectionList).selected
         prettier = []
         for enum in selected:
@@ -125,6 +126,7 @@ class DriverUI(App):
                     stopped += 1
 
     def startDriver(self, futabaDevice):
+        """start a single device"""
         return self.startDrivers([futabaDevice])[0]
 
     def startDrivers(self, futabaDevices):
@@ -153,6 +155,28 @@ class DriverUI(App):
             raise e
             # raise RuntimeError("Unable to start device drivers!") from e
         return subprocs
+
+    def stopAllDrivers(self):
+        """Cleanup function to stop any running drivers"""
+        deviceList = filter(
+            lambda device: (hasattr(device, "subproc") and device.subproc is not None),
+            self.futabaDevices,
+        )
+
+        for device in deviceList:
+            # First send terminate signal to all running subprocs
+            try:
+                device.subproc.terminate()
+            except Exception:
+                pass
+
+        for device in deviceList:
+            # Next check each subproc and wait for it if it hasn't yet finished terminating
+            try:
+                device.subproc.wait()
+                device.subproc = None
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

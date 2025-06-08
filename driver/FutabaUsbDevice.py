@@ -1,10 +1,11 @@
 """Class representing a single Futaba USB adapater"""
 
 import json
+import os
 
 import uinput
 import usb
-from utils import generateLogger
+import utils
 
 
 class FutabaUsbDevice:
@@ -93,7 +94,7 @@ class FutabaUsbDevice:
         self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
         self.configFile = ()
         self.logName = self.name.replace(" ", "-").strip().upper()
-        self.logger = generateLogger(self.logName)
+        self.logger = utils.generateLogger(self.logName)
         self.config = self._loadConfig()
         self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
@@ -147,7 +148,7 @@ class FutabaUsbDevice:
             dict: A dictionary containing the driver settings
         """
         productName = self.usbHandle.product.strip().upper().replace(" ", "-")
-        configFile = f"configs/{productName}.json"
+        configFile = os.path.join(utils.getConfigsPath(), f"{productName}.json")
 
         config = None
         try:
@@ -209,18 +210,21 @@ class FutabaUsbDevice:
         Returns:
             list: Ordered list of channel data frames
         """
+        self.logger.debug(f"Attempting to parse data frame {data}")
         try:
-            parsed = []
-            for i in range(0, len(data), 2):
-                # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
-                channelData = int.from_bytes(data[i : i + 2], byteorder="little")
-                channelData = (channelData - 704) * 256 // 21
-                parsed.append(channelData)
-            parsed.reverse()
+            channelData = [
+                (  # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
+                    (int.from_bytes(data[i : i + 2], byteorder="little") - 704)
+                    * 256
+                    // 21
+                )
+                for i in range(0, len(data), 2)
+            ]
+            channelData.reverse()
         except Exception as e:
             raise ValueError(f"Unable to parse data frame {data}") from e
-        self.logger.debug(f"Parsed data frame >{parsed}<")
-        return parsed
+        self.logger.debug(f"Parsed data frame >{channelData}<")
+        return channelData
 
     def _sendDataFrame(self, data):
         """Sends the provided list of data packets to our virutal device
@@ -230,13 +234,23 @@ class FutabaUsbDevice:
             packet from the physical device
         """
         # Queue one event for each channel
-        for i, event in enumerate(self.eventList):
-            channelData = data[i]
+        for index, (
+            event,
+            channelData,
+            eventReverseFlag,
+        ) in enumerate(
+            zip(
+                self.eventList,
+                data,
+                self.eventReverseFlag,
+            )
+        ):
             # Reverse the input if necessary
-            if self.eventReverseFlag[i]:
-                channelData = self.eventMaxValue - data[i]
+            if eventReverseFlag:
+                channelData = self.eventMaxValue - channelData
             # queue channel event
             self.virtualDevice.emit(event, channelData, syn=False)
+            self.logger.debug(f"parsed events {channelData}")
         # Synchronize (fire all queued events)
         self.virtualDevice.syn()
 

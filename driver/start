@@ -3,6 +3,7 @@
 import signal
 from argparse import ArgumentParser
 
+import utils
 from FutabaUsbDevice import FutabaUsbDevice
 
 parser = ArgumentParser()
@@ -43,6 +44,7 @@ args = parser.parse_args()
 def main():
     """Creates the driver, sets up signal kill listeners and starts the driver"""
     try:
+        utils.configSanityCheck()
         driver = FutabaUsbDevice(
             productID=args.productID,
             vendorID=args.vendorID,
