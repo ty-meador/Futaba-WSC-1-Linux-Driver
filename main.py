@@ -150,7 +150,7 @@ class DriverUI(App):
             futabaDevices,
         )
 
-        # Request graceful termination of all processes
+        # Request graceful termination of all subprocs
         for device in deviceList:
             try:
                 device.subproc.terminate()

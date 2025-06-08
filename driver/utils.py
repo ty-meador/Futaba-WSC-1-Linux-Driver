@@ -37,7 +37,7 @@ def getProjectRoot():
 
 
 def generateLogger(
-    name=inspect.stack()[1].function,  # Hack to get name of whoever called us :D
+    name=inspect.stack()[1].function,  # Hack to get name of whatever called us :D
     level=logging.INFO,
 ):
     """Generates a logger

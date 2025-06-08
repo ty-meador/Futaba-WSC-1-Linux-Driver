@@ -298,7 +298,7 @@ class FutabaUsbDevice:
                     dataFrame = self.usbHandle.read(
                         self.usbEndpoint,
                         self.frameSize,
-                        timeout=1000,
+                        timeout=1000,  # typically timeouts are caused by the transmitter not being connected to the dongle though an idle transmitter may also cause a timeout
                     )
                     # Parse channel data from HW frame
                     channelData = self._parseDataFrame(dataFrame)

@@ -1,4 +1,5 @@
-![Image of VRC-Pro RC simulator with the chosen input device being "Virtual Futaba WSC-1"](screenshots/vrc-pro-with-futaba-wsc-1.png "VRC-Pro with WSC-1")
+![Image of VRC-Pro RC simulator with the chosen input device being "Virtual Futaba WSC-1 on the right, and a UI on the left; The left of which is displaying a list of available Futaba USB devices, and the right of which is displaying a list of currently running devices"](screenshots/banner.png "VRC-Pro with WSC-1")
+
 
 # Futaba USB RC Linux Driver 
 
