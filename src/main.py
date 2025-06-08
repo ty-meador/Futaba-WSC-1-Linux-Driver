@@ -44,7 +44,10 @@ class DriverUI(App):
                 str(device.bus),
                 "--port",
                 str(device.port_number),
+                "--name",
+                device.name,
             )
+
             device.selectItem = Selection(device.name, selectionKey)
             device.enum = {
                 f"{device.name}": selectionKey,
@@ -113,15 +116,7 @@ class DriverUI(App):
         subprocs = []
         try:
             for device in futabaDevices:
-                driverCmd = [
-                    "python3",
-                    "driver/start",
-                    "--bus",
-                    str(device.bus),
-                    "--port",
-                    str(device.port_number),
-                ]
-                subprocs.append(subprocess.Popen(driverCmd))
+                subprocs.append(subprocess.Popen(device.startCmd))
         except Exception as e:
             raise e
             # raise RuntimeError("Unable to start device drivers!") from e
