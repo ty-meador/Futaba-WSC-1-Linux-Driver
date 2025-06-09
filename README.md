@@ -10,16 +10,24 @@ This repo is inspired by [dji-mini-controller-linux-driver](https://github.com/c
 ## Installation
 
 ### Commands
-NOTE: The driver requires root level access which means you must be a sudoer!
-```
-git clone https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver.git # Clone this repo
-cd futaba-usb-rc-linux-driver                                            # Change working directory to the repo you just cloned
-sudo pip3 install -r requirements.txt                                    # install dependencies
+
+```shell
+# NOTE: The driver requires root level access which means you must be a sudoer!
+
+# Clone this repo
+git clone https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver.git 
+# Change working directory to the repo you just cloned
+cd futaba-usb-rc-linux-driver
+# install dependencies
+sudo pip3 install -r requirements.txt
 ```
 
 ## Use
 ```shell
-sudo start.sh # Start the UI.
+# Make sure you are in the projects folder
+cd /path/to/futaba-usb-rc-linux-driver
+# Start the UI
+sudo start.sh 
 ```
 
 - This will start a text-based UI
