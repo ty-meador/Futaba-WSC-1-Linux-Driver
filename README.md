@@ -5,7 +5,8 @@
 
 Python script that will remap the native hardware inputs to a virtual joystick device. This allows most windows games to play nicely with your hardware on Linux. In theory this should "just work" if any Futaba USB RC adapter but I've only tested with the Futaba WSC-1 on VRC-Pro
 
-This repo is inspired by [dji-mini-controller-linux-driver](https://github.com/catrielmuller/dji-mini-controller-linux-driver).
+## Credits
+This project was inspired by the [Futaba_T16IZ_Linux](https://github.com/shaozu/Futaba_T16IZ_Linux) repo which was inspired by [dji-mini-controller-linux-driver](https://github.com/catrielmuller/dji-mini-controller-linux-driver).
 
 ## Installation
 
@@ -38,6 +39,7 @@ sudo start.sh
 - Each device that you start will run in a **seperate subprocess**
   - This ensures that each device gets the maximum bandwidth possible
   - This prevents the entire driver from crashing if a single device crashes
+- **Leave the terminal running while you game**
 
 
 ```shell
@@ -46,7 +48,6 @@ sudo start.sh
 │ ▐X▌ Futaba WSC-1 (bus-1, port-1)                                         │└──────────────────────────────────────────────────────────────────────────┘
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
-# Leave this terminal running and launch the RC sim of your choice
 ```
 - If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
 
