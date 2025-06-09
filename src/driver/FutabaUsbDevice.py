@@ -157,12 +157,12 @@ class FutabaUsbDevice:
 
         config = None
         try:
-            self.logger.debug("Attempting to load config file...")
+            # self.logger.debug("Attempting to load config file...")
             with open(configFile, "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
-            self.logger.debug(f"...{configFile} loaded!")
+            # self.logger.debug(f"...{configFile} loaded!")
         except FileNotFoundError:
-            self.logger.debug(f"-> {configFile} not found, loading default config...")
+            # self.logger.debug(f"-> {configFile} not found, loading default config...")
             with open("default_config.json", "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
         finally:
@@ -216,7 +216,7 @@ class FutabaUsbDevice:
         Returns:
             list: Ordered list of channel data frames
         """
-        self.logger.debug(f"Attempting to parse data frame {data}")
+        # self.logger.debug(f"Attempting to parse data frame {data}")
         try:
             channelData = [
                 (  # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
@@ -229,7 +229,7 @@ class FutabaUsbDevice:
             channelData.reverse()
         except Exception as e:
             raise ValueError(f"Unable to parse data frame {data}") from e
-        self.logger.debug(f"Parsed data frame >{channelData}<")
+        # self.logger.debug(f"Parsed data frame >{channelData}<")
         return channelData
 
     def sendDataFrame(self, data):
@@ -256,7 +256,7 @@ class FutabaUsbDevice:
                 channelData = self.eventMaxValue - channelData
             # queue channel event
             self.virtualDevice.emit(event, channelData, syn=False)
-            self.logger.debug(f"parsed events {channelData}")
+            # self.logger.debug(f"parsed events {channelData}")
         # Synchronize (fire all queued events)
         self.virtualDevice.syn()
 
@@ -264,17 +264,17 @@ class FutabaUsbDevice:
         """Start the driver"""
         try:
             # self.stdout("Starting driver")
-            self.logger.debug(f"Attempting to start virtual {self.name}")
+            # self.logger.debug(f"Attempting to start virtual {self.name}")
             if self.state != "ready":
                 raise Exception(
                     "Attempted to start a FutabaUSBDevice before the driver was in the ready state"
                 )
 
-            self.logger.debug("-> Detaching kernel driver...")
+            # self.logger.debug("-> Detaching kernel driver...")
             if self.usbHandle.is_kernel_driver_active(0):
                 self.usbHandle.detach_kernel_driver(0)
 
-            self.logger.debug("-> Using default configuration...")
+            # self.logger.debug("-> Using default configuration...")
             self.usbHandle.set_configuration()
 
             if self.usbEndpoint is None:
@@ -336,7 +336,7 @@ class FutabaUsbDevice:
         """Stop the driver"""
         # self.stdout("Stopping driver")
         try:
-            self.logger.debug("Releasing the USB interface...")
+            # self.logger.debug("Releasing the USB interface...")
             usb.util.release_interface(self.usbHandle, 0)
         except Exception as e:
             self.logger.warning(
@@ -345,7 +345,7 @@ class FutabaUsbDevice:
             self.logger.warning(e)
 
         try:
-            self.logger.debug("Reattaching the kernel driver...")
+            # self.logger.debug("Reattaching the kernel driver...")
             self.usbHandle.attach_kernel_driver(0)
         except Exception as e:
             self.logger.warning(
@@ -354,7 +354,7 @@ class FutabaUsbDevice:
             self.logger.warning(e)
 
         try:
-            self.logger.debug("Resetting device...")
+            # self.logger.debug("Resetting device...")
             self.usbHandle.reset()
         except Exception as e:
             self.logger.warning(

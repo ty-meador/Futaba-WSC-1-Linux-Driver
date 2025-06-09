@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """The main program - run with `sudo python3 main.py`"""
 
 import atexit
@@ -44,7 +45,7 @@ class DriverUI(App):
                 str(device.bus),
                 "--port",
                 str(device.port_number),
-                "--name",
+                "--use-name",
                 device.name,
             )
 

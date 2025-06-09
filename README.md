@@ -7,7 +7,7 @@ Python script that will remap the native hardware inputs to a virtual joystick d
 
 This repo is inspired by [dji-mini-controller-linux-driver](https://github.com/catrielmuller/dji-mini-controller-linux-driver).
 
-## Installation and Use
+## Installation
 
 ### Commands
 NOTE: The driver requires root level access which means you must be a sudoer!
@@ -15,9 +15,33 @@ NOTE: The driver requires root level access which means you must be a sudoer!
 git clone https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver.git # Clone this repo
 cd futaba-usb-rc-linux-driver                                            # Change working directory to the repo you just cloned
 sudo pip3 install -r requirements.txt                                    # install dependencies
-sudo python3 main.py                                                     # start the driver
 ```
-Leave this terminal running and launch the RC sim of your choice. Your device should show up as `Virtual {futaba_device_name}`
+
+## Use
+```shell
+sudo start.sh # Start the UI.
+```
+
+- This will start a text-based UI
+- The UI will show a list of available Futaba USB devices
+  - Navigate with the arrow keys
+  - Spacebar to select/deselect
+- To start or stop a device, simply select or de-select it respectively
+- Each device that you start will run in a **seperate subprocess**
+  - This ensures that each device gets the maximum bandwidth possible
+  - This prevents the entire driver from crashing if a single device crashes
+
+
+```shell
+┌─ Driver for Futaba R/C -> USB Receivers ─────────────────────────────────┐┌─ Running Drivers ────────────────────────────────────────────────────────┐
+│                                                                          ││['Futaba WSC-1 (bus-1, port-1)']                                          │
+│ ▐X▌ Futaba WSC-1 (bus-1, port-1)                                         │└──────────────────────────────────────────────────────────────────────────┘
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+# Leave this terminal running and launch the RC sim of your choice
+```
+- If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
+
 
 ## Issues and Contributing
 If you encounter any issues or would like to contribute:
@@ -30,4 +54,4 @@ If you encounter any issues or would like to contribute:
 | [WSC-1](https://futabausa.com/product/wsc-1/) | [VRC-Pro](https://store.steampowered.com/app/335070/VRC_PRO/) |  &check;  |
 
 ## Known issues
- - If you restart the driver while VRC-Pro is running, you MUST go into the settings and select the Futaba adapter again!
+ - If you start (or restart) the driver while VRC-Pro is running, you MUST go into the settings and select the Futaba adapter as your input device
