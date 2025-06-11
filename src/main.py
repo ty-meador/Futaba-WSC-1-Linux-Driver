@@ -49,7 +49,7 @@ class DriverUI(App):
                 device.name,
             )
 
-            device.selectItem = Selection(device.name, selectionKey)
+            device.listOption = Selection(device.name, selectionKey)
             device.enum = {
                 f"{device.name}": selectionKey,
                 f"{selectionKey}": device.name,
@@ -62,14 +62,28 @@ class DriverUI(App):
             raise Exception("No Futaba USB device detected!")
 
     def compose(self):
-        sList = []
-        for device in self.futabaDevices:
-            sList.append(device.selectItem)
         yield Header()
         with Horizontal():
-            yield SelectionList(*sList)
+            yield SelectionList(*[device.listOption for device in self.futabaDevices])
             yield Pretty([])
         yield Footer()
+
+    def getRunningDevices(self, futabaDevices=None):
+        """Returns a list of running futaba devices
+
+        Args:
+            futabaDevices (list of usb.core.Device, optional): List of devices to filter. Defaults to all found devices.
+
+        Returns:
+            _type_: _description_
+        """
+        devices = futabaDevices
+        if devices is None:
+            devices = self.futabaDevices
+        return filter(
+            lambda device: hasattr(device, "subproc") and device.subproc is not None,
+            devices,
+        )
 
     def on_mount(self):  # noqa: C0103
         """on mount event callback"""
@@ -95,7 +109,8 @@ class DriverUI(App):
 
         # Kill drivers for deselected devices
         deviceList = filter(
-            lambda device: device.enum[device.name] not in selected, self.futabaDevices
+            lambda device: device.enum[device.name] not in selected,
+            self.futabaDevices,
         )
         self.stopDrivers(deviceList)
         self.query_one(Pretty).update(prettier)
@@ -114,14 +129,14 @@ class DriverUI(App):
             list of subprocess: A list of subprocesses each of which is responsable for
             a single device driver
         """
-        subprocs = []
-        try:
-            for device in futabaDevices:
-                subprocs.append(subprocess.Popen(device.startCmd))
-        except Exception as e:
-            raise e
-            # raise RuntimeError("Unable to start device drivers!") from e
-        return subprocs
+        return [
+            subprocess.Popen(
+                device.startCmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            for device in futabaDevices
+        ]
 
     def startAllDrivers(self):
         """Starts a driver for all found futaba devices"""
@@ -133,7 +148,7 @@ class DriverUI(App):
         Args:
             futabaDevice (usb.core.Device): a futaba device
         """
-        self.stopDriver([futabaDevice])
+        self.stopDrivers([futabaDevice])
 
     def stopDrivers(self, futabaDevices):
         """Takes a list of futaba devices and stops any driver subprocesses that are attached to them
@@ -141,19 +156,25 @@ class DriverUI(App):
         Args:
             futabaDevices (list of usb.core.Device): List of Futaba devices
         """
-        deviceList = filter(
-            lambda device: hasattr(device, "subproc") and device.subproc is not None,
-            futabaDevices,
-        )
-
         # Request graceful termination of all subprocs
+        deviceList = self.getRunningDevices(futabaDevices)
         for device in deviceList:
             try:
                 device.subproc.terminate()
                 device.subproc.wait()
                 device.subproc = None
             except Exception as e:
-                self.logger.warning(e)
+                self.logger.error(e)
+
+        # Force kill any subprocs that aren't dead yet
+        deviceList = self.getRunningDevices(deviceList)
+        for device in deviceList:
+            try:
+                device.subproc.kill()
+                device.subproc.wait()
+                device.subproc = None
+            except Exception as e:
+                self.logger.error(e)
 
     def stopAllDrivers(self):
         """Stops all running drivers"""

@@ -1,6 +1,5 @@
 """Utility functions for the project"""
 
-import inspect
 import json
 import logging
 import os
@@ -21,6 +20,13 @@ def getConfigsPath():
     return os.path.abspath(os.path.join(getProjectRoot(), "src", "driver", "configs"))
 
 
+def getCalibrationsPath():
+    """Gets the abs path to the calibration files directory"""
+    return os.path.abspath(
+        os.path.join(getProjectRoot(), "src", "driver", "calibrations")
+    )
+
+
 def getProjectRoot():
     """
     Gets the project root directory, assuming this function is called
@@ -37,7 +43,7 @@ def getProjectRoot():
 
 
 def generateLogger(
-    name=inspect.stack()[1].function,  # Hack to get name of whatever called us :D
+    name="logs",  # Hack to get name of whatever called us :D
     level=logging.INFO,
 ):
     """Generates a logger

@@ -48,6 +48,7 @@ args = parser.parse_args()
 
 def main():
     """Creates the driver, sets up signal kill listeners and starts the driver"""
+
     try:
         utils.configSanityCheck()
         driver = FutabaUsbDevice(
@@ -57,15 +58,18 @@ def main():
             port=args.port,
             name=args.name,
         )
+
+        def stopDriver():
+            driver.stop()
+
         # Set up sigkill listeners so we can exit gracefully
-        stopSignals = [signal.SIGINT, signal.SIGTERM]
-        for stopSignal in stopSignals:
-            signal.signal(stopSignal, driver.stop)
+        signal.signal(signal.SIGINT, stopDriver)
+        signal.signal(signal.SIGTERM, stopDriver)
 
         # Blocks the main thread - That's OK because this should be run as a subprocess anyway
         driver.start()
     except Exception:
-        driver.stop()
+        stopDriver()
 
 
 if __name__ == "__main__":

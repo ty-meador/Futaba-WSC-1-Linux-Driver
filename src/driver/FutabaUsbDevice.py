@@ -97,10 +97,17 @@ class FutabaUsbDevice:
         self.name = name
         if self.name is None:
             self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
-        self.configFile = ()
-        self.logName = self.name.replace(" ", "-").strip().upper()
+        self.logName = self.name.replace(" ", "_").strip().upper()
+        self.productName = self.usbHandle.product.strip().upper().replace(" ", "-")
         self.logger = utils.generateLogger(self.logName)
         self.config = self.loadConfig()
+        self.calibration = self.loadCalibration()
+        # self.smap = interp1d([595, 3510], [0, 32768])
+        # self.tmap = interp1d([608, 3251], [0, 32768])
+        self.tmap = lambda x: self.interpolate(x, 620, 3300)
+        self.smap = lambda x: self.interpolate(x, 600, 3495)
+        self.gmap = lambda x: x
+        # self.gmap = lambda x: self.interpolate(x, 704, 3392)
         self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
         # 8 channels
@@ -114,8 +121,19 @@ class FutabaUsbDevice:
             uinput.ABS_TILT_X,
             uinput.ABS_TILT_Y,
         ]
+        self.valueMaps = [
+            self.gmap,
+            self.gmap,
+            self.gmap,
+            self.gmap,
+            self.gmap,
+            self.gmap,
+            self.tmap,
+            self.smap,
+        ]
         # Default to no reversed inputs
         self.eventReverseFlag = [False] * len(self.eventList)
+        # self.channelCalibrations = [interp1d([], [])]
 
         self.logger.info(f"Found {self.name}")
 
@@ -137,13 +155,14 @@ class FutabaUsbDevice:
     def __repr__(self):
         return self.usbHandle
 
-    # def stdout(self, msg):
-    #     """prints a message to stdout with an identifying banner
-
-    #     Args:
-    #         msg (str): The message to output
-    #     """
-    #     print(f"{self.name} -> {msg}")
+    def interpolate(self, value, low, high):
+        """Guarantees that the value falls between 0 and 32768 based on a provided hight and low calibration"""
+        if value < low:
+            return 0
+        elif value > high:
+            return 32768
+        else:
+            return int(((value - low) / (high - low)) * 32768)
 
     def loadConfig(self):
         """Loads the settings for this particular device and falls back
@@ -152,31 +171,62 @@ class FutabaUsbDevice:
         Returns:
             dict: A dictionary containing the driver settings
         """
-        productName = self.usbHandle.product.strip().upper().replace(" ", "-")
-        configFile = os.path.join(utils.getConfigsPath(), f"{productName}.json")
+        logger = self.logger
+        productName = self.productName
+        logger.debug("loading config")
+        logger.debug("Setting up path to default config file...")
+        defaultFileName = "default.json"
+        defaultFilePath = os.path.join(utils.getConfigsPath(), defaultFileName)
+        logger.debug("-> Done!")
 
         config = None
         try:
-            # self.logger.debug("Attempting to load config file...")
-            with open(configFile, "r", encoding="utf-8") as cfgFile:
+            configFileName = f"{productName}.json"
+            configFilePath = os.path.join(utils.getConfigsPath(), configFileName)
+
+            logger.debug("Attempting to load config file...")
+            with open(configFilePath, "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
-            # self.logger.debug(f"...{configFile} loaded!")
+            logger.debug(f"...{configFileName} loaded!")
         except FileNotFoundError:
-            # self.logger.debug(f"-> {configFile} not found, loading default config...")
-            with open("default_config.json", "r", encoding="utf-8") as cfgFile:
+            logger.debug(f"-> {configFileName} not found, loading default config...")
+            with open(defaultFilePath, "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
+            logger.debug(f"-> {defaultFileName} loaded!")
         finally:
             if config is None:
                 raise FileNotFoundError(
-                    f"Unable to load {configFile}.json or default_config.json!"
+                    f"Unable to load {configFileName} or {defaultFileName}!"
                 )
         return config
 
-    def loadDefaultConfig(self):
-        config = None
-        with open("default_config.json", "r", encoding="utf-8") as cfgFile:
-            config = json.load(cfgFile)
-        return config
+    def loadCalibration(self):
+        """Loads the calibration file for this device"""
+        calibration = None
+        productName = self.productName
+        calibrationFileName = f"{productName}.json"
+        calibrationFilePath = os.path.join(
+            utils.getCalibrationsPath(),
+            calibrationFileName,
+        )
+        defaultFileName = "default.json"
+        defaultFilePath = os.path.join(
+            utils.getCalibrationsPath(),
+            defaultFileName,
+        )
+
+        try:
+            with open(calibrationFilePath, "r", encoding="utf-8") as calibFile:
+                calibration = json.load(calibFile)
+        except FileNotFoundError:
+            with open(defaultFilePath, "r", encoding="utf-8") as calibFile:
+                calibration = json.load(calibFile)
+        finally:
+            if calibration is None:
+                raise FileNotFoundError(
+                    f"Unable to load {calibrationFileName} or {defaultFileName}"
+                )
+        return calibration
 
     def findEndpoint(self, device):
         """_summary_
@@ -216,21 +266,35 @@ class FutabaUsbDevice:
         Returns:
             list: Ordered list of channel data frames
         """
-        # self.logger.debug(f"Attempting to parse data frame {data}")
         try:
+            # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
             channelData = [
-                (  # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
-                    (int.from_bytes(data[i : i + 2], byteorder="little") - 704)
-                    * 256
-                    // 21
+                (
+                    self.valueMaps[i // 2](
+                        int.from_bytes(data[i : i + 2], byteorder="little")
+                    )
                 )
                 for i in range(0, len(data), 2)
             ]
             channelData.reverse()
+            self.logger.debug(channelData)
+            return channelData
         except Exception as e:
-            raise ValueError(f"Unable to parse data frame {data}") from e
-        # self.logger.debug(f"Parsed data frame >{channelData}<")
-        return channelData
+            self.logger.debug(e)
+
+    # def _parseDataFrame_DEBUG(self, data):
+    #     _c = [
+    #         int.from_bytes(data[i : i + 2], byteorder="little")
+    #         for i in range(0, len(data), 2)
+    #     ]
+    #     # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
+    #     channelData = [
+    #         (int.from_bytes(data[i : i + 2], byteorder="little") - 704) * 256 // 21
+    #         for i in range(0, len(data), 2)
+    #     ]
+    #     self.logger.debug(f"s: {_c[7]}, t: {_c[6]}")
+    #     channelData.reverse()
+    #     return channelData
 
     def sendDataFrame(self, data):
         """Sends the provided list of data packets to our virutal device
@@ -239,128 +303,128 @@ class FutabaUsbDevice:
             data (list): A list where each index represents a single channel. Each item will be a data
             packet from the physical device
         """
+        eventMaxVal = self.eventMaxValue
+        eventList = self.eventList
+        reverseFlags = self.eventReverseFlag
+        vDevice = self.virtualDevice
         # Queue one event for each channel
         for _, (
-            event,
             channelData,
-            eventReverseFlag,
+            event,
+            reverseFlag,
         ) in enumerate(
             zip(
-                self.eventList,
                 data,
-                self.eventReverseFlag,
+                eventList,
+                reverseFlags,
             )
         ):
             # Reverse the input if necessary
-            if eventReverseFlag:
-                channelData = self.eventMaxValue - channelData
+            if reverseFlag:
+                channelData = eventMaxVal - channelData
             # queue channel event
-            self.virtualDevice.emit(event, channelData, syn=False)
+            vDevice.emit(event, channelData, syn=False)
             # self.logger.debug(f"parsed events {channelData}")
         # Synchronize (fire all queued events)
-        self.virtualDevice.syn()
+        vDevice.syn()
 
     def start(self):
         """Start the driver"""
         try:
-            # self.stdout("Starting driver")
-            # self.logger.debug(f"Attempting to start virtual {self.name}")
             if self.state != "ready":
                 raise Exception(
                     "Attempted to start a FutabaUSBDevice before the driver was in the ready state"
                 )
 
-            # self.logger.debug("-> Detaching kernel driver...")
-            if self.usbHandle.is_kernel_driver_active(0):
-                self.usbHandle.detach_kernel_driver(0)
+            usbHandle = self.usbHandle
+            endpoint = self.usbEndpoint
+            frameSize = self.frameSize
+            parseDataFrame = self.parseDataFrame
+            sendDataFrame = self.sendDataFrame
+            logger = self.logger
+            stop = self.stop
+            name = self.name
+            if usbHandle.is_kernel_driver_active(0):
+                usbHandle.detach_kernel_driver(0)
 
             # self.logger.debug("-> Using default configuration...")
-            self.usbHandle.set_configuration()
+            usbHandle.set_configuration()
 
-            if self.usbEndpoint is None:
-                self.logger.critical(
-                    f"Unable to find usb endpoint using the handle >{self.usbHandle}<"
+            if endpoint is None:
+                logger.critical(
+                    f"Unable to find usb endpoint using the handle >{usbHandle}<"
                 )
-                self.stop(1)
+                stop(1)
 
-            self.logger.info(f"Driver started: {self.usbEndpoint} -> {self.name}")
+            logger.info(f"Driver started: {endpoint} -> {name}")
 
-            # Main loop
-            # start = time.time()
-            # end = time.time()
-            # frameCount = 0
             while True:
                 try:
-                    # if end - start > 1:  # second
-                    #     self.logger.info(
-                    #         f"Avg framrate of {frameCount} over the last {end - start} seconds"
-                    #     )
-                    #     frameCount = 0
-                    #     start = time.time()
-
                     # read frame from HW device
-                    dataFrame = self.usbHandle.read(
-                        self.usbEndpoint,
-                        self.frameSize,
+                    dataFrame = usbHandle.read(
+                        endpoint,
+                        frameSize,
                         timeout=1000,  # typically timeouts are caused by the transmitter not being connected to the dongle though an idle transmitter may also cause a timeout
                     )
                     # Parse channel data from HW frame
-                    channelData = self.parseDataFrame(dataFrame)
+                    channelData = parseDataFrame(dataFrame)
                     # Send channel data to virtual device
-                    self.sendDataFrame(channelData)
-                    # frameCount += 1
-                    # end = time.time()
+                    sendDataFrame(channelData)
                 except usb.core.USBError as e:
-                    expectedErrors = [
-                        110  # Transmitter not connected to dongle
-                    ]
+                    # expectedErrors = [
+                    #     110  # Transmitter not connected to dongle
+                    # ]
+                    #
+                    # if e.errno not in expectedErrors:
 
                     # kaboom?
-                    if e.errno not in expectedErrors:
+                    if e.errno != 110:
                         # Yes Rico, kaboom.
                         self.state = "critical-usb-error"
-                        self.logger.critical(e)
+                        logger.critical(e)
                         raise e
         except usb.core.USBError as e:
             if e.errno == 13:  # Access denied - permissions issue
                 self.state = "critical-insufficient-permissions"
-                self.logger.critical("Insufficient permissions to hook USB interface")
+                logger.critical("Insufficient permissions to hook USB interface")
                 # self.stdout("Drivers must be run as root")
                 raise RuntimeError(
                     "Insufficient permissions to hook USB interface"
                 ) from e
         finally:
-            self.stop()
+            stop()
 
     def stop(self, exitCode=None):
         """Stop the driver"""
-        # self.stdout("Stopping driver")
+        logger = self.logger
+        usbHandle = self.usbHandle
+
         try:
-            # self.logger.debug("Releasing the USB interface...")
-            usb.util.release_interface(self.usbHandle, 0)
+            logger.debug("Releasing the USB interface...")
+            usb.util.release_interface(usbHandle, 0)
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
             )
-            self.logger.warning(e)
+            logger.error(e)
 
         try:
-            # self.logger.debug("Reattaching the kernel driver...")
-            self.usbHandle.attach_kernel_driver(0)
+            logger.debug("Reattaching the kernel driver...")
+            usbHandle.attach_kernel_driver(0)
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
             )
-            self.logger.warning(e)
+            logger.error(e)
 
         try:
-            # self.logger.debug("Resetting device...")
-            self.usbHandle.reset()
+            logger.debug("Resetting device...")
+            usbHandle.reset()
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
             )
-            self.logger.warning(e)
+            logger.error(e)
 
         if exitCode is not None:
             exit(exitCode)

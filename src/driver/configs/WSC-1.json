@@ -1,4 +1,5 @@
 {
     "frame_size": 16,
-    "event_max_value": 32768
+    "event_max_value": 32768,
+    "channel_count": 8
 }
