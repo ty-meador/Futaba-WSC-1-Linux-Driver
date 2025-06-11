@@ -277,7 +277,6 @@ class FutabaUsbDevice:
                 for i in range(0, len(data), 2)
             ]
             channelData.reverse()
-            self.logger.debug(channelData)
             return channelData
         except Exception as e:
             self.logger.debug(e)
