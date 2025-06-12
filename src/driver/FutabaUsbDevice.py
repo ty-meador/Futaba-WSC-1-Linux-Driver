@@ -4,14 +4,19 @@ import atexit
 import json
 import os
 
+import numpy as np
 import uinput
 import usb
 import utils
 
+FUTABA_VENDOR_ID = 4101
+WSC_1_PRODUCT_ID = 10
 
-class FutabaUsbDevice:
+
+class FutabaUsbDevice(usb.core.Device):
     """
     Example:
+            # What a Futaba device looks like in LSPCI
             DEVICE ID 1008:000a on Bus 001 Address 002 =================
                 bLength                :   0x12 (18 bytes)
                 bDescriptorType        :    0x1 Device
@@ -63,18 +68,36 @@ class FutabaUsbDevice:
         bus=None,
         port=None,
         name=None,
+        channelEvents=None,
+        channelCalibrations=None,
+        productName=None,
+        config=None,
     ):
-        self.state = "initializing"
         atexit.register(self.stop)
 
-        if vendorID is None:
-            vendorID = 4104  # Futaba
-        if productID is None:
-            productID = 10  # WSC-1
         if bus is None:
             raise TypeError("You must specify the bus of the device")
         if port is None:
             raise TypeError("You must specify the port of the device")
+        if vendorID is None:
+            vendorID = FUTABA_VENDOR_ID
+        if productID is None:
+            productID = WSC_1_PRODUCT_ID
+        if productName is None:
+            productName = "WSC-1"
+        if channelEvents is None:
+            channelEvents = [
+                uinput.ABS_X,
+                uinput.ABS_Y,
+                uinput.ABS_RX,
+                uinput.ABS_RY,
+                uinput.ABS_THROTTLE,
+                uinput.ABS_RUDDER,
+                uinput.ABS_TILT_X,
+                uinput.ABS_TILT_Y,
+            ]
+        if channelCalibrations is None:
+            channelCalibrations = self.loadCalibration()
 
         devices = usb.core.find(
             find_all=True,
@@ -98,47 +121,20 @@ class FutabaUsbDevice:
         if self.name is None:
             self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
         self.logName = self.name.replace(" ", "_").strip().upper()
-        self.productName = self.usbHandle.product.strip().upper().replace(" ", "-")
+        self.productName = productName
         self.logger = utils.generateLogger(self.logName)
-        self.config = self.loadConfig()
-        self.calibration = self.loadCalibration()
-        # self.smap = interp1d([595, 3510], [0, 32768])
-        # self.tmap = interp1d([608, 3251], [0, 32768])
-        self.tmap = lambda x: self.interpolate(x, 620, 3300)
-        self.smap = lambda x: self.interpolate(x, 600, 3495)
-        self.gmap = lambda x: x
-        # self.gmap = lambda x: self.interpolate(x, 704, 3392)
+        self.config = config
+        self.channelCalibrations = channelCalibrations
         self.frameSize = self.config["frame_size"]
         self.eventMaxValue = self.config["event_max_value"]
-        # 8 channels
-        self.eventList = [
-            uinput.ABS_X,
-            uinput.ABS_Y,
-            uinput.ABS_RX,
-            uinput.ABS_RY,
-            uinput.ABS_THROTTLE,
-            uinput.ABS_RUDDER,
-            uinput.ABS_TILT_X,
-            uinput.ABS_TILT_Y,
-        ]
-        self.valueMaps = [
-            self.gmap,
-            self.gmap,
-            self.gmap,
-            self.gmap,
-            self.gmap,
-            self.gmap,
-            self.tmap,
-            self.smap,
-        ]
+        self.channelEvents = channelEvents
         # Default to no reversed inputs
-        self.eventReverseFlag = [False] * len(self.eventList)
-        # self.channelCalibrations = [interp1d([], [])]
+        self.eventReverseFlag = [False] * len(self.channelEvents)
 
         self.logger.info(f"Found {self.name}")
 
         events = tuple(
-            map(lambda event: event + (0, self.eventMaxValue, 0, 0), self.eventList)
+            map(lambda event: event + (0, self.eventMaxValue, 0, 0), self.channelEvents)
         )
 
         self.virtualDevice = uinput.Device(
@@ -147,22 +143,12 @@ class FutabaUsbDevice:
             vendor=self.usbHandle.idVendor,
         )
         self.logger.info(f"created on usb endpoint {self.usbEndpoint}")
-        self.state = "ready"
 
     def __str__(self):
         return f"{self.name} driver"
 
     def __repr__(self):
-        return self.usbHandle
-
-    def interpolate(self, value, low, high):
-        """Guarantees that the value falls between 0 and 32768 based on a provided hight and low calibration"""
-        if value < low:
-            return 0
-        elif value > high:
-            return 32768
-        else:
-            return int(((value - low) / (high - low)) * 32768)
+        return str(self.usbHandle)
 
     def loadConfig(self):
         """Loads the settings for this particular device and falls back
@@ -172,22 +158,19 @@ class FutabaUsbDevice:
             dict: A dictionary containing the driver settings
         """
         logger = self.logger
-        productName = self.productName
+        config = None
+        configFileName = f"{self.productName}.json"
+        configFilePath = os.path.join(utils.getConfigsPath(), configFileName)
         logger.debug("loading config")
-        logger.debug("Setting up path to default config file...")
         defaultFileName = "default.json"
         defaultFilePath = os.path.join(utils.getConfigsPath(), defaultFileName)
         logger.debug("-> Done!")
 
-        config = None
         try:
-            configFileName = f"{productName}.json"
-            configFilePath = os.path.join(utils.getConfigsPath(), configFileName)
-
             logger.debug("Attempting to load config file...")
             with open(configFilePath, "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
-            logger.debug(f"...{configFileName} loaded!")
+            logger.debug(f"-> {configFileName} loaded!")
         except FileNotFoundError:
             logger.debug(f"-> {configFileName} not found, loading default config...")
             with open(defaultFilePath, "r", encoding="utf-8") as cfgFile:
@@ -201,32 +184,29 @@ class FutabaUsbDevice:
         return config
 
     def loadCalibration(self):
-        """Loads the calibration file for this device"""
-        calibration = None
+        """Loads the calibration file"""
         productName = self.productName
+        logger = self.logger
+        channelCalibrations = None
         calibrationFileName = f"{productName}.json"
-        calibrationFilePath = os.path.join(
-            utils.getCalibrationsPath(),
-            calibrationFileName,
-        )
-        defaultFileName = "default.json"
-        defaultFilePath = os.path.join(
-            utils.getCalibrationsPath(),
-            defaultFileName,
-        )
-
+        calibrationFilePath = os.path.join("calibrations", calibrationFileName)
         try:
             with open(calibrationFilePath, "r", encoding="utf-8") as calibFile:
-                calibration = json.load(calibFile)
-        except FileNotFoundError:
+                channelCalibrations = json.load(calibFile)
+        except FileNotFoundError as e:
+            logger.error(e)
+
+            defaultFileName = "default.json"
+            defaultFilePath = os.path.join(
+                utils.getCalibrationsPath(),
+                defaultFileName,
+            )
             with open(defaultFilePath, "r", encoding="utf-8") as calibFile:
-                calibration = json.load(calibFile)
+                channelCalibrations = json.load(calibFile)
         finally:
-            if calibration is None:
-                raise FileNotFoundError(
-                    f"Unable to load {calibrationFileName} or {defaultFileName}"
-                )
-        return calibration
+            pass
+
+        return channelCalibrations
 
     def findEndpoint(self, device):
         """_summary_
@@ -242,9 +222,7 @@ class FutabaUsbDevice:
             : The endpoint object used to capture frames from the physical device
         """
         if not isinstance(device, usb.core.Device):
-            raise ValueError(
-                "The device provided to _findEndpoint is not of type usb.core.Device"
-            )
+            raise ValueError("Expected first param to be of type usb.core.Device")
         for config in device:
             for interface in config:
                 for endpoint in interface:
@@ -266,12 +244,16 @@ class FutabaUsbDevice:
         Returns:
             list: Ordered list of channel data frames
         """
+        channelCalibrations = self.channelCalibrations
+        logger = self.logger
         try:
-            # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
             channelData = [
                 (
-                    self.valueMaps[i // 2](
-                        int.from_bytes(data[i : i + 2], byteorder="little")
+                    np.interp(
+                        # Rempa data based on calibration
+                        int.from_bytes(data[i : i + 2], byteorder="little"),
+                        channelCalibrations[i // 2][0],
+                        channelCalibrations[i // 2][1],
                     )
                 )
                 for i in range(0, len(data), 2)
@@ -279,21 +261,7 @@ class FutabaUsbDevice:
             channelData.reverse()
             return channelData
         except Exception as e:
-            self.logger.debug(e)
-
-    # def _parseDataFrame_DEBUG(self, data):
-    #     _c = [
-    #         int.from_bytes(data[i : i + 2], byteorder="little")
-    #         for i in range(0, len(data), 2)
-    #     ]
-    #     # remap data from (min 704, center 2048, max 3392) -> (min 0, center 16384, max 32768)
-    #     channelData = [
-    #         (int.from_bytes(data[i : i + 2], byteorder="little") - 704) * 256 // 21
-    #         for i in range(0, len(data), 2)
-    #     ]
-    #     self.logger.debug(f"s: {_c[7]}, t: {_c[6]}")
-    #     channelData.reverse()
-    #     return channelData
+            logger.error(e)
 
     def sendDataFrame(self, data):
         """Sends the provided list of data packets to our virutal device
@@ -303,7 +271,7 @@ class FutabaUsbDevice:
             packet from the physical device
         """
         eventMaxVal = self.eventMaxValue
-        eventList = self.eventList
+        channelEvents = self.channelEvents
         reverseFlags = self.eventReverseFlag
         vDevice = self.virtualDevice
         # Queue one event for each channel
@@ -314,27 +282,19 @@ class FutabaUsbDevice:
         ) in enumerate(
             zip(
                 data,
-                eventList,
+                channelEvents,
                 reverseFlags,
             )
         ):
-            # Reverse the input if necessary
-            if reverseFlag:
-                channelData = eventMaxVal - channelData
+            channelData = eventMaxVal - channelData if reverseFlag else channelData
             # queue channel event
             vDevice.emit(event, channelData, syn=False)
-            # self.logger.debug(f"parsed events {channelData}")
         # Synchronize (fire all queued events)
         vDevice.syn()
 
     def start(self):
         """Start the driver"""
         try:
-            if self.state != "ready":
-                raise Exception(
-                    "Attempted to start a FutabaUSBDevice before the driver was in the ready state"
-                )
-
             usbHandle = self.usbHandle
             endpoint = self.usbEndpoint
             frameSize = self.frameSize
@@ -363,30 +323,38 @@ class FutabaUsbDevice:
                     dataFrame = usbHandle.read(
                         endpoint,
                         frameSize,
-                        timeout=1000,  # typically timeouts are caused by the transmitter not being connected to the dongle though an idle transmitter may also cause a timeout
+                        # R/C transmitters/receivers are based on 2.4Ghz spread
+                        # specktrum technology, similar to that used in WiFi.
+                        # Unlike WiFi however, The signal is used for real-time
+                        # communication with a remotely operated vehicle. As such,
+                        # Manufacturers are behooved to minimize latency. They
+                        # do this through a combination of highly effecient
+                        # (usually proprietary) protocols, and (more
+                        # importantly) **by only providing new frames when
+                        # necessary**
+                        #
+                        # Therefore, we don't care about timeouts. The long
+                        # timeout length here is actually meant to be a
+                        # performance OPTIMIZATION. The transmitter will not
+                        # send a new frame if the inputs have not moved -
+                        # REGARDLESS OF THE STATE OF THE DEVICE OR VEHICLE
+                        timeout=1000,
                     )
                     # Parse channel data from HW frame
                     channelData = parseDataFrame(dataFrame)
                     # Send channel data to virtual device
                     sendDataFrame(channelData)
                 except usb.core.USBError as e:
-                    # expectedErrors = [
-                    #     110  # Transmitter not connected to dongle
-                    # ]
-                    #
-                    # if e.errno not in expectedErrors:
-
                     # kaboom?
-                    if e.errno != 110:
+                    if e.errno != 110:  # Transmitter timeout - ignore
                         # Yes Rico, kaboom.
-                        self.state = "critical-usb-error"
                         logger.critical(e)
                         raise e
         except usb.core.USBError as e:
-            if e.errno == 13:  # Access denied - permissions issue
-                self.state = "critical-insufficient-permissions"
+            # Access denied - permissions issue
+            if e.errno == 13:
                 logger.critical("Insufficient permissions to hook USB interface")
-                # self.stdout("Drivers must be run as root")
+                logger.critical("DRIVER MUST BE RUN WITH SUDO!")
                 raise RuntimeError(
                     "Insufficient permissions to hook USB interface"
                 ) from e
