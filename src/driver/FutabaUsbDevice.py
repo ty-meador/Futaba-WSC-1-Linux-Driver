@@ -74,6 +74,7 @@ class FutabaUsbDevice(usb.core.Device):
         config=None,
     ):
         atexit.register(self.stop)
+        self.logger = utils.generateLogger("driver")
 
         if bus is None:
             raise TypeError("You must specify the bus of the device")
@@ -96,14 +97,12 @@ class FutabaUsbDevice(usb.core.Device):
                 uinput.ABS_TILT_X,
                 uinput.ABS_TILT_Y,
             ]
+        if config is None:
+            config = self.loadConfig(productName=productName)
         if channelCalibrations is None:
-            channelCalibrations = self.loadCalibration()
+            channelCalibrations = self.loadCalibration(productName=productName)
 
-        devices = usb.core.find(
-            find_all=True,
-            idVendor=vendorID,
-            idProduct=productID,
-        )
+        devices = usb.core.find(find_all=True)
 
         if devices is None:
             self.stop(1)
@@ -122,7 +121,6 @@ class FutabaUsbDevice(usb.core.Device):
             self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
         self.logName = self.name.replace(" ", "_").strip().upper()
         self.productName = productName
-        self.logger = utils.generateLogger(self.logName)
         self.config = config
         self.channelCalibrations = channelCalibrations
         self.frameSize = self.config["frame_size"]
@@ -150,7 +148,7 @@ class FutabaUsbDevice(usb.core.Device):
     def __repr__(self):
         return str(self.usbHandle)
 
-    def loadConfig(self):
+    def loadConfig(self, productName=None):
         """Loads the settings for this particular device and falls back
         to the default config file if one doesn't exist
 
@@ -159,7 +157,11 @@ class FutabaUsbDevice(usb.core.Device):
         """
         logger = self.logger
         config = None
-        configFileName = f"{self.productName}.json"
+
+        if productName is None:
+            productName = self.productName
+
+        configFileName = f"{productName}.json"
         configFilePath = os.path.join(utils.getConfigsPath(), configFileName)
         logger.debug("loading config")
         defaultFileName = "default.json"
@@ -183,18 +185,24 @@ class FutabaUsbDevice(usb.core.Device):
                 )
         return config
 
-    def loadCalibration(self):
+    def loadCalibration(self, productName=None):
         """Loads the calibration file"""
-        productName = self.productName
+        if productName is None:
+            productName = self.productName
         logger = self.logger
         channelCalibrations = None
         calibrationFileName = f"{productName}.json"
-        calibrationFilePath = os.path.join("calibrations", calibrationFileName)
+        calibrationFilePath = os.path.join(
+            utils.getCalibrationsPath(), calibrationFileName
+        )
+
         try:
             with open(calibrationFilePath, "r", encoding="utf-8") as calibFile:
                 channelCalibrations = json.load(calibFile)
-        except FileNotFoundError as e:
-            logger.error(e)
+        except FileNotFoundError:
+            logger.warning(
+                f"not calibration found for device {productName}, using default calibration"
+            )
 
             defaultFileName = "default.json"
             defaultFilePath = os.path.join(
@@ -235,7 +243,7 @@ class FutabaUsbDevice(usb.core.Device):
                         return endpoint.bEndpointAddress
         raise RuntimeError("No interrupt endpoint found!")
 
-    def parseDataFrame(self, data):
+    def parseDataFrame(self, data, channelCalibrations):
         """Parses the provided data frame into an ordered list of channel data frames
 
         Args:
@@ -244,24 +252,21 @@ class FutabaUsbDevice(usb.core.Device):
         Returns:
             list: Ordered list of channel data frames
         """
-        channelCalibrations = self.channelCalibrations
-        logger = self.logger
-        try:
-            channelData = [
-                (
+        channelData = [
+            (
+                int(
                     np.interp(
-                        # Rempa data based on calibration
-                        int.from_bytes(data[i : i + 2], byteorder="little"),
-                        channelCalibrations[i // 2][0],
-                        channelCalibrations[i // 2][1],
+                        # Interpolate raw data based on calibration
+                        int.from_bytes(data[i : i + 2], byteorder="little"),  # Value
+                        channelCalibrations[i // 2][0],  # input range
+                        channelCalibrations[i // 2][1],  # output range
                     )
                 )
-                for i in range(0, len(data), 2)
-            ]
-            channelData.reverse()
-            return channelData
-        except Exception as e:
-            logger.error(e)
+            )
+            for i in range(0, len(data), 2)
+        ]
+        channelData.reverse()
+        return channelData
 
     def sendDataFrame(self, data):
         """Sends the provided list of data packets to our virutal device
@@ -303,6 +308,7 @@ class FutabaUsbDevice(usb.core.Device):
             logger = self.logger
             stop = self.stop
             name = self.name
+            channelCalibrations = self.channelCalibrations
             if usbHandle.is_kernel_driver_active(0):
                 usbHandle.detach_kernel_driver(0)
 
@@ -341,7 +347,7 @@ class FutabaUsbDevice(usb.core.Device):
                         timeout=1000,
                     )
                     # Parse channel data from HW frame
-                    channelData = parseDataFrame(dataFrame)
+                    channelData = parseDataFrame(dataFrame, channelCalibrations)
                     # Send channel data to virtual device
                     sendDataFrame(channelData)
                 except usb.core.USBError as e:
@@ -373,7 +379,7 @@ class FutabaUsbDevice(usb.core.Device):
             logger.warning(
                 "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
             )
-            logger.error(e)
+            logger.warning(e)
 
         try:
             logger.debug("Reattaching the kernel driver...")
@@ -382,7 +388,7 @@ class FutabaUsbDevice(usb.core.Device):
             logger.warning(
                 "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
             )
-            logger.error(e)
+            logger.warning(e)
 
         try:
             logger.debug("Resetting device...")
@@ -391,7 +397,63 @@ class FutabaUsbDevice(usb.core.Device):
             logger.warning(
                 "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
             )
-            logger.error(e)
+            logger.warning(e)
 
         if exitCode is not None:
             exit(exitCode)
+
+
+class WSC_1(FutabaUsbDevice):
+    """Class for WSC-1 USB adapter"""
+
+    def __init__(
+        self,
+        bus=None,
+        port=None,
+        name=None,
+    ):
+        super().__init__(
+            bus=bus,
+            port=port,
+            name=name,
+            productID=10,
+            productName="WSC-1",
+            channelEvents=[
+                uinput.ABS_X,
+                uinput.ABS_Y,
+                uinput.ABS_RX,
+                uinput.ABS_RY,
+                uinput.ABS_THROTTLE,
+                uinput.ABS_RUDDER,
+                uinput.ABS_TILT_X,
+                uinput.ABS_TILT_Y,
+            ],
+        )
+
+
+class T16IZ(FutabaUsbDevice):
+    "Class for T16IZ USB device"
+
+    def __init__(
+        self,
+        bus=None,
+        port=None,
+        name=None,
+    ):
+        super().__init__(
+            bus=bus,
+            port=port,
+            name=name,
+            productID=11,
+            productName="T16IZ",
+            channelEvents=[
+                uinput.ABS_X,
+                uinput.ABS_Y,
+                uinput.ABS_RX,
+                uinput.ABS_RY,
+                uinput.ABS_THROTTLE,
+                uinput.ABS_RUDDER,
+                uinput.ABS_TILT_X,
+                uinput.ABS_TILT_Y,
+            ],
+        )

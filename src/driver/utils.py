@@ -43,7 +43,7 @@ def getProjectRoot():
 
 
 def generateLogger(
-    name="logs",  # Hack to get name of whatever called us :D
+    name="logs",
     level=logging.INFO,
 ):
     """Generates a logger

@@ -47,8 +47,9 @@ class DriverUI(App):
                 str(device.port_number),
                 "--use-name",
                 device.name,
+                "--device-class",
+                device.product,
             )
-
             device.listOption = Selection(device.name, selectionKey)
             device.enum = {
                 f"{device.name}": selectionKey,

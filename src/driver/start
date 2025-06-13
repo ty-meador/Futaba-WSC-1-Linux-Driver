@@ -5,7 +5,9 @@ import signal
 from argparse import ArgumentParser
 
 import utils
-from FutabaUsbDevice import FutabaUsbDevice
+from FutabaUsbDevice import T16IZ, WSC_1, FutabaUsbDevice
+
+logger = utils.generateLogger("start_script")
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -43,6 +45,13 @@ parser.add_argument(
     help="The name that you want to use for the process - optional",
 )
 
+parser.add_argument(
+    "--device-class",
+    dest="deviceClass",
+    type=str,
+    help="The type of device. ie WSC-1, T16IZ, etc",
+)
+
 args = parser.parse_args()
 
 
@@ -51,25 +60,38 @@ def main():
 
     try:
         utils.configSanityCheck()
-        driver = FutabaUsbDevice(
-            productID=args.productID,
-            vendorID=args.vendorID,
-            bus=args.bus,
-            port=args.port,
-            name=args.name,
-        )
-
-        def stopDriver():
-            driver.stop()
+        driver = None
+        if args.deviceClass.upper() == "WSC-1" or args.productID == 10:
+            driver = WSC_1(
+                bus=args.bus,
+                port=args.port,
+                name=args.name,
+            )
+        elif args.deviceClass.upper() == "T16IZ" or args.productID == 11:
+            driver = T16IZ(
+                bus=args.bus,
+                port=args.port,
+                name=args.name,
+            )
+        else:
+            driver = FutabaUsbDevice(
+                productID=args.productID,
+                vendorID=args.vendorID,
+                bus=args.bus,
+                port=args.port,
+                name=args.name,
+            )
 
         # Set up sigkill listeners so we can exit gracefully
-        signal.signal(signal.SIGINT, stopDriver)
-        signal.signal(signal.SIGTERM, stopDriver)
+        signal.signal(signal.SIGINT, lambda _, __: driver.stop())
+        signal.signal(signal.SIGTERM, lambda _, __: driver.stop())
 
         # Blocks the main thread - That's OK because this should be run as a subprocess anyway
         driver.start()
-    except Exception:
-        stopDriver()
+    except Exception as e:
+        logger.error(e)
+        if driver is not None:
+            driver.stop()
 
 
 if __name__ == "__main__":
