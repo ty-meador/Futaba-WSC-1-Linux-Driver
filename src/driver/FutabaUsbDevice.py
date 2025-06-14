@@ -69,73 +69,36 @@ class FutabaUsbDevice:
 
     """
 
-    def __init__(
-        self,
-        vendorID=None,
-        productID=None,
-        bus=None,
-        port=None,
-        name=None,
-        channelEvents=None,
-        channelCalibrations=None,
-        productName=None,
-        config=None,
-    ):
+    def __init__(self, bus=None, port=None, name=None):
         atexit.register(self.stop)
         self.logger = utils.generateLogger("driver")
 
-        if bus is None:
-            raise TypeError("You must specify the bus of the device")
-        if port is None:
-            raise TypeError("You must specify the port of the device")
-        if vendorID is None:
-            vendorID = FUTABA_VENDOR_ID
-        if productID is None:
-            productID = PRODUCTS["WSC-1"]
-        if productName is None:
-            productName = "UNKNOWN"
-        if channelEvents is None:
-            channelEvents = [
-                uinput.ABS_X,
-                uinput.ABS_Y,
-                uinput.ABS_RX,
-                uinput.ABS_RY,
-                uinput.ABS_THROTTLE,
-                uinput.ABS_RUDDER,
-                uinput.ABS_TILT_X,
-                uinput.ABS_TILT_Y,
-            ]
-        if config is None:
-            config = self.loadConfig(productName=productName)
-        if channelCalibrations is None:
-            channelCalibrations = self.loadCalibration(productName=productName)
-
-        devices = usb.core.find(find_all=True)
-
-        if devices is None:
-            self.stop(1)
+        self.logger.debug("Attempting to instantiate FutabaUsbDevice:")
+        self.logger.debug(f"-> bus={bus}")
+        self.logger.debug(f"-> port={port}")
+        self.logger.debug(f"-> name={name}")
 
         self.usbHandle = None
-        for device in devices:
+        for device in usb.core.find(find_all=True):
             if int(device.bus) == int(bus) and int(device.port_number) == int(port):
                 self.usbHandle = device
 
         if self.usbHandle is None:
             raise RuntimeError("Could not locate the specified device!")
 
-        self.usbEndpoint = self.findEndpoint(self.usbHandle)
+        self.interruptEndpoint = self.findEndpoint(self.usbHandle)
+        self.config = self.loadConfig()
+        self.channelCalibrations = self.loadCalibration()
         self.name = name
         if self.name is None:
-            self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.usbEndpoint})"
-        self.logName = self.name.replace(" ", "_").strip().upper()
-        self.productName = productName
-        self.config = config
-        self.channelCalibrations = channelCalibrations
-        self.channelEvents = channelEvents
+            self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.interruptEndpoint})"
+
+        self.channelEvents = []
+        for evtName in self.config["channel_events"]:
+            self.channelEvents.append(getattr(uinput, evtName))
+
         # Default to no reversed inputs
         self.eventReverseFlag = [False] * len(self.channelEvents)
-
-        self.logger.info(f"Found {self.name}")
 
         events = tuple(
             map(
@@ -149,7 +112,7 @@ class FutabaUsbDevice:
             self.name,
             vendor=self.usbHandle.idVendor,
         )
-        self.logger.info(f"created on usb endpoint {self.usbEndpoint}")
+        self.logger.info(f"created with interrupt endpoint {self.interruptEndpoint}")
 
     def __str__(self):
         return f"{self.name} driver"
@@ -168,25 +131,24 @@ class FutabaUsbDevice:
         config = None
 
         if productName is None:
-            productName = self.productName
+            productName = self.usbHandle.product
 
         configFileName = f"{productName}.json"
         configFilePath = os.path.join(utils.CONFIG_PATH, configFileName)
         logger.debug("loading config")
         defaultFileName = "default.json"
         defaultFilePath = os.path.join(utils.CONFIG_PATH, defaultFileName)
-        logger.debug("-> Done!")
 
         try:
-            logger.debug("Attempting to load config file...")
+            logger.debug("-> Attempting to load config file...")
             with open(configFilePath, "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
-            logger.debug(f"-> {configFileName} loaded!")
+            logger.debug(f"---> {configFileName} loaded!")
         except FileNotFoundError:
-            logger.debug(f"-> {configFileName} not found, loading default config...")
+            logger.debug(f"---> {configFileName} not found, loading default config...")
             with open(defaultFilePath, "r", encoding="utf-8") as cfgFile:
                 config = json.load(cfgFile)
-            logger.debug(f"-> {defaultFileName} loaded!")
+            logger.debug(f"---> {defaultFileName} loaded!")
         finally:
             if config is None:
                 raise FileNotFoundError(
@@ -197,7 +159,7 @@ class FutabaUsbDevice:
     def loadCalibration(self, productName=None):
         """Loads the calibration file"""
         if productName is None:
-            productName = self.productName
+            productName = self.usbHandle.product
         logger = self.logger
         channelCalibrations = None
         calibrationFileName = f"{productName}.json"
@@ -275,42 +237,13 @@ class FutabaUsbDevice:
         channelData.reverse()
         return channelData
 
-    def sendDataFrame(self, data):
-        """Sends the provided list of data packets to our virutal device
-
-        Args:
-            data (list): A list where each index represents a single channel. Each item will be a data
-            packet from the physical device
-        """
-        eventMaxVal = self.config["event_max_value"]
-        channelEvents = self.channelEvents
-        reverseFlags = self.eventReverseFlag
-        vDevice = self.virtualDevice
-        # Queue one event for each channel
-        for _, (
-            channelData,
-            event,
-            reverseFlag,
-        ) in enumerate(
-            zip(
-                data,
-                channelEvents,
-                reverseFlags,
-            )
-        ):
-            channelData = eventMaxVal - channelData if reverseFlag else channelData
-            # queue channel event
-            vDevice.emit(event, channelData, syn=False)
-        # Synchronize (fire all queued events)
-        vDevice.syn()
-
     def start(self):
         """Start the driver"""
         try:
             channelCalibrations = self.channelCalibrations
             channelEvents = self.channelEvents
             emit = self.virtualDevice.emit
-            endpoint = self.usbEndpoint
+            endpoint = self.interruptEndpoint
             eventMaxVal = self.config["event_max_value"]
             frameSize = self.config["frame_size"]
             fromBytes = int.from_bytes
@@ -328,27 +261,35 @@ class FutabaUsbDevice:
 
             logger.info(f"Driver started: {endpoint} -> {name}")
 
+            # R/C transmitters/receivers are based on 2.4Ghz spread
+            # specktrum technology, similar to that used in WiFi.
+            # Unlike WiFi however, The signal is used for real-time
+            # communication with a remotely operated vehicle. As such,
+            # Manufacturers are behooved to minimize latency. They
+            # do this through a combination of highly effecient
+            # (usually proprietary) protocols, and (more
+            # importantly) **by only providing new frames when
+            # necessary**
+            #
+            # Therefore, we don't care about timeouts. The long
+            # timeout length here is actually meant to be a
+            # performance OPTIMIZATION. The transmitter will not
+            # send a new frame if the inputs have not moved -
+            # REGARDLESS OF THE STATE OF THE DEVICE
             while True:
-                # R/C transmitters/receivers are based on 2.4Ghz spread
-                # specktrum technology, similar to that used in WiFi.
-                # Unlike WiFi however, The signal is used for real-time
-                # communication with a remotely operated vehicle. As such,
-                # Manufacturers are behooved to minimize latency. They
-                # do this through a combination of highly effecient
-                # (usually proprietary) protocols, and (more
-                # importantly) **by only providing new frames when
-                # necessary**
-                #
-                # Therefore, we don't care about timeouts. The long
-                # timeout length here is actually meant to be a
-                # performance OPTIMIZATION. The transmitter will not
-                # send a new frame if the inputs have not moved -
-                # REGARDLESS OF THE STATE OF THE DEVICE
-                rawData = usbHandle.read(
-                    endpoint,
-                    frameSize,
-                    timeout=999999999999999,
-                )
+                try:
+                    rawData = usbHandle.read(
+                        endpoint,
+                        frameSize,
+                        timeout=100,
+                    )
+                except usb.core.USBError as e:
+                    # kaboom?
+                    if e.errno != 110:
+                        # Yes Rico, kaboom.
+                        logger.critical(e)
+                        raise e
+                    # Transmitter timeout - ignore
 
                 channelsData = [
                     (
@@ -426,59 +367,3 @@ class FutabaUsbDevice:
 
         if exitCode is not None:
             exit(exitCode)
-
-
-class WSC_1(FutabaUsbDevice):
-    """Class for WSC-1 USB adapter"""
-
-    def __init__(
-        self,
-        bus=None,
-        port=None,
-        name=None,
-    ):
-        super().__init__(
-            bus=bus,
-            port=port,
-            name=name,
-            productID=10,
-            productName="WSC-1",
-            channelEvents=[
-                uinput.ABS_X,
-                uinput.ABS_Y,
-                uinput.ABS_RX,
-                uinput.ABS_RY,
-                uinput.ABS_THROTTLE,
-                uinput.ABS_RUDDER,
-                uinput.ABS_TILT_X,
-                uinput.ABS_TILT_Y,
-            ],
-        )
-
-
-class T16IZ(FutabaUsbDevice):
-    "Class for T16IZ USB device"
-
-    def __init__(
-        self,
-        bus=None,
-        port=None,
-        name=None,
-    ):
-        super().__init__(
-            bus=bus,
-            port=port,
-            name=name,
-            productID=11,
-            productName="T16IZ",
-            channelEvents=[
-                uinput.ABS_X,
-                uinput.ABS_Y,
-                uinput.ABS_RX,
-                uinput.ABS_RY,
-                uinput.ABS_THROTTLE,
-                uinput.ABS_RUDDER,
-                uinput.ABS_TILT_X,
-                uinput.ABS_TILT_Y,
-            ],
-        )

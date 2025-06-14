@@ -24,8 +24,8 @@ class DriverUI(App):
 
     def __init__(self):
         super().__init__()
-        self.futabaDevices = []
         atexit.register(self.stopAllDrivers)
+        self.futabaDevices = []
         self.logger = utils.generateLogger()
         self.startCmds = []
         self.selectionENUM = {}

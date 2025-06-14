@@ -5,7 +5,7 @@ import signal
 from argparse import ArgumentParser
 
 import utils
-from FutabaUsbDevice import PRODUCTS, T16IZ, WSC_1, FutabaUsbDevice
+from FutabaUsbDevice import FutabaUsbDevice
 
 logger = utils.generateLogger("start_script")
 
@@ -57,42 +57,36 @@ args = parser.parse_args()
 
 def main():
     """Creates the driver, sets up signal kill listeners and starts the driver"""
-    if args.deviceClass is None and args.productID is None:
-        raise RuntimeError(
-            "You must provide either a --device-class flag or a --product-id flag!"
-        )
 
     try:
         utils.configSanityCheck()
         driver = None
-        if args.deviceClass.upper() == "WSC-1" or args.productID == PRODUCTS["WSC-1"]:
-            driver = WSC_1(
-                bus=args.bus,
-                port=args.port,
-                name=args.name,
-            )
-        elif args.deviceClass.upper() == "T16IZ" or args.productID == PRODUCTS["T16IZ"]:
-            driver = T16IZ(
-                bus=args.bus,
-                port=args.port,
-                name=args.name,
-            )
-        else:
-            logger.warning(
-                f"There is no device class for product >{args.deviceClass.upper()}<"
-            )
-            if args.productID is None:
-                raise RuntimeError(
-                    f"productID was not provided and >{args.deviceClass.upper()}< does not yet have a class defined"
-                )
+        # if args.deviceClass.upper() == "WSC-1" or args.productID == PRODUCTS["WSC-1"]:
+        #     driver = WSC_1(
+        #         bus=args.bus,
+        #         port=args.port,
+        #         name=args.name,
+        #     )
+        # elif args.deviceClass.upper() == "T16IZ" or args.productID == PRODUCTS["T16IZ"]:
+        #     driver = T16IZ(
+        #         bus=args.bus,
+        #         port=args.port,
+        #         name=args.name,
+        #     )
+        # else:
+        #     logger.warning(
+        #         f"There is no device class for product >{args.deviceClass.upper()}<"
+        #     )
+        #     if args.productID is None:
+        #         raise RuntimeError(
+        #             f"productID was not provided and >{args.deviceClass.upper()}< does not yet have a class defined"
+        #         )
 
-            driver = FutabaUsbDevice(
-                productID=args.productID,
-                vendorID=args.vendorID,
-                bus=args.bus,
-                port=args.port,
-                name=args.name,
-            )
+        driver = FutabaUsbDevice(
+            bus=args.bus,
+            port=args.port,
+            name=args.name,
+        )
 
         # Set up sigkill listeners so we can exit gracefully
         signal.signal(signal.SIGINT, lambda _, __: driver.stop())
