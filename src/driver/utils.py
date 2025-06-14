@@ -12,19 +12,6 @@ HANDLER = handlers.RotatingFileHandler(
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
 )
-# current_file_path = os.path.abspath(__file__)
-
-
-def getConfigsPath():
-    """Gets the abs path to the config files directory"""
-    return os.path.abspath(os.path.join(getProjectRoot(), "src", "driver", "configs"))
-
-
-def getCalibrationsPath():
-    """Gets the abs path to the calibration files directory"""
-    return os.path.abspath(
-        os.path.join(getProjectRoot(), "src", "driver", "calibrations")
-    )
 
 
 def getProjectRoot():
@@ -33,6 +20,7 @@ def getProjectRoot():
     from a file within the project, and that there's a 'pyproject.toml'
     file at the project root.
     """
+
     # Start from THIS file's directory
     currentFile = Path(__file__).resolve()  # Using resolve to get an absolute path.
     # Go up directories until we find 'pyproject.toml'
@@ -42,9 +30,15 @@ def getProjectRoot():
     raise FileNotFoundError("Project root (with .pylintrc) not found.")
 
 
+# current_file_path = os.path.abspath(__file__)
+ROOT_DIR = os.path.abspath(getProjectRoot() / "src")
+CONFIG_PATH = os.path.join(ROOT_DIR, "driver", "configs")
+CALIBRATION_PATH = os.path.join(ROOT_DIR, "driver", "calibrations")
+
+
 def generateLogger(
     name="logs",
-    level=logging.INFO,
+    level=logging.DEBUG,
 ):
     """Generates a logger
 
@@ -69,16 +63,15 @@ def generateLogger(
 
 def configSanityCheck():
     """Ensures that the default config file exists with default values"""
-    configsPath = getConfigsPath()
     logger = generateLogger()
     # Ensure default config file exists
-    if not os.path.exists(os.path.join(configsPath, "default.json")):
+    if not os.path.exists(os.path.join(CONFIG_PATH, "default.json")):
         logger.warning("default_config.json does not exist")
         generateDefaultConfigFile()
     else:  # Is the default file sane?
         try:
             with open(
-                os.path.join(configsPath, "default.json"), "r", encoding="utf-8"
+                os.path.join(CONFIG_PATH, "default.json"), "r", encoding="utf-8"
             ) as cfgFile:
                 json.load(cfgFile)
         except Exception:
@@ -94,8 +87,7 @@ def generateDefaultConfigFile(forceRegenerate=False):
         forceRegenerate (bool, optional): If true the existing configuration file will be deleted and a new one will be created using default values. Defaults to False.
     """
     logger = generateLogger()
-    configsPath = getConfigsPath()
-    fileName = os.path.join(configsPath, "default.json")
+    fileName = os.path.join(CONFIG_PATH, "default.json")
     backupFileName = f"{fileName}.{time.time()}.BACKUP"
 
     logger.info("Attempting to generate the default config file...")

@@ -9,11 +9,19 @@ import uinput
 import usb
 import utils
 
+PRODUCTS = {
+    "default": 999,
+    "WSC-1": 10,
+    "T16IZ": 11,
+    10: "WSC-1",
+    11: "T16IZ",
+    999: "default",
+}
+
 FUTABA_VENDOR_ID = 4101
-WSC_1_PRODUCT_ID = 10
 
 
-class FutabaUsbDevice(usb.core.Device):
+class FutabaUsbDevice:
     """
     Example:
             # What a Futaba device looks like in LSPCI
@@ -83,9 +91,9 @@ class FutabaUsbDevice(usb.core.Device):
         if vendorID is None:
             vendorID = FUTABA_VENDOR_ID
         if productID is None:
-            productID = WSC_1_PRODUCT_ID
+            productID = PRODUCTS["WSC-1"]
         if productName is None:
-            productName = "WSC-1"
+            productName = "UNKNOWN"
         if channelEvents is None:
             channelEvents = [
                 uinput.ABS_X,
@@ -123,8 +131,6 @@ class FutabaUsbDevice(usb.core.Device):
         self.productName = productName
         self.config = config
         self.channelCalibrations = channelCalibrations
-        self.frameSize = self.config["frame_size"]
-        self.eventMaxValue = self.config["event_max_value"]
         self.channelEvents = channelEvents
         # Default to no reversed inputs
         self.eventReverseFlag = [False] * len(self.channelEvents)
@@ -132,7 +138,10 @@ class FutabaUsbDevice(usb.core.Device):
         self.logger.info(f"Found {self.name}")
 
         events = tuple(
-            map(lambda event: event + (0, self.eventMaxValue, 0, 0), self.channelEvents)
+            map(
+                lambda event: event + (0, self.config["event_max_value"], 0, 0),
+                self.channelEvents,
+            )
         )
 
         self.virtualDevice = uinput.Device(
@@ -162,10 +171,10 @@ class FutabaUsbDevice(usb.core.Device):
             productName = self.productName
 
         configFileName = f"{productName}.json"
-        configFilePath = os.path.join(utils.getConfigsPath(), configFileName)
+        configFilePath = os.path.join(utils.CONFIG_PATH, configFileName)
         logger.debug("loading config")
         defaultFileName = "default.json"
-        defaultFilePath = os.path.join(utils.getConfigsPath(), defaultFileName)
+        defaultFilePath = os.path.join(utils.CONFIG_PATH, defaultFileName)
         logger.debug("-> Done!")
 
         try:
@@ -192,9 +201,7 @@ class FutabaUsbDevice(usb.core.Device):
         logger = self.logger
         channelCalibrations = None
         calibrationFileName = f"{productName}.json"
-        calibrationFilePath = os.path.join(
-            utils.getCalibrationsPath(), calibrationFileName
-        )
+        calibrationFilePath = os.path.join(utils.CALIBRATION_PATH, calibrationFileName)
 
         try:
             with open(calibrationFilePath, "r", encoding="utf-8") as calibFile:
@@ -206,7 +213,7 @@ class FutabaUsbDevice(usb.core.Device):
 
             defaultFileName = "default.json"
             defaultFilePath = os.path.join(
-                utils.getCalibrationsPath(),
+                utils.CALIBRATION_PATH,
                 defaultFileName,
             )
             with open(defaultFilePath, "r", encoding="utf-8") as calibFile:
@@ -275,7 +282,7 @@ class FutabaUsbDevice(usb.core.Device):
             data (list): A list where each index represents a single channel. Each item will be a data
             packet from the physical device
         """
-        eventMaxVal = self.eventMaxValue
+        eventMaxVal = self.config["event_max_value"]
         channelEvents = self.channelEvents
         reverseFlags = self.eventReverseFlag
         vDevice = self.virtualDevice
@@ -300,62 +307,80 @@ class FutabaUsbDevice(usb.core.Device):
     def start(self):
         """Start the driver"""
         try:
-            usbHandle = self.usbHandle
-            endpoint = self.usbEndpoint
-            frameSize = self.frameSize
-            parseDataFrame = self.parseDataFrame
-            sendDataFrame = self.sendDataFrame
-            logger = self.logger
-            stop = self.stop
-            name = self.name
             channelCalibrations = self.channelCalibrations
+            channelEvents = self.channelEvents
+            emit = self.virtualDevice.emit
+            endpoint = self.usbEndpoint
+            eventMaxVal = self.config["event_max_value"]
+            frameSize = self.config["frame_size"]
+            fromBytes = int.from_bytes
+            interp = np.interp
+            logger = self.logger
+            name = self.name
+            reverseFlags = self.eventReverseFlag
+            stop = self.stop
+            synchronize = self.virtualDevice.syn
+            usbHandle = self.usbHandle
+
             if usbHandle.is_kernel_driver_active(0):
                 usbHandle.detach_kernel_driver(0)
-
-            # self.logger.debug("-> Using default configuration...")
             usbHandle.set_configuration()
-
-            if endpoint is None:
-                logger.critical(
-                    f"Unable to find usb endpoint using the handle >{usbHandle}<"
-                )
-                stop(1)
 
             logger.info(f"Driver started: {endpoint} -> {name}")
 
             while True:
-                try:
-                    # read frame from HW device
-                    dataFrame = usbHandle.read(
-                        endpoint,
-                        frameSize,
-                        # R/C transmitters/receivers are based on 2.4Ghz spread
-                        # specktrum technology, similar to that used in WiFi.
-                        # Unlike WiFi however, The signal is used for real-time
-                        # communication with a remotely operated vehicle. As such,
-                        # Manufacturers are behooved to minimize latency. They
-                        # do this through a combination of highly effecient
-                        # (usually proprietary) protocols, and (more
-                        # importantly) **by only providing new frames when
-                        # necessary**
-                        #
-                        # Therefore, we don't care about timeouts. The long
-                        # timeout length here is actually meant to be a
-                        # performance OPTIMIZATION. The transmitter will not
-                        # send a new frame if the inputs have not moved -
-                        # REGARDLESS OF THE STATE OF THE DEVICE OR VEHICLE
-                        timeout=1000,
+                # R/C transmitters/receivers are based on 2.4Ghz spread
+                # specktrum technology, similar to that used in WiFi.
+                # Unlike WiFi however, The signal is used for real-time
+                # communication with a remotely operated vehicle. As such,
+                # Manufacturers are behooved to minimize latency. They
+                # do this through a combination of highly effecient
+                # (usually proprietary) protocols, and (more
+                # importantly) **by only providing new frames when
+                # necessary**
+                #
+                # Therefore, we don't care about timeouts. The long
+                # timeout length here is actually meant to be a
+                # performance OPTIMIZATION. The transmitter will not
+                # send a new frame if the inputs have not moved -
+                # REGARDLESS OF THE STATE OF THE DEVICE
+                rawData = usbHandle.read(
+                    endpoint,
+                    frameSize,
+                    timeout=999999999999999,
+                )
+
+                channelsData = [
+                    (
+                        int(
+                            interp(
+                                # Interpolate raw data based on calibration
+                                fromBytes(
+                                    rawData[i : i + 2], byteorder="little"
+                                ),  # Value
+                                channelCalibrations[i // 2][0],  # input range
+                                channelCalibrations[i // 2][1],  # output range
+                            )
+                        )
                     )
-                    # Parse channel data from HW frame
-                    channelData = parseDataFrame(dataFrame, channelCalibrations)
-                    # Send channel data to virtual device
-                    sendDataFrame(channelData)
-                except usb.core.USBError as e:
-                    # kaboom?
-                    if e.errno != 110:  # Transmitter timeout - ignore
-                        # Yes Rico, kaboom.
-                        logger.critical(e)
-                        raise e
+                    for i in range(0, len(rawData), 2)
+                ]
+                channelsData.reverse()
+
+                # Queue one event for each channel
+                for channelData, channelEvent, reverseFlag in zip(
+                    channelsData, channelEvents, reverseFlags
+                ):
+                    if reverseFlag:
+                        channelData = eventMaxVal - channelData
+                    # queue channel event
+                    emit(
+                        channelEvent,
+                        channelData,
+                        syn=False,
+                    )
+                # Synchronize (fire all queued events)
+                synchronize()
         except usb.core.USBError as e:
             # Access denied - permissions issue
             if e.errno == 13:

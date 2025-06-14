@@ -12,7 +12,7 @@ from textual.events import Mount
 from textual.widgets import Footer, Header, Pretty, SelectionList
 from textual.widgets.selection_list import Selection
 
-from driver import utils
+import driver.utils as utils
 
 driverCmds = []
 
@@ -78,12 +78,11 @@ class DriverUI(App):
         Returns:
             _type_: _description_
         """
-        devices = futabaDevices
-        if devices is None:
-            devices = self.futabaDevices
+        if futabaDevices is None:
+            futabaDevices = self.futabaDevices
         return filter(
             lambda device: hasattr(device, "subproc") and device.subproc is not None,
-            devices,
+            futabaDevices,
         )
 
     def on_mount(self):  # noqa: C0103

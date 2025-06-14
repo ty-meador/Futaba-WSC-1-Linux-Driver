@@ -1,10 +1,4 @@
 {
     "frame_size": 16,
-    "event_max_value": 32768,
-    "products": {
-        "0xa": "WSC-1",
-        "WSC-1": "0xa",
-        "0xb": "T16IZ",
-        "T16IZ": "0xb"
-    }
+    "event_max_value": 32768
 }
