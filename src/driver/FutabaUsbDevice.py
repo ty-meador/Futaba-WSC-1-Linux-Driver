@@ -72,11 +72,7 @@ class FutabaUsbDevice:
     def __init__(self, bus=None, port=None, name=None):
         atexit.register(self.stop)
         self.logger = utils.generateLogger("driver")
-
         self.logger.debug("Attempting to instantiate FutabaUsbDevice:")
-        self.logger.debug(f"-> bus={bus}")
-        self.logger.debug(f"-> port={port}")
-        self.logger.debug(f"-> name={name}")
 
         self.usbHandle = None
         for device in usb.core.find(find_all=True):
@@ -98,7 +94,7 @@ class FutabaUsbDevice:
             self.channelEvents.append(getattr(uinput, evtName))
 
         # Default to no reversed inputs
-        self.eventReverseFlag = [False] * len(self.channelEvents)
+        self.eventReverseFlags = [False] * len(self.channelEvents)
 
         events = tuple(
             map(
@@ -112,7 +108,17 @@ class FutabaUsbDevice:
             self.name,
             vendor=self.usbHandle.idVendor,
         )
-        self.logger.info(f"created with interrupt endpoint {self.interruptEndpoint}")
+
+        self.logger.debug("Virtual driver started:")
+        self.logger.debug(f"-> bus={bus}")
+        self.logger.debug(f"-> channelCalibrations: {self.channelCalibrations}")
+        self.logger.debug(f"-> channelEvents: {self.channelEvents}")
+        self.logger.debug(f"-> config: {self.config}")
+        self.logger.debug(f"-> interruptEndpoint: {self.interruptEndpoint}")
+        self.logger.debug(f"-> name: {self.name}")
+        self.logger.debug(f"-> port={port}")
+        self.logger.debug(f"-> reverseFlags: {self.eventReverseFlags}")
+        self.logger.debug(f"-> virtualDevice: {self.virtualDevice}")
 
     def __str__(self):
         return f"{self.name} driver"
@@ -212,31 +218,6 @@ class FutabaUsbDevice:
                         return endpoint.bEndpointAddress
         raise RuntimeError("No interrupt endpoint found!")
 
-    def parseDataFrame(self, data, channelCalibrations):
-        """Parses the provided data frame into an ordered list of channel data frames
-
-        Args:
-            data (dataFrame): A data frame from the physical device
-
-        Returns:
-            list: Ordered list of channel data frames
-        """
-        channelData = [
-            (
-                int(
-                    np.interp(
-                        # Interpolate raw data based on calibration
-                        int.from_bytes(data[i : i + 2], byteorder="little"),  # Value
-                        channelCalibrations[i // 2][0],  # input range
-                        channelCalibrations[i // 2][1],  # output range
-                    )
-                )
-            )
-            for i in range(0, len(data), 2)
-        ]
-        channelData.reverse()
-        return channelData
-
     def start(self):
         """Start the driver"""
         try:
@@ -250,7 +231,7 @@ class FutabaUsbDevice:
             interp = np.interp
             logger = self.logger
             name = self.name
-            reverseFlags = self.eventReverseFlag
+            reverseFlags = self.eventReverseFlags
             stop = self.stop
             synchronize = self.virtualDevice.syn
             usbHandle = self.usbHandle
@@ -283,6 +264,38 @@ class FutabaUsbDevice:
                         frameSize,
                         timeout=100,
                     )
+
+                    channelsData = [
+                        (
+                            int(
+                                interp(
+                                    # Interpolate raw data based on calibration
+                                    fromBytes(
+                                        rawData[i : i + 2], byteorder="little"
+                                    ),  # Value
+                                    channelCalibrations[i // 2][0],  # input range
+                                    channelCalibrations[i // 2][1],  # output range
+                                )
+                            )
+                        )
+                        for i in range(0, len(rawData), 2)
+                    ]
+                    channelsData.reverse()
+
+                    # Queue one event for each channel
+                    for channelData, channelEvent, reverseFlag in zip(
+                        channelsData, channelEvents, reverseFlags
+                    ):
+                        if reverseFlag:
+                            channelData = eventMaxVal - channelData
+                        # queue channel event
+                        emit(
+                            channelEvent,
+                            channelData,
+                            syn=False,
+                        )
+                    # Synchronize (fire all queued events)
+                    synchronize()
                 except usb.core.USBError as e:
                     # kaboom?
                     if e.errno != 110:
@@ -290,38 +303,6 @@ class FutabaUsbDevice:
                         logger.critical(e)
                         raise e
                     # Transmitter timeout - ignore
-
-                channelsData = [
-                    (
-                        int(
-                            interp(
-                                # Interpolate raw data based on calibration
-                                fromBytes(
-                                    rawData[i : i + 2], byteorder="little"
-                                ),  # Value
-                                channelCalibrations[i // 2][0],  # input range
-                                channelCalibrations[i // 2][1],  # output range
-                            )
-                        )
-                    )
-                    for i in range(0, len(rawData), 2)
-                ]
-                channelsData.reverse()
-
-                # Queue one event for each channel
-                for channelData, channelEvent, reverseFlag in zip(
-                    channelsData, channelEvents, reverseFlags
-                ):
-                    if reverseFlag:
-                        channelData = eventMaxVal - channelData
-                    # queue channel event
-                    emit(
-                        channelEvent,
-                        channelData,
-                        syn=False,
-                    )
-                # Synchronize (fire all queued events)
-                synchronize()
         except usb.core.USBError as e:
             # Access denied - permissions issue
             if e.errno == 13:

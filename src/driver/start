@@ -25,13 +25,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--vendor-id",
-    dest="vendorID",
-    type=str,
-    help="(optional) Specify the vendor id of the Futaba USB device you want to start a driver for",
-)
-
-parser.add_argument(
     "--product-id",
     dest="productID",
     type=str,
@@ -45,13 +38,6 @@ parser.add_argument(
     help="The name that you want to use for the process - optional",
 )
 
-parser.add_argument(
-    "--device-class",
-    dest="deviceClass",
-    type=str,
-    help="The type of device. ie WSC-1, T16IZ, etc",
-)
-
 args = parser.parse_args()
 
 
@@ -60,28 +46,6 @@ def main():
 
     try:
         utils.configSanityCheck()
-        driver = None
-        # if args.deviceClass.upper() == "WSC-1" or args.productID == PRODUCTS["WSC-1"]:
-        #     driver = WSC_1(
-        #         bus=args.bus,
-        #         port=args.port,
-        #         name=args.name,
-        #     )
-        # elif args.deviceClass.upper() == "T16IZ" or args.productID == PRODUCTS["T16IZ"]:
-        #     driver = T16IZ(
-        #         bus=args.bus,
-        #         port=args.port,
-        #         name=args.name,
-        #     )
-        # else:
-        #     logger.warning(
-        #         f"There is no device class for product >{args.deviceClass.upper()}<"
-        #     )
-        #     if args.productID is None:
-        #         raise RuntimeError(
-        #             f"productID was not provided and >{args.deviceClass.upper()}< does not yet have a class defined"
-        #         )
-
         driver = FutabaUsbDevice(
             bus=args.bus,
             port=args.port,
