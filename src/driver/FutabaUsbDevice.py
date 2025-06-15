@@ -71,7 +71,7 @@ class FutabaUsbDevice:
 
     def __init__(self, bus=None, port=None, name=None):
         atexit.register(self.stop)
-        self.logger = utils.generateLogger("driver")
+        self.logger = utils.getLogger("driver")
         self.logger.debug("Attempting to instantiate FutabaUsbDevice:")
 
         self.usbHandle = None

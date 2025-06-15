@@ -7,9 +7,10 @@ from argparse import ArgumentParser
 import utils
 from FutabaUsbDevice import FutabaUsbDevice
 
-logger = utils.generateLogger("start_script")
+logger = utils.getLogger("start_script")
 
 parser = ArgumentParser()
+
 parser.add_argument(
     "--bus",
     dest="bus",
@@ -46,11 +47,7 @@ def main():
 
     try:
         utils.configSanityCheck()
-        driver = FutabaUsbDevice(
-            bus=args.bus,
-            port=args.port,
-            name=args.name,
-        )
+        driver = FutabaUsbDevice(bus=args.bus, port=args.port, name=args.name)
 
         # Set up sigkill listeners so we can exit gracefully
         signal.signal(signal.SIGINT, lambda _, __: driver.stop())

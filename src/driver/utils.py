@@ -13,6 +13,32 @@ HANDLER = handlers.RotatingFileHandler(
     backupCount=5,
 )
 
+DEFAULT_CALIBRATION = [
+    [[600, 2050, 3500], [0, 16384, 32768]],
+    [[610, 1931, 3251], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+]
+
+DEFAULT_CONFIG = {
+    "frame_size": 16,
+    "event_max_value": 32768,
+    "channel_events": [
+        "ABS_X",
+        "ABS_Y",
+        "ABS_RX",
+        "ABS_RY",
+        "ABS_THROTTLE",
+        "ABS_RUDDER",
+        "ABS_TILT_X",
+        "ABS_TILT_Y",
+    ],
+}
+
 
 def getProjectRoot():
     """
@@ -30,13 +56,12 @@ def getProjectRoot():
     raise FileNotFoundError("Project root (with .pylintrc) not found.")
 
 
-# current_file_path = os.path.abspath(__file__)
 ROOT_DIR = os.path.abspath(getProjectRoot() / "src")
 CONFIG_PATH = os.path.join(ROOT_DIR, "driver", "configs")
 CALIBRATION_PATH = os.path.join(ROOT_DIR, "driver", "calibrations")
 
 
-def generateLogger(
+def getLogger(
     name="logs",
     level=logging.DEBUG,
 ):
@@ -61,9 +86,13 @@ def generateLogger(
     return logger
 
 
+def calibrationSanityCheck():
+    """Ensures that the default calibraion file exists with default values"""
+
+
 def configSanityCheck():
     """Ensures that the default config file exists with default values"""
-    logger = generateLogger()
+    logger = getLogger()
     # Ensure default config file exists
     if not os.path.exists(os.path.join(CONFIG_PATH, "default.json")):
         logger.warning("default_config.json does not exist")
@@ -86,7 +115,7 @@ def generateDefaultConfigFile(forceRegenerate=False):
     Args:
         forceRegenerate (bool, optional): If true the existing configuration file will be deleted and a new one will be created using default values. Defaults to False.
     """
-    logger = generateLogger()
+    logger = getLogger()
     fileName = os.path.join(CONFIG_PATH, "default.json")
     backupFileName = f"{fileName}.{time.time()}.BACKUP"
 
@@ -103,9 +132,5 @@ def generateDefaultConfigFile(forceRegenerate=False):
         else:  # file exists, not force regenerating - do nothing
             return
 
-    # A dict with a 1:1 representation of the JSON file that will be generated...
-    defaultConfig = {"frame_size": 16, "event_max_value": 32768}
-
-    # ...told ya
     with open(fileName, "w+", encoding="utf-8") as cfgFile:
-        cfgFile.write(json.dumps(defaultConfig, indent=4))
+        cfgFile.write(json.dumps(DEFAULT_CONFIG, indent=4))
