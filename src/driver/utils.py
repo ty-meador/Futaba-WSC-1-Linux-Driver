@@ -1,9 +1,7 @@
 """Utility functions for the project"""
 
-import json
 import logging
 import os
-import time
 from logging import handlers
 from pathlib import Path
 
@@ -12,32 +10,6 @@ HANDLER = handlers.RotatingFileHandler(
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
 )
-
-DEFAULT_CALIBRATION = [
-    [[600, 2050, 3500], [0, 16384, 32768]],
-    [[610, 1931, 3251], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-]
-
-DEFAULT_CONFIG = {
-    "frame_size": 16,
-    "event_max_value": 32768,
-    "channel_events": [
-        "ABS_X",
-        "ABS_Y",
-        "ABS_RX",
-        "ABS_RY",
-        "ABS_THROTTLE",
-        "ABS_RUDDER",
-        "ABS_TILT_X",
-        "ABS_TILT_Y",
-    ],
-}
 
 
 def getProjectRoot():
@@ -84,53 +56,3 @@ def getLogger(
     logger.setLevel(level)
     logger.addHandler(handler)
     return logger
-
-
-def calibrationSanityCheck():
-    """Ensures that the default calibraion file exists with default values"""
-
-
-def configSanityCheck():
-    """Ensures that the default config file exists with default values"""
-    logger = getLogger()
-    # Ensure default config file exists
-    if not os.path.exists(os.path.join(CONFIG_PATH, "default.json")):
-        logger.warning("default_config.json does not exist")
-        generateDefaultConfigFile()
-    else:  # Is the default file sane?
-        try:
-            with open(
-                os.path.join(CONFIG_PATH, "default.json"), "r", encoding="utf-8"
-            ) as cfgFile:
-                json.load(cfgFile)
-        except Exception:
-            logger.error("Unable to parse configs/default.json. Regenerating it...")
-            # Delete the existing default config and regenerate it
-            generateDefaultConfigFile(forceRegenerate=True)
-
-
-def generateDefaultConfigFile(forceRegenerate=False):
-    """Regenerates the default config file
-
-    Args:
-        forceRegenerate (bool, optional): If true the existing configuration file will be deleted and a new one will be created using default values. Defaults to False.
-    """
-    logger = getLogger()
-    fileName = os.path.join(CONFIG_PATH, "default.json")
-    backupFileName = f"{fileName}.{time.time()}.BACKUP"
-
-    logger.info("Attempting to generate the default config file...")
-    if os.path.exists(fileName):
-        logger.warning("Default config file already exists...")
-        # Force regenerate will delete the existing file and generate a
-        # new one from scratch
-        if forceRegenerate is True:
-            os.rename(fileName, backupFileName)
-            logger.warning(
-                f"-> Force regnerating default config file: your config file was backed up to {backupFileName}"
-            )
-        else:  # file exists, not force regenerating - do nothing
-            return
-
-    with open(fileName, "w+", encoding="utf-8") as cfgFile:
-        cfgFile.write(json.dumps(DEFAULT_CONFIG, indent=4))

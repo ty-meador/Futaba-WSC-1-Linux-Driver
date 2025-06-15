@@ -45,8 +45,12 @@ args = parser.parse_args()
 def main():
     """Creates the driver, sets up signal kill listeners and starts the driver"""
 
+    ##
+    # - Create the drvier
+    # - create sigkill listeners to we can exit gracefully when requested
+    # - start the driver (blocks indefinitely)
+    ##
     try:
-        utils.configSanityCheck()
         driver = FutabaUsbDevice(bus=args.bus, port=args.port, name=args.name)
 
         # Set up sigkill listeners so we can exit gracefully

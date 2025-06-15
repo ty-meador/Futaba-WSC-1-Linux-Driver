@@ -18,6 +18,32 @@ PRODUCTS = {
     999: "default",
 }
 
+
+DEFAULT_CALIBRATION = [
+    [[600, 2050, 3500], [0, 16384, 32768]],
+    [[610, 1931, 3251], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+]
+
+DEFAULT_CONFIG = {
+    "frame_size": 16,
+    "event_max_value": 32768,
+    "channel_events": [
+        "ABS_X",
+        "ABS_Y",
+        "ABS_RX",
+        "ABS_RY",
+        "ABS_THROTTLE",
+        "ABS_RUDDER",
+        "ABS_TILT_X",
+        "ABS_TILT_Y",
+    ],
+}
 FUTABA_VENDOR_ID = 4101
 
 
@@ -157,9 +183,10 @@ class FutabaUsbDevice:
             logger.debug(f"---> {defaultFileName} loaded!")
         finally:
             if config is None:
-                raise FileNotFoundError(
-                    f"Unable to load {configFileName} or {defaultFileName}!"
+                logger.debug(
+                    f"Unable to load {configFileName} or {defaultFileName}, using hard-coded defaults"
                 )
+                config = DEFAULT_CONFIG
         return config
 
     def loadCalibration(self, productName=None):
@@ -180,14 +207,12 @@ class FutabaUsbDevice:
             )
 
             defaultFileName = "default.json"
-            defaultFilePath = os.path.join(
-                utils.CALIBRATION_PATH,
-                defaultFileName,
-            )
+            defaultFilePath = os.path.join(utils.CALIBRATION_PATH, defaultFileName)
             with open(defaultFilePath, "r", encoding="utf-8") as calibFile:
                 channelCalibrations = json.load(calibFile)
         finally:
-            pass
+            if channelCalibrations is None:
+                channelCalibrations = DEFAULT_CALIBRATION
 
         return channelCalibrations
 
