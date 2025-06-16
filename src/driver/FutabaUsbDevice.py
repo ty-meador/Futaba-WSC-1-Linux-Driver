@@ -18,18 +18,6 @@ PRODUCTS = {
     999: "default",
 }
 
-
-DEFAULT_CALIBRATION = [
-    [[600, 2050, 3500], [0, 16384, 32768]],
-    [[610, 1931, 3251], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-]
-
 DEFAULT_CONFIG = {
     "frame_size": 16,
     "event_max_value": 32768,
@@ -44,6 +32,18 @@ DEFAULT_CONFIG = {
         "ABS_TILT_Y",
     ],
 }
+
+DEFAULT_CALIBRATION = [
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 2048, 3392], [0, 16384, 32768]],
+]
+
 FUTABA_VENDOR_ID = 4101
 
 
@@ -165,56 +165,59 @@ class FutabaUsbDevice:
         if productName is None:
             productName = self.usbHandle.product
 
-        configFileName = f"{productName}.json"
-        configFilePath = os.path.join(utils.CONFIG_PATH, configFileName)
-        logger.debug("loading config")
-        defaultFileName = "default.json"
-        defaultFilePath = os.path.join(utils.CONFIG_PATH, defaultFileName)
+        filePath = os.path.join(utils.CONFIG_PATH, f"{productName}.json")
+        defaultPath = os.path.join(utils.CONFIG_PATH, "default.json")
 
-        try:
-            logger.debug("-> Attempting to load config file...")
-            with open(configFilePath, "r", encoding="utf-8") as cfgFile:
-                config = json.load(cfgFile)
-            logger.debug(f"---> {configFileName} loaded!")
-        except FileNotFoundError:
-            logger.debug(f"---> {configFileName} not found, loading default config...")
-            with open(defaultFilePath, "r", encoding="utf-8") as cfgFile:
-                config = json.load(cfgFile)
-            logger.debug(f"---> {defaultFileName} loaded!")
-        finally:
-            if config is None:
-                logger.debug(
-                    f"Unable to load {configFileName} or {defaultFileName}, using hard-coded defaults"
-                )
-                config = DEFAULT_CONFIG
+        logger.debug(f"loading {filePath}")
+        config = self.loadJsonFile(filePath)
+
+        if config is None:
+            logger.debug(f"device config not found, loading {defaultPath}")
+            config = self.loadJsonFile(defaultPath)
+        if config is None:
+            logger.debug("using hard-coded defaults")
+            config = DEFAULT_CONFIG
+
+        logger.debug(f"config={config}")
         return config
 
     def loadCalibration(self, productName=None):
         """Loads the calibration file"""
+        logger = self.logger
         if productName is None:
             productName = self.usbHandle.product
+
+        filePath = os.path.join(utils.CALIBRATION_PATH, f"{productName}.json")
+        defaultPath = os.path.join(utils.CALIBRATION_PATH, "default.json")
+
+        logger.debug(f"loading {filePath}")
+        channelCalibrations = self.loadJsonFile(filePath)
+
+        if channelCalibrations is None:
+            logger.debug(f"loading{defaultPath}")
+            channelCalibrations = self.loadJsonFile(defaultPath)
+        if channelCalibrations is None:
+            logger.debug("using hard-coded defaults")
+            channelCalibrations = DEFAULT_CALIBRATION
+
+        logger.debug(f"channelCalibrations={channelCalibrations}")
+        return channelCalibrations
+
+    def loadJsonFile(self, filePath):
+        """Attempts to load the given file and falls back to the fallback file"""
         logger = self.logger
-        channelCalibrations = None
-        calibrationFileName = f"{productName}.json"
-        calibrationFilePath = os.path.join(utils.CALIBRATION_PATH, calibrationFileName)
+        parsedJson = None
 
         try:
-            with open(calibrationFilePath, "r", encoding="utf-8") as calibFile:
-                channelCalibrations = json.load(calibFile)
+            logger.debug(f"> Looking for {filePath}")
+            with open(filePath, "r", encoding="utf-8") as jsonFile:
+                parsedJson = json.load(jsonFile)
+            logger.debug("--> loaded!")
         except FileNotFoundError:
-            logger.warning(
-                f"not calibration found for device {productName}, using default calibration"
-            )
+            # parsedJson defaults to None
+            logger.debug("--> not found, returning >None<")
 
-            defaultFileName = "default.json"
-            defaultFilePath = os.path.join(utils.CALIBRATION_PATH, defaultFileName)
-            with open(defaultFilePath, "r", encoding="utf-8") as calibFile:
-                channelCalibrations = json.load(calibFile)
-        finally:
-            if channelCalibrations is None:
-                channelCalibrations = DEFAULT_CALIBRATION
-
-        return channelCalibrations
+        return parsedJson
 
     def findEndpoint(self, device):
         """_summary_
