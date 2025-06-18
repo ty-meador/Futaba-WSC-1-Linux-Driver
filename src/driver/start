@@ -60,9 +60,9 @@ def main():
         # Blocks the main thread - That's OK because this should be run as a subprocess anyway
         driver.start()
     except Exception as e:
-        logger.error(e)
         if driver is not None:
             driver.stop()
+        raise e
 
 
 if __name__ == "__main__":

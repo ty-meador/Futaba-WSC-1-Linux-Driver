@@ -35,7 +35,7 @@ CALIBRATION_PATH = os.path.join(ROOT_DIR, "driver", "calibrations")
 
 def getLogger(
     name="logs",
-    level=logging.DEBUG,
+    level=logging.warning,
 ):
     """Generates a logger
 

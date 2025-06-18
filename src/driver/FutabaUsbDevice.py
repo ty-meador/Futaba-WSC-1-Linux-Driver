@@ -1,5 +1,6 @@
 """Class representing a single Futaba USB adapater"""
 
+import array
 import atexit
 import json
 import os
@@ -34,14 +35,14 @@ DEFAULT_CONFIG = {
 }
 
 DEFAULT_CALIBRATION = [
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
-    [[704, 2048, 3392], [0, 16384, 32768]],
+    [[704, 3392], [0, 32768]],
+    [[704, 3392], [0, 32768]],
+    [[704, 3392], [0, 32768]],
+    [[704, 3392], [0, 32768]],
+    [[704, 3392], [0, 32768]],
+    [[704, 3392], [0, 32768]],
+    [[704, 3392], [0, 32768]],
+    [[704, 3392], [0, 32768]],
 ]
 
 FUTABA_VENDOR_ID = 4101
@@ -97,9 +98,9 @@ class FutabaUsbDevice:
 
     def __init__(self, bus=None, port=None, name=None):
         atexit.register(self.stop)
+        self.runFlag = False
         self.logger = utils.getLogger("driver")
-        self.logger.debug("Attempting to instantiate FutabaUsbDevice:")
-
+        self.logger.debug("Attempting to instantiate FutabaUsbDevice")
         self.usbHandle = None
         for device in usb.core.find(find_all=True):
             if int(device.bus) == int(bus) and int(device.port_number) == int(port):
@@ -108,9 +109,15 @@ class FutabaUsbDevice:
         if self.usbHandle is None:
             raise RuntimeError("Could not locate the specified device!")
 
+        self.logger.debug("Attempting to find interrupt endpoint")
         self.interruptEndpoint = self.findEndpoint(self.usbHandle)
+        self.logger.debug("Attempting to load device configuration")
         self.config = self.loadConfig()
-        self.channelCalibrations = self.loadCalibration()
+        self.logger.debug("Attempting to load device calibration")
+        self.calibratedChannelMaps = self.generateCalibrationMaps(
+            self.loadCalibration()
+        )
+
         self.name = name
         if self.name is None:
             self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.interruptEndpoint})"
@@ -137,7 +144,6 @@ class FutabaUsbDevice:
 
         self.logger.debug("Virtual driver started:")
         self.logger.debug(f"-> bus={bus}")
-        self.logger.debug(f"-> channelCalibrations: {self.channelCalibrations}")
         self.logger.debug(f"-> channelEvents: {self.channelEvents}")
         self.logger.debug(f"-> config: {self.config}")
         self.logger.debug(f"-> interruptEndpoint: {self.interruptEndpoint}")
@@ -182,7 +188,14 @@ class FutabaUsbDevice:
         return config
 
     def loadCalibration(self, productName=None):
-        """Loads the calibration file"""
+        """Loads the calibration file for the given product
+
+        Args:
+            productName (str, optional): The name of the product to load the calibration for. Defaults to None.
+
+        Returns:
+            list of list: Each inner list will contain exactly 2 items, each of which are lists.
+        """
         logger = self.logger
         if productName is None:
             productName = self.usbHandle.product
@@ -204,7 +217,14 @@ class FutabaUsbDevice:
         return channelCalibrations
 
     def loadJsonFile(self, filePath):
-        """Attempts to load the given file and falls back to the fallback file"""
+        """Generic function to load a JSON file into a dictionary
+
+        Args:
+            filePath (str): The path to the json file you want to load
+
+        Returns:
+            dict: The parsed json
+        """
         logger = self.logger
         parsedJson = None
 
@@ -246,133 +266,218 @@ class FutabaUsbDevice:
                         return endpoint.bEndpointAddress
         raise RuntimeError("No interrupt endpoint found!")
 
+    def generateCalibrationMaps(self, channelCalibrations):
+        """Use the channelCalibrations to generate a calibrated map for each channel
+
+        Args:
+            channelCalibrations (Array of Array): The first will contain exactly 2 values, the start and end of the spectrum of possible input values. The second will contain exactly 2 values, the start and end of the spectrum of possible output values. Defaults to self.channelCalibrations
+
+        Returns:
+            Array of Array of Array: The calibrated channel maps
+        """
+
+        calibratedChannels = []
+        for channelCalibration in channelCalibrations:
+            inputRange = channelCalibration[0]
+            outputRange = channelCalibration[1]
+            calibratedChannels.append(self.calculateValueMap(inputRange, outputRange))
+        return calibratedChannels
+
+    def calculateValueMap(
+        self,
+        # These values appear to work well for at least the WSC-1 and T16IZ
+        # making them the safest known values so far
+        inputRange=None,
+        outputRange=None,
+    ):
+        """Generate a list of values that maps the input range to the output range
+
+        Args:
+            inputRange (list, optional): This determines the size of the map. Defaults to [600, 3500].
+            outputRange (list, optional): This determines what values are generated in the map. Defaults to [0, 32768].
+
+        Returns:
+            list: A list of all possible output values given the range of input values
+        """
+        if not hasattr(inputRange, "__len__") or len(inputRange) != 2:
+            self.logger.error(
+                "inputRange must be an array of length 2, using defaults instead"
+            )
+            inputRange = [600, 3500]
+        if not hasattr(outputRange, "__len__") or len(outputRange) != 2:
+            self.logger.error(
+                "outputRange must be an array of length 2, using defaults instead"
+            )
+            outputRange = [0, 32768]
+
+        if not isinstance(inputRange[0], int):
+            raise TypeError(
+                f"Expected inputRange[0] to be of type int, found {type(inputRange[0])}"
+            )
+        if not isinstance(inputRange[1], int):
+            raise TypeError(
+                f"Expected inputRange[1] to be of type int, found {type(inputRange[1])}"
+            )
+        if not isinstance(outputRange[0], int):
+            raise TypeError(
+                f"Expected outputRange[0] to be of type int, found {type(outputRange[0])}"
+            )
+        if not isinstance(outputRange[1], int):
+            raise TypeError(
+                f"Expected outputRange[1] to be of type int, found {type(inputRange[1])}"
+            )
+
+        # Guarantee that we are working with ints
+        inputRange[0] = int(inputRange[0])
+        inputRange[1] = int(inputRange[1])
+        outputRange[0] = int(outputRange[0])
+        outputRange[1] = int(outputRange[1])
+
+        lowerInput = inputRange[0]
+        upperInput = inputRange[1]
+        lowerOutput = outputRange[0]
+
+        # Create a value map such that the index of the array represents
+        # the input value, and the contents at that index is the output
+        inputValues = np.array([lowerOutput] * upperInput, int)
+        for i in range(lowerInput, upperInput):
+            inputValues[i] = i
+        return array.array(
+            "I",
+            np.round(
+                np.interp(
+                    inputValues,
+                    inputRange,
+                    outputRange,
+                ),
+                0,
+            ).astype(int),
+        )
+        # return np.round(np.interp(inputValues, inputRange, outputRange), 0).astype(int)
+
+    def eventLoop(self):
+        """The main event loop of the driver - INDEFINITELY BLOCKING OPERATION"""
+        # Define variables before loop so we don't waste time creating
+        # a new variable each iteration and the interpreter doesn't have
+        # to evaluate dots, dict subscripts etc etc
+        self.runFlag = True
+        calibration = None
+        calibrationMaps = self.calibratedChannelMaps
+        channel = None
+        channelEvents = self.channelEvents
+        emit = self.virtualDevice.emit
+        endpoint = self.interruptEndpoint
+        eventMaxVal = self.config["event_max_value"]
+        frameSize = self.config["frame_size"]
+        fromBytes = int.from_bytes
+        logger = self.logger
+        maxInputVal = None
+        rawData = None
+        readDevice = self.usbHandle.read
+        reverseFlags = self.eventReverseFlags
+        synchronize = self.virtualDevice.syn
+
+        while self.runFlag:
+            try:
+                # - The transmitter may not send a new frame if the inputs remain static
+                # - No reason to care about timeouts
+                # - - Long timeout length = less timeouts
+                # - - Less timeouts = fewer exceptions caught
+                # - - Fewer exceptions caught = less overhead
+                rawData = readDevice(
+                    endpoint,
+                    frameSize,
+                    timeout=1000,
+                )
+
+                channelData = []
+                for i in range(0, len(rawData), 2):
+                    channel = i // 2
+                    calibration = calibrationMaps[channel]
+
+                    rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
+
+                    # Avoid overflows and underflows
+                    maxInputVal = len(calibration) - 1
+                    if rawValue > maxInputVal:
+                        rawValue = maxInputVal
+                    elif rawValue < 0:
+                        rawValue = 0
+                    # Extract calibrated value from map
+                    channelData.append(calibration[rawValue])
+                channelData.reverse()
+
+                for data, event, reverseFlag in zip(  # Queue one event for each channel
+                    channelData, channelEvents, reverseFlags
+                ):
+                    if reverseFlag:
+                        data = eventMaxVal - data
+                    emit(event, data, syn=False)
+
+                synchronize()  # fire all queued events
+            except usb.core.USBError as e:
+                # kaboom?
+                if e.errno != 110:
+                    # Yes Rico, kaboom.
+                    logger.critical(e)
+                    raise e
+
     def start(self):
         """Start the driver"""
+
+        endpoint = self.interruptEndpoint
+
+        logger = self.logger
+        name = self.name
+
+        usbHandle = self.usbHandle
+        if usbHandle.is_kernel_driver_active(0):
+            usbHandle.detach_kernel_driver(0)
+        usbHandle.set_configuration()
+
+        logger.info(f"Driver started: {endpoint} -> {name}")
         try:
-            channelCalibrations = self.channelCalibrations
-            channelEvents = self.channelEvents
-            emit = self.virtualDevice.emit
-            endpoint = self.interruptEndpoint
-            eventMaxVal = self.config["event_max_value"]
-            frameSize = self.config["frame_size"]
-            fromBytes = int.from_bytes
-            interp = np.interp
-            logger = self.logger
-            name = self.name
-            reverseFlags = self.eventReverseFlags
-            stop = self.stop
-            synchronize = self.virtualDevice.syn
-            usbHandle = self.usbHandle
+            self.eventLoop()  # Block indefinitely
 
-            if usbHandle.is_kernel_driver_active(0):
-                usbHandle.detach_kernel_driver(0)
-            usbHandle.set_configuration()
-
-            logger.info(f"Driver started: {endpoint} -> {name}")
-
-            # R/C transmitters/receivers are based on 2.4Ghz spread
-            # specktrum technology, similar to that used in WiFi.
-            # Unlike WiFi however, The signal is used for real-time
-            # communication with a remotely operated vehicle. As such,
-            # Manufacturers are behooved to minimize latency. They
-            # do this through a combination of highly effecient
-            # (usually proprietary) protocols, and (more
-            # importantly) **by only providing new frames when
-            # necessary**
-            #
-            # Therefore, we don't care about timeouts. The long
-            # timeout length here is actually meant to be a
-            # performance OPTIMIZATION. The transmitter will not
-            # send a new frame if the inputs have not moved -
-            # REGARDLESS OF THE STATE OF THE DEVICE
-            while True:
-                try:
-                    rawData = usbHandle.read(
-                        endpoint,
-                        frameSize,
-                        timeout=100,
-                    )
-
-                    channelsData = [
-                        (
-                            int(
-                                interp(
-                                    # Interpolate raw data based on calibration
-                                    fromBytes(
-                                        rawData[i : i + 2], byteorder="little"
-                                    ),  # Value
-                                    channelCalibrations[i // 2][0],  # input range
-                                    channelCalibrations[i // 2][1],  # output range
-                                )
-                            )
-                        )
-                        for i in range(0, len(rawData), 2)
-                    ]
-                    channelsData.reverse()
-
-                    # Queue one event for each channel
-                    for channelData, channelEvent, reverseFlag in zip(
-                        channelsData, channelEvents, reverseFlags
-                    ):
-                        if reverseFlag:
-                            channelData = eventMaxVal - channelData
-                        # queue channel event
-                        emit(
-                            channelEvent,
-                            channelData,
-                            syn=False,
-                        )
-                    # Synchronize (fire all queued events)
-                    synchronize()
-                except usb.core.USBError as e:
-                    # kaboom?
-                    if e.errno != 110:
-                        # Yes Rico, kaboom.
-                        logger.critical(e)
-                        raise e
-                    # Transmitter timeout - ignore
-        except usb.core.USBError as e:
-            # Access denied - permissions issue
-            if e.errno == 13:
-                logger.critical("Insufficient permissions to hook USB interface")
-                logger.critical("DRIVER MUST BE RUN WITH SUDO!")
-                raise RuntimeError(
-                    "Insufficient permissions to hook USB interface"
-                ) from e
+        except usb.core.USBError:
+            pass
         finally:
-            stop()
+            self.stop()
 
     def stop(self, exitCode=None):
-        """Stop the driver"""
-        logger = self.logger
-        usbHandle = self.usbHandle
+        """Stop the driver if it is running
+
+        Args:
+            exitCode (int, optional): If provided the driver will exit with this code. Defaults to None.
+        """
+        self.runFlag = False
 
         try:
-            logger.debug("Releasing the USB interface...")
-            usb.util.release_interface(usbHandle, 0)
+            self.logger.debug("Releasing the USB interface...")
+            usb.util.release_interface(self.usbHandle, 0)
         except Exception as e:
-            logger.warning(
+            self.logger.warning(
                 "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
             )
-            logger.warning(e)
+            self.logger.warning(e)
 
         try:
-            logger.debug("Reattaching the kernel driver...")
-            usbHandle.attach_kernel_driver(0)
+            self.logger.debug("Reattaching the kernel driver...")
+            self.usbHandle.attach_kernel_driver(0)
         except Exception as e:
-            logger.warning(
+            self.logger.warning(
                 "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
             )
-            logger.warning(e)
+            self.logger.warning(e)
 
         try:
-            logger.debug("Resetting device...")
-            usbHandle.reset()
+            self.logger.debug("Resetting device...")
+            self.usbHandle.reset()
         except Exception as e:
-            logger.warning(
+            self.logger.warning(
                 "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
             )
-            logger.warning(e)
+            self.logger.warning(e)
 
         if exitCode is not None:
             exit(exitCode)
