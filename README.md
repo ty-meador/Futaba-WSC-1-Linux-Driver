@@ -28,7 +28,7 @@ sudo pip3 install -r requirements.txt
 # Make sure you are in the projects folder
 cd /path/to/futaba-usb-rc-linux-driver
 # Start the UI
-sudo start.sh 
+sudo ./start.sh 
 ```
 
 - This will start a text-based UI
