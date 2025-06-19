@@ -78,11 +78,35 @@ class FutabaDeviceManager:
             return "RUNNING"
         return "IDLE"
 
+    def start(self, deviceIndex):
+        """Start the devices at the given indexes
+
+        Args:
+            deviceIndexes (list of int, optional): The devices you want to start. Defaults to [].
+        """
+        if isinstance(deviceIndex, int):
+            self._startDriver(self.futabaDevices[deviceIndex])
+        elif hasattr("__iter__", deviceIndex):
+            for idx in deviceIndex:
+                self._startDriver(self.futabaDevices[idx])
+
+    def stop(self, deviceIndex):
+        """Stop the devices at the given indexes
+
+        Args:
+            deviceIndexes (list of int, optional): The devices you want to stop. Defaults to [].
+        """
+        if isinstance(deviceIndex, int):
+            self._stopDriver(self.futabaDevices[deviceIndex])
+        elif hasattr("__iter__", deviceIndex):
+            for idx in deviceIndex:
+                self._stopDriver(self.futabaDevices[idx])
+
     def __init__(self):
         atexit.register(self._stopAllDrivers)
         self.logger = utils.getLogger(self.__class__)
         self.startCmds = []
-        self.futabaDevices = tuple(
+        self.futabaDevices = [
             map(
                 self._initializeCoreDevice,
                 [
@@ -91,7 +115,7 @@ class FutabaDeviceManager:
                     if device.manufacturer.lower() == "futaba"
                 ],
             )
-        )
+        ]
         if len(self.futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
 
@@ -230,35 +254,33 @@ class Driver:
     def __init__(self, bus=None, port=None, name=None):
         atexit.register(self.stop)
         self.runFlag = False
-        self.logger = utils.getLogger("driver")
         self.usbHandle = None
         for device in usb.core.find(find_all=True):
             if int(device.bus) == int(bus) and int(device.port_number) == int(port):
                 self.usbHandle = device
+                break
 
         if self.usbHandle is None:
             raise RuntimeError("Could not locate the specified device!")
 
+        self.name = name
+        if self.name is None:
+            self.name = f"{self.usbHandle.product}({bus},{port})"
+        self.logger = utils.getLogger(f"{self.name} -= INITIALIZING =-")
         self.logger.debug("Attempting to find interrupt endpoint")
         self.interruptEndpoint = self.findEndpoint(self.usbHandle)
         self.logger.debug("Attempting to load device configuration")
         self.config = self.loadConfig()
         self.logger.debug("Attempting to load device calibration")
-        self.calibratedChannelMaps = self.generateCalibrationMaps(
-            self.loadCalibration()
+        self.calibration = self.loadCalibration()
+        # Each channel will have an array that maps the devices raw value to a calibrated value
+        self.channelMaps = self.generateChannelMaps(self.calibration)
+        self.channelEvents = tuple(
+            getattr(uinput, evtName) for evtName in self.config["channel_events"]
         )
 
-        self.name = name
-        if self.name is None:
-            self.name = f"{self.usbHandle.manufacturer}-{self.usbHandle.product}({self.interruptEndpoint})"
-
-        self.channelEvents = []
-        for evtName in self.config["channel_events"]:
-            self.channelEvents.append(getattr(uinput, evtName))
-
         # Default to no reversed inputs
-        self.eventReverseFlags = [False] * len(self.channelEvents)
-
+        self.reverseFlags = [False] * len(self.channelEvents)
         events = tuple(
             map(
                 lambda event: event + (0, self.config["event_max_value"], 0, 0),
@@ -272,14 +294,15 @@ class Driver:
             vendor=self.usbHandle.idVendor,
         )
 
-        self.logger.debug("Virtual driver started:")
+        self.logger = utils.getLogger(f"{self.name} -= IDLE =-")
+        self.logger.debug("Userspace driver ready:")
         self.logger.debug(f"-> bus={bus}")
         self.logger.debug(f"-> channelEvents: {self.channelEvents}")
         self.logger.debug(f"-> config: {self.config}")
         self.logger.debug(f"-> interruptEndpoint: {self.interruptEndpoint}")
         self.logger.debug(f"-> name: {self.name}")
         self.logger.debug(f"-> port={port}")
-        self.logger.debug(f"-> reverseFlags: {self.eventReverseFlags}")
+        self.logger.debug(f"-> reverseFlags: {self.reverseFlags}")
         self.logger.debug(f"-> virtualDevice: {self.virtualDevice}")
 
     def __str__(self):
@@ -396,7 +419,7 @@ class Driver:
                         return endpoint.bEndpointAddress
         raise RuntimeError("No interrupt endpoint found!")
 
-    def generateCalibrationMaps(self, channelCalibrations):
+    def generateChannelMaps(self, channelCalibrations):
         """Use the channelCalibrations to generate a calibrated map for each channel
 
         Args:
@@ -413,13 +436,7 @@ class Driver:
             calibratedChannels.append(self.calculateValueMap(inputRange, outputRange))
         return calibratedChannels
 
-    def calculateValueMap(
-        self,
-        # These values appear to work well for at least the WSC-1 and T16IZ
-        # making them the safest known values so far
-        inputRange=None,
-        outputRange=None,
-    ):
+    def calculateValueMap(self, inputRange=None, outputRange=None):
         """Generate a list of values that maps the input range to the output range
 
         Args:
@@ -491,8 +508,9 @@ class Driver:
         # a new variable each iteration and the interpreter doesn't have
         # to evaluate dots, dict subscripts etc etc
         self.runFlag = True
+        logger = utils.getLogger(f"{self.name} -= RUNNING =-")
         calibration = None
-        calibrationMaps = self.calibratedChannelMaps
+        calibrationMaps = self.channelMaps
         channel = None
         channelEvents = self.channelEvents
         emit = self.virtualDevice.emit
@@ -504,7 +522,7 @@ class Driver:
         maxInputVal = None
         rawData = None
         readDevice = self.usbHandle.read
-        reverseFlags = self.eventReverseFlags
+        reverseFlags = self.reverseFlags
         synchronize = self.virtualDevice.syn
 
         while self.runFlag:
@@ -531,7 +549,7 @@ class Driver:
                     maxInputVal = len(calibration) - 1
                     if rawValue > maxInputVal:
                         rawValue = maxInputVal
-                    elif rawValue < 0:
+                    elif rawValue < 0:  # TO-DO USE THE ACTUAL MIN OUTPUT VALUE
                         rawValue = 0
                     # Extract calibrated value from map
                     channelData.append(calibration[rawValue])
@@ -556,9 +574,8 @@ class Driver:
         """Start the driver"""
 
         endpoint = self.interruptEndpoint
-
-        logger = self.logger
         name = self.name
+        logger = utils.getLogger(f"{self.name} -= STARTING =-")
 
         usbHandle = self.usbHandle
         if usbHandle.is_kernel_driver_active(0):
@@ -581,33 +598,34 @@ class Driver:
             exitCode (int, optional): If provided the driver will exit with this code. Defaults to None.
         """
         self.runFlag = False
+        logger = utils.getLogger(f"{self.name} -= STOPPING =-")
 
         try:
-            self.logger.debug("Releasing the USB interface...")
+            logger.debug("Releasing the USB interface...")
             usb.util.release_interface(self.usbHandle, 0)
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
             )
-            self.logger.warning(e)
+            logger.warning(e)
 
         try:
-            self.logger.debug("Reattaching the kernel driver...")
+            logger.debug("Reattaching the kernel driver...")
             self.usbHandle.attach_kernel_driver(0)
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
             )
-            self.logger.warning(e)
+            logger.warning(e)
 
         try:
-            self.logger.debug("Resetting device...")
+            logger.debug("Resetting device...")
             self.usbHandle.reset()
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
             )
-            self.logger.warning(e)
+            logger.warning(e)
 
         if exitCode is not None:
             exit(exitCode)
