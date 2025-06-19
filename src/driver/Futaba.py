@@ -4,20 +4,13 @@ import array
 import atexit
 import json
 import os
+import subprocess
 
 import numpy as np
 import uinput
 import usb
-import utils
 
-PRODUCTS = {
-    "default": 999,
-    "WSC-1": 10,
-    "T16IZ": 11,
-    10: "WSC-1",
-    11: "T16IZ",
-    999: "default",
-}
+from driver import utils
 
 DEFAULT_CONFIG = {
     "frame_size": 16,
@@ -34,6 +27,10 @@ DEFAULT_CONFIG = {
     ],
 }
 
+##
+# Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
+# for this great starting point!
+##
 DEFAULT_CALIBRATION = [
     [[704, 3392], [0, 32768]],
     [[704, 3392], [0, 32768]],
@@ -47,60 +44,193 @@ DEFAULT_CALIBRATION = [
 
 FUTABA_VENDOR_ID = 4101
 
+PRODUCTS = {
+    "default": 999,
+    "WSC-1": 10,
+    "T16IZ": 11,
+    10: "WSC-1",
+    11: "T16IZ",
+    999: "default",
+}
 
-class FutabaUsbDevice:
-    """
-    Example:
-            # What a Futaba device looks like in LSPCI
-            DEVICE ID 1008:000a on Bus 001 Address 002 =================
-                bLength                :   0x12 (18 bytes)
-                bDescriptorType        :    0x1 Device
-                bcdUSB                 :  0x200 USB 2.0
-                bDeviceClass           :    0x0 Specified at interface
-                bDeviceSubClass        :    0x0
-                bDeviceProtocol        :    0x0
-                bMaxPacketSize0        :   0x40 (64 bytes)
-                idVendor               : 0x1008
-                idProduct              : 0x000a
-                bcdDevice              :  0x200 Device 2.0
-                iManufacturer          :    0x1 Futaba
-                iProduct               :    0x2 WSC-1
-                iSerialNumber          :    0x3 000000000
-                bNumConfigurations     :    0x1
-                    CONFIGURATION 1: 500 mA ==================================
-                    bLength              :    0x9 (9 bytes)
-                    bDescriptorType      :    0x2 Configuration
-                    wTotalLength         :   0x22 (34 bytes)
-                    bNumInterfaces       :    0x1
-                    bConfigurationValue  :    0x1
-                    iConfiguration       :    0x0
-                    bmAttributes         :   0x80 Bus Powered
-                    bMaxPower            :   0xfa (500 mA)
-                        INTERFACE 0: Human Interface Device ====================
-                        bLength            :    0x9 (9 bytes)
-                        bDescriptorType    :    0x4 Interface
-                        bInterfaceNumber   :    0x0
-                        bAlternateSetting  :    0x0
-                        bNumEndpoints      :    0x1
-                        bInterfaceClass    :    0x3 Human Interface Device
-                        bInterfaceSubClass :    0x0
-                        bInterfaceProtocol :    0x0
-                        iInterface         :    0x0
-                            ENDPOINT 0x87: Interrupt IN ==========================
-                            bLength          :    0x7 (7 bytes)
-                            bDescriptorType  :    0x5 Endpoint
-                            bEndpointAddress :   0x87 IN
-                            bmAttributes     :    0x3 Interrupt
-                            wMaxPacketSize   :   0x40 (64 bytes)
-                            bInterval        :    0x1
 
-    """
+class FutabaDeviceManager:
+    """Provides a class-based interface for starting and stopping Futaba USB device drivers"""
+
+    def getDeviceList(self):
+        """Returns an ordered list of devices
+
+        Returns:
+            tuple of string: Ordered list of available devices
+        """
+        return tuple(map(lambda device: device.name, self.futabaDevices))
+
+    def getDeviceStatus(self, deviceIndex):
+        """Get the status of the device at the given index
+
+        Args:
+            deviceIndex (int): The device that you want the status of
+
+        Returns:
+            string: "RUNNING" or "IDLE"
+        """
+        if self._deviceIsRunning(self.futabaDevices[deviceIndex]):
+            return "RUNNING"
+        return "IDLE"
+
+    def __init__(self):
+        atexit.register(self._stopAllDrivers)
+        self.logger = utils.getLogger(self.__class__)
+        self.startCmds = []
+        self.futabaDevices = tuple(
+            map(
+                self._initializeCoreDevice,
+                [
+                    device
+                    for device in usb.core.find(find_all=True)
+                    if device.manufacturer.lower() == "futaba"
+                ],
+            )
+        )
+        if len(self.futabaDevices) == 0:
+            raise Exception("No Futaba USB device detected!")
+
+    @staticmethod
+    def _initializeCoreDevice(device):
+        """Appends the properties required for this driver to the provided device
+
+        Args:
+            device (usb.core.Device): The device to modify
+
+        Returns:
+            usb.core.Device: The modified device
+        """
+        device.name = f"{device.manufacturer} {device.product} (bus-{device.bus}, port-{device.port_number})"
+        device.subproc = None
+        device.startCmd = (
+            "python3",
+            "driver/start",
+            "--bus",
+            str(device.bus),
+            "--port",
+            str(device.port_number),
+            "--use-name",
+            device.name,
+        )
+        return device
+
+    @staticmethod
+    def _deviceIsRunning(futabaDevice):
+        """Function to determine if a given device is actively running
+
+        Args:
+            futabaDevice (core.usb.Device): The device to check
+
+        Returns:
+            bool: True if the device has a subprocess
+        """
+        return (
+            hasattr(futabaDevice, "subproc")  # Has device been initialized?
+            and futabaDevice.subproc is not None  # Is there a subproc attached to it?
+            and futabaDevice.poll() is None  # Is the subproc alive?
+        )
+
+    def _getIdleDevices(self, futabaDevices=None):
+        """Gets a list of devices that are not running
+
+        Args:
+            futabaDevices (array of usb.core.Device, optional): The devices to filter. Defaults to self.futabaDevices.
+
+        Returns:
+            list of usb.core.Device: Filtered list containing only devices that are not actively running
+        """
+        if futabaDevices is None:
+            futabaDevices = self.futabaDevices
+        return filter(not self._deviceIsRunning, futabaDevices)
+
+    def _getRunningDevices(self, futabaDevices=None):
+        """Returns a list of running futaba devices
+
+        Args:
+            futabaDevices (list of usb.core.Device, optional): List of devices to filter. Defaults to all found devices.
+
+        Returns:
+            _type_: _description_
+        """
+        if futabaDevices is None:
+            futabaDevices = self.futabaDevices
+        return filter(self._deviceIsRunning, futabaDevices)
+
+    def _startDriver(self, futabaDevice):
+        """start a single device"""
+        return subprocess.Popen(
+            futabaDevice.startCmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    def _startDrivers(self, futabaDevices):
+        """Starts all Futaba devices provided
+
+        Args:
+            futabaDevices (list of usb.core.Device): A list of Futaba USB device handles
+
+        Returns:
+            list of subprocess: A list of subprocesses each of which is responsable for
+            a single device driver
+        """
+        return [self._startDriver(device) for device in futabaDevices]
+
+    def _startAllDrivers(self):
+        """Starts a driver for all found futaba devices"""
+        return self._startDrivers(self.futabaDevices)
+
+    def _stopDriver(self, futabaDevice):
+        """Stops a single device driver
+
+        Args:
+            futabaDevice (usb.core.Device): a futaba device
+        """
+        if self._deviceIsRunning(futabaDevice):
+            # Ask nicely
+            try:
+                futabaDevice.subproc.terminate()
+                futabaDevice.subproc.wait(timeout=5)
+                futabaDevice.subproc = None
+            except Exception as e:
+                self.logger.error(e)
+
+        if self._deviceIsRunning(futabaDevice):
+            # Ask not so nicely
+            try:
+                futabaDevice.subproc.kill()
+                futabaDevice.subproc.wait(timeout=5)
+                futabaDevice.subproc = None
+            except Exception as e:
+                self.logger.error(e)
+        return futabaDevice
+
+    def _stopDrivers(self, futabaDevices):
+        """Takes a list of futaba devices and stops any driver subprocesses that are attached to them
+
+        Args:
+            futabaDevices (list of usb.core.Device): List of Futaba devices
+        """
+        # blocks waiting for each subproc to end
+        return map(self._stopDriver, filter(self._deviceIsRunning, futabaDevices))
+
+    def _stopAllDrivers(self):
+        """Stops all running drivers"""
+        return self._stopDrivers(self.futabaDevices)
+
+
+class Driver:
+    """Provides a class based interface for a single Futaba USB device"""
 
     def __init__(self, bus=None, port=None, name=None):
         atexit.register(self.stop)
         self.runFlag = False
         self.logger = utils.getLogger("driver")
-        self.logger.debug("Attempting to instantiate FutabaUsbDevice")
         self.usbHandle = None
         for device in usb.core.find(find_all=True):
             if int(device.bus) == int(bus) and int(device.port_number) == int(port):

@@ -4,8 +4,7 @@
 import signal
 from argparse import ArgumentParser
 
-import utils
-from FutabaUsbDevice import FutabaUsbDevice
+from driver import Futaba, utils
 
 logger = utils.getLogger("start_script")
 
@@ -51,7 +50,7 @@ def main():
     # - start the driver (blocks indefinitely)
     ##
     try:
-        driver = FutabaUsbDevice(bus=args.bus, port=args.port, name=args.name)
+        driver = Futaba.Driver(bus=args.bus, port=args.port, name=args.name)
 
         # Set up sigkill listeners so we can exit gracefully
         signal.signal(signal.SIGINT, lambda _, __: driver.stop())

@@ -5,32 +5,23 @@ import os
 from logging import handlers
 from pathlib import Path
 
-HANDLER = handlers.RotatingFileHandler(
-    "logs.txt",
+CALIBRATION_PATH = None
+CONFIG_PATH = None
+LOG_PATH = None
+ROOT_DIR = None
+
+for parent in Path(__file__).resolve().parents:
+    if (parent / ".pylintrc").exists():
+        LOG_PATH = os.path.abspath(parent / "logs")
+        ROOT_DIR = os.path.abspath(parent / "src")
+        CONFIG_PATH = os.path.abspath(ROOT_DIR / "configs")
+        CALIBRATION_PATH = os.path.abspath(ROOT_DIR / "calibrations")
+
+LOG_HANDLER = handlers.RotatingFileHandler(
+    LOG_PATH,
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
 )
-
-
-def getProjectRoot():
-    """
-    Gets the project root directory, assuming this function is called
-    from a file within the project, and that there's a 'pyproject.toml'
-    file at the project root.
-    """
-
-    # Start from THIS file's directory
-    currentFile = Path(__file__).resolve()  # Using resolve to get an absolute path.
-    # Go up directories until we find 'pyproject.toml'
-    for parent in currentFile.parents:  # Iterate over every parent.
-        if (parent / ".pylintrc").exists():  # Checks if file exists
-            return parent
-    raise FileNotFoundError("Project root (with .pylintrc) not found.")
-
-
-ROOT_DIR = os.path.abspath(getProjectRoot() / "src")
-CONFIG_PATH = os.path.join(ROOT_DIR, "driver", "configs")
-CALIBRATION_PATH = os.path.join(ROOT_DIR, "driver", "calibrations")
 
 
 def getLogger(
@@ -48,7 +39,7 @@ def getLogger(
     Returns:
         logger: The generated logger
     """
-    handler = HANDLER
+    handler = LOG_HANDLER
     handler.setFormatter(
         logging.Formatter(f"%(asctime)s - {name} %(levelname)s\t: %(message)s")
     )
