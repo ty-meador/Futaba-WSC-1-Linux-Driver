@@ -63,7 +63,10 @@ class FutabaDeviceManager:
         Returns:
             tuple of string: Ordered list of available devices
         """
-        return tuple(map(lambda device: device.name, self.futabaDevices))
+        return [
+            {"name": device.name, "state": device.getState()}
+            for device in self.futabaDevices
+        ]
 
     def getDeviceStatus(self, deviceIndex):
         """Get the status of the device at the given index
@@ -102,19 +105,18 @@ class FutabaDeviceManager:
             for idx in deviceIndex:
                 self._stopDriver(self.futabaDevices[idx])
 
+    def stopAll(self):
+        """Stops all running drivers"""
+        return self._stopDrivers(self.futabaDevices)
+
     def __init__(self):
-        atexit.register(self._stopAllDrivers)
-        self.logger = utils.getLogger(self.__class__)
+        atexit.register(self.stopAll)
+        self.logger = utils.getLogger("FutabaDeviceManager")
         self.startCmds = []
         self.futabaDevices = [
-            map(
-                self._initializeCoreDevice,
-                [
-                    device
-                    for device in usb.core.find(find_all=True)
-                    if device.manufacturer.lower() == "futaba"
-                ],
-            )
+            FutabaDeviceDriver(self._initializeCoreDevice(device))
+            for device in usb.core.find(find_all=True)
+            if device.manufacturer.lower() == "futaba"
         ]
         if len(self.futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
@@ -243,73 +245,101 @@ class FutabaDeviceManager:
         # blocks waiting for each subproc to end
         return map(self._stopDriver, filter(self._deviceIsRunning, futabaDevices))
 
-    def _stopAllDrivers(self):
-        """Stops all running drivers"""
-        return self._stopDrivers(self.futabaDevices)
 
-
-class Driver:
+class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device"""
 
-    def __init__(self, bus=None, port=None, name=None):
-        atexit.register(self.stop)
-        self.runFlag = False
-        self.usbHandle = None
-        for device in usb.core.find(find_all=True):
-            if int(device.bus) == int(bus) and int(device.port_number) == int(port):
-                self.usbHandle = device
-                break
+    def calculateValueMap(self, inputRange=None, outputRange=None):
+        """Generate a list of values that maps the input range to the output range
 
-        if self.usbHandle is None:
-            raise RuntimeError("Could not locate the specified device!")
+        Args:
+            inputRange (list, optional): This determines the size of the map. Defaults to [600, 3500].
+            outputRange (list, optional): This determines what values are generated in the map. Defaults to [0, 32768].
 
-        self.name = name
-        if self.name is None:
-            self.name = f"{self.usbHandle.product}({bus},{port})"
-        self.logger = utils.getLogger(f"{self.name} -= INITIALIZING =-")
-        self.logger.debug("Attempting to find interrupt endpoint")
-        self.interruptEndpoint = self.findEndpoint(self.usbHandle)
-        self.logger.debug("Attempting to load device configuration")
-        self.config = self.loadConfig()
-        self.logger.debug("Attempting to load device calibration")
-        self.calibration = self.loadCalibration()
-        # Each channel will have an array that maps the devices raw value to a calibrated value
-        self.channelMaps = self.generateChannelMaps(self.calibration)
-        self.channelEvents = tuple(
-            getattr(uinput, evtName) for evtName in self.config["channel_events"]
-        )
-
-        # Default to no reversed inputs
-        self.reverseFlags = [False] * len(self.channelEvents)
-        events = tuple(
-            map(
-                lambda event: event + (0, self.config["event_max_value"], 0, 0),
-                self.channelEvents,
+        Returns:
+            list: A list of all possible output values given the range of input values
+        """
+        if not hasattr(inputRange, "__len__") or len(inputRange) != 2:
+            self.logger.error(
+                "inputRange must be an array of length 2, using defaults instead"
             )
+            inputRange = [600, 3500]
+        if not hasattr(outputRange, "__len__") or len(outputRange) != 2:
+            self.logger.error(
+                "outputRange must be an array of length 2, using defaults instead"
+            )
+            outputRange = [0, 32768]
+
+        if not isinstance(inputRange[0], int):
+            raise TypeError(
+                f"Expected inputRange[0] to be of type int, found {type(inputRange[0])}"
+            )
+        if not isinstance(inputRange[1], int):
+            raise TypeError(
+                f"Expected inputRange[1] to be of type int, found {type(inputRange[1])}"
+            )
+        if not isinstance(outputRange[0], int):
+            raise TypeError(
+                f"Expected outputRange[0] to be of type int, found {type(outputRange[0])}"
+            )
+        if not isinstance(outputRange[1], int):
+            raise TypeError(
+                f"Expected outputRange[1] to be of type int, found {type(inputRange[1])}"
+            )
+
+        # Guarantee that we are working with ints
+        inputRange[0] = int(inputRange[0])
+        inputRange[1] = int(inputRange[1])
+        outputRange[0] = int(outputRange[0])
+        outputRange[1] = int(outputRange[1])
+
+        lowerInput = inputRange[0]
+        upperInput = inputRange[1]
+        lowerOutput = outputRange[0]
+
+        # Create a value map such that the index of the array represents
+        # the input value, and the contents at that index is the output
+        inputValues = np.array([lowerOutput] * upperInput, int)
+        for i in range(lowerInput, upperInput):
+            inputValues[i] = i
+        return array.array(
+            "I",  # int
+            np.round(
+                np.interp(
+                    inputValues,
+                    inputRange,
+                    outputRange,
+                ),
+                0,  # No decimals
+            ).astype(int),
         )
 
-        self.virtualDevice = uinput.Device(
-            events,
-            self.name,
-            vendor=self.usbHandle.idVendor,
-        )
+    def findEndpoint(self, device):
+        """Find the USB interrupt endpoint for the provided device
 
-        self.logger = utils.getLogger(f"{self.name} -= IDLE =-")
-        self.logger.debug("Userspace driver ready:")
-        self.logger.debug(f"-> bus={bus}")
-        self.logger.debug(f"-> channelEvents: {self.channelEvents}")
-        self.logger.debug(f"-> config: {self.config}")
-        self.logger.debug(f"-> interruptEndpoint: {self.interruptEndpoint}")
-        self.logger.debug(f"-> name: {self.name}")
-        self.logger.debug(f"-> port={port}")
-        self.logger.debug(f"-> reverseFlags: {self.reverseFlags}")
-        self.logger.debug(f"-> virtualDevice: {self.virtualDevice}")
+        Args:
+            device (usb.core.Device): The device that we want to emulate
 
-    def __str__(self):
-        return f"{self.name} driver"
+        Raises:
+            ValueError: Raised if the provided device is not an of type usb.core.device
+            RuntimeError: Raised if the provided device does not have an endpoint
 
-    def __repr__(self):
-        return str(self.usbHandle)
+        Returns:
+            : The endpoint object used to capture frames from the physical device
+        """
+        if not isinstance(device, usb.core.Device):
+            raise ValueError("Expected first param to be of type usb.core.Device")
+        for config in device:
+            for interface in config:
+                for endpoint in interface:
+                    if (
+                        usb.util.endpoint_direction(endpoint.bEndpointAddress)
+                        == usb.util.ENDPOINT_IN
+                        # 0x3 indicates interrupt endpoint
+                        and endpoint.bmAttributes == 0x3
+                    ):
+                        return endpoint.bEndpointAddress
+        raise RuntimeError("No interrupt endpoint found!")
 
     def loadConfig(self, productName=None):
         """Loads the settings for this particular device and falls back
@@ -392,33 +422,6 @@ class Driver:
 
         return parsedJson
 
-    def findEndpoint(self, device):
-        """_summary_
-
-        Args:
-            device (usb.core.Device): The device that we want to emulate
-
-        Raises:
-            ValueError: Raised if the provided device is not an of type usb.core.device
-            RuntimeError: Raised if the provided device does not have an endpoint
-
-        Returns:
-            : The endpoint object used to capture frames from the physical device
-        """
-        if not isinstance(device, usb.core.Device):
-            raise ValueError("Expected first param to be of type usb.core.Device")
-        for config in device:
-            for interface in config:
-                for endpoint in interface:
-                    if (
-                        usb.util.endpoint_direction(endpoint.bEndpointAddress)
-                        == usb.util.ENDPOINT_IN
-                        # 0x3 indicates interrupt endpoint
-                        and endpoint.bmAttributes == 0x3
-                    ):
-                        return endpoint.bEndpointAddress
-        raise RuntimeError("No interrupt endpoint found!")
-
     def generateChannelMaps(self, channelCalibrations):
         """Use the channelCalibrations to generate a calibrated map for each channel
 
@@ -436,79 +439,14 @@ class Driver:
             calibratedChannels.append(self.calculateValueMap(inputRange, outputRange))
         return calibratedChannels
 
-    def calculateValueMap(self, inputRange=None, outputRange=None):
-        """Generate a list of values that maps the input range to the output range
-
-        Args:
-            inputRange (list, optional): This determines the size of the map. Defaults to [600, 3500].
-            outputRange (list, optional): This determines what values are generated in the map. Defaults to [0, 32768].
-
-        Returns:
-            list: A list of all possible output values given the range of input values
-        """
-        if not hasattr(inputRange, "__len__") or len(inputRange) != 2:
-            self.logger.error(
-                "inputRange must be an array of length 2, using defaults instead"
-            )
-            inputRange = [600, 3500]
-        if not hasattr(outputRange, "__len__") or len(outputRange) != 2:
-            self.logger.error(
-                "outputRange must be an array of length 2, using defaults instead"
-            )
-            outputRange = [0, 32768]
-
-        if not isinstance(inputRange[0], int):
-            raise TypeError(
-                f"Expected inputRange[0] to be of type int, found {type(inputRange[0])}"
-            )
-        if not isinstance(inputRange[1], int):
-            raise TypeError(
-                f"Expected inputRange[1] to be of type int, found {type(inputRange[1])}"
-            )
-        if not isinstance(outputRange[0], int):
-            raise TypeError(
-                f"Expected outputRange[0] to be of type int, found {type(outputRange[0])}"
-            )
-        if not isinstance(outputRange[1], int):
-            raise TypeError(
-                f"Expected outputRange[1] to be of type int, found {type(inputRange[1])}"
-            )
-
-        # Guarantee that we are working with ints
-        inputRange[0] = int(inputRange[0])
-        inputRange[1] = int(inputRange[1])
-        outputRange[0] = int(outputRange[0])
-        outputRange[1] = int(outputRange[1])
-
-        lowerInput = inputRange[0]
-        upperInput = inputRange[1]
-        lowerOutput = outputRange[0]
-
-        # Create a value map such that the index of the array represents
-        # the input value, and the contents at that index is the output
-        inputValues = np.array([lowerOutput] * upperInput, int)
-        for i in range(lowerInput, upperInput):
-            inputValues[i] = i
-        return array.array(
-            "I",
-            np.round(
-                np.interp(
-                    inputValues,
-                    inputRange,
-                    outputRange,
-                ),
-                0,
-            ).astype(int),
-        )
-        # return np.round(np.interp(inputValues, inputRange, outputRange), 0).astype(int)
-
     def eventLoop(self):
         """The main event loop of the driver - INDEFINITELY BLOCKING OPERATION"""
         # Define variables before loop so we don't waste time creating
         # a new variable each iteration and the interpreter doesn't have
         # to evaluate dots, dict subscripts etc etc
         self.runFlag = True
-        logger = utils.getLogger(f"{self.name} -= RUNNING =-")
+        self._setState("RUNNING")
+        logger = self.logger
         calibration = None
         calibrationMaps = self.channelMaps
         channel = None
@@ -570,8 +508,16 @@ class Driver:
                     logger.critical(e)
                     raise e
 
+    def getState(self):
+        """Gets the current state of the driver
+
+        Returns:
+            string: The current state of the driver
+        """
+        return self.state
+
     def start(self):
-        """Start the driver"""
+        """Start the driver if it is not running"""
 
         endpoint = self.interruptEndpoint
         name = self.name
@@ -598,7 +544,8 @@ class Driver:
             exitCode (int, optional): If provided the driver will exit with this code. Defaults to None.
         """
         self.runFlag = False
-        logger = utils.getLogger(f"{self.name} -= STOPPING =-")
+        self._setState("STOPPING")
+        logger = self.logger
 
         try:
             logger.debug("Releasing the USB interface...")
@@ -629,3 +576,62 @@ class Driver:
 
         if exitCode is not None:
             exit(exitCode)
+
+    def __init__(self, coreDevice):
+        if coreDevice.manufacturer.lower() != "futaba":
+            raise RuntimeError("NOT A Futaba DEVICE!")
+
+        atexit.register(self.stop)
+        utils.getLogger("DEBUG").critical(coreDevice)
+        self.runFlag = False
+        self.state = "INITIALIZING"
+        self.usbHandle = coreDevice
+        self.usbHandle.port = coreDevice.port_numbers[0]
+        self.interruptEndpoint = self.findEndpoint(self.usbHandle)
+        self.name = f"{coreDevice.product}({self.usbHandle.bus},{self.usbHandle.port})"
+        self.logger = utils.getLogger(f"{self.name} -= {self.state} =-")
+        self.logger.debug("Attempting to load device configuration")
+        self.config = self.loadConfig()
+        self.logger.debug("Attempting to load device calibration")
+        self.calibration = self.loadCalibration()
+        # Each channel will have an array that maps the devices raw value to a calibrated value
+        self.channelMaps = self.generateChannelMaps(self.calibration)
+        self.channelEvents = tuple(
+            getattr(uinput, evtName) for evtName in self.config["channel_events"]
+        )
+
+        # Default to no reversed inputs
+        self.reverseFlags = [False] * len(self.channelEvents)
+        events = tuple(
+            [
+                event + (0, self.config["event_max_value"], 0, 0)
+                for event in self.channelEvents
+            ]
+        )
+
+        self.virtualDevice = uinput.Device(
+            events,
+            self.name,
+            vendor=self.usbHandle.idVendor,
+        )
+
+        self.logger = utils.getLogger(f"{self.name} -= IDLE =-")
+        self.logger.debug("Userspace driver ready:")
+        self.logger.debug(f"-> bus={self.usbHandle.bus}")
+        self.logger.debug(f"-> channelEvents: {self.channelEvents}")
+        self.logger.debug(f"-> config: {self.config}")
+        self.logger.debug(f"-> interruptEndpoint: {self.interruptEndpoint}")
+        self.logger.debug(f"-> name: {self.name}")
+        self.logger.debug(f"-> port={self.usbHandle.port}")
+        self.logger.debug(f"-> reverseFlags: {self.reverseFlags}")
+        self.logger.debug(f"-> virtualDevice: {self.virtualDevice}")
+
+    def __str__(self):
+        return f"{self.name} driver"
+
+    def __repr__(self):
+        return str(self.usbHandle)
+
+    def _setState(self, state):
+        self.logger = utils.getLogger(f"{self.name} -= {state} =-")
+        self.state = state

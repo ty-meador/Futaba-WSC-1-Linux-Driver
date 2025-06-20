@@ -14,11 +14,17 @@ parser.add_argument(
     help="Start the text-based UI",
 )
 
+parser.add_argument(
+    "--debug",
+    action="store_true",
+    help="Enable debug log level",
+)
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.text_ui:
-        DriverUI().run()
+        DriverUI(debug=True).run()
     else:
         pass  # TO-DO
