@@ -25,8 +25,7 @@ class DriverUI(App):
         futabaDevices = self.fdm.getDeviceList()
 
         self.selectionList = [
-            Selection(f"{device['name']}({device['state']})", i)
-            for i, device in enumerate(futabaDevices)
+            Selection(f"{device['name']}", i) for i, device in enumerate(futabaDevices)
         ]
 
         if len(futabaDevices) == 0:
@@ -48,7 +47,10 @@ class DriverUI(App):
     @on(SelectionList.SelectedChanged)
     def update_selected_view(self):  # noqa: C0103
         """callback"""
-        # selected = self.query_one(SelectionList).selected
+        selected = self.query_one(SelectionList).selected
+
+        for idx in selected:
+            self.fdm.start(idx)
 
         self.query_one(Pretty).update(
             list(filter(lambda d: d["state"] == "RUNNING", self.fdm.getDeviceList()))

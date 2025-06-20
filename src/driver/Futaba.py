@@ -4,7 +4,7 @@ import array
 import atexit
 import json
 import os
-import subprocess
+from multiprocessing import Process
 
 import numpy as np
 import uinput
@@ -114,36 +114,12 @@ class FutabaDeviceManager:
         self.logger = utils.getLogger("FutabaDeviceManager")
         self.startCmds = []
         self.futabaDevices = [
-            FutabaDeviceDriver(self._initializeCoreDevice(device))
+            FutabaDeviceDriver(device)
             for device in usb.core.find(find_all=True)
             if device.manufacturer.lower() == "futaba"
         ]
         if len(self.futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
-
-    @staticmethod
-    def _initializeCoreDevice(device):
-        """Appends the properties required for this driver to the provided device
-
-        Args:
-            device (usb.core.Device): The device to modify
-
-        Returns:
-            usb.core.Device: The modified device
-        """
-        device.name = f"{device.manufacturer} {device.product} (bus-{device.bus}, port-{device.port_number})"
-        device.subproc = None
-        device.startCmd = (
-            "python3",
-            "driver/start",
-            "--bus",
-            str(device.bus),
-            "--port",
-            str(device.port_number),
-            "--use-name",
-            device.name,
-        )
-        return device
 
     @staticmethod
     def _deviceIsRunning(futabaDevice):
@@ -189,11 +165,7 @@ class FutabaDeviceManager:
 
     def _startDriver(self, futabaDevice):
         """start a single device"""
-        return subprocess.Popen(
-            futabaDevice.startCmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        return futabaDevice.start()
 
     def _startDrivers(self, futabaDevices):
         """Starts all Futaba devices provided
@@ -530,7 +502,8 @@ class FutabaDeviceDriver:
 
         logger.info(f"Driver started: {endpoint} -> {name}")
         try:
-            self.eventLoop()  # Block indefinitely
+            # self.eventLoop()  # Block indefinitely
+            self.subProc.start
 
         except usb.core.USBError:
             pass
@@ -582,9 +555,9 @@ class FutabaDeviceDriver:
             raise RuntimeError("NOT A Futaba DEVICE!")
 
         atexit.register(self.stop)
-        utils.getLogger("DEBUG").critical(coreDevice)
         self.runFlag = False
         self.state = "INITIALIZING"
+        self.subProc = Process(target=self.eventLoop)
         self.usbHandle = coreDevice
         self.usbHandle.port = coreDevice.port_numbers[0]
         self.interruptEndpoint = self.findEndpoint(self.usbHandle)
