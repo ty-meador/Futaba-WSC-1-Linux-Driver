@@ -22,7 +22,7 @@ class DriverUI(App):
 
         self.fdm = FutabaDeviceManager()
         atexit.register(self.fdm.stopAll)
-        futabaDevices = self.fdm.getDeviceList()
+        futabaDevices = self.fdm.listDevices()
 
         self.selectionList = [
             Selection(f"{device['name']}", i) for i, device in enumerate(futabaDevices)

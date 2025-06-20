@@ -64,7 +64,7 @@ PRODUCTS = {
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers"""
 
-    def listAvailableDevices(self):
+    def listDevices(self):
         """Returns an ordered list of devices
 
         Returns:
@@ -104,7 +104,7 @@ class FutabaDeviceManager:
                     self.futabaDevices[idx].start()
         except Exception as e:
             self.logger.warning(e)
-        return self.listAvailableDevices()
+        return self.listDevices()
 
     def stop(self, deviceIndex):
         """Stop the devices at the given indexes
@@ -120,7 +120,7 @@ class FutabaDeviceManager:
                     self.futabaDevices[idx].stop()
         except Exception as e:
             self.logger.warning(e)
-        return self.listAvailableDevices()
+        return self.listDevices()
 
     def stopAll(self):
         """Stops all running drivers"""
@@ -129,7 +129,7 @@ class FutabaDeviceManager:
                 device.stop()
         except Exception as e:
             self.logger.warning(e)
-        return self.listAvailableDevices()
+        return self.listDevices()
 
     def __init__(self):
         atexit.register(self.stopAll)
