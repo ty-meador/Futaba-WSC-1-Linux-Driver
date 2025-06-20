@@ -12,13 +12,13 @@ ROOT_DIR = None
 
 for parent in Path(__file__).resolve().parents:
     if (parent / ".pylintrc").exists():
-        LOG_PATH = os.path.abspath((os.path.join(parent, "logs")))
         ROOT_DIR = os.path.abspath(os.path.join(parent, "src"))
-        CONFIG_PATH = os.path.abspath(os.path.join(ROOT_DIR, "configs"))
-        CALIBRATION_PATH = os.path.abspath(os.path.join(ROOT_DIR, "calibrations"))
-
+        LOG_PATH = os.path.abspath((os.path.join(parent, "logs")))
+        CONFIG_PATH = os.path.abspath(os.path.join(ROOT_DIR, "driver", "configs"))
+        CALIBRATION_PATH = os.path.abspath(
+            os.path.join(ROOT_DIR, "driver", "calibrations")
+        )
         os.makedirs(LOG_PATH, exist_ok=True)
-        os.makedirs(ROOT_DIR, exist_ok=True)
         os.makedirs(CONFIG_PATH, exist_ok=True)
         os.makedirs(CALIBRATION_PATH, exist_ok=True)
 

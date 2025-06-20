@@ -14,7 +14,6 @@ from driver import utils
 
 DEFAULT_CONFIG = {
     "frame_size": 16,
-    "event_max_value": 32768,
     "channel_events": [
         "ABS_X",
         "ABS_Y",
@@ -27,22 +26,27 @@ DEFAULT_CONFIG = {
     ],
 }
 
+##
+# An array of length EVENT_MAX_VAL will be used
+# to map the raw device inputs to values between EVENT_MIN_VAL
+# and EVENT_MAX_VAL
+##
 EVENT_MAX_VAL = 32768
-EVEN_MIN_VAL = 0
+EVENT_MIN_VAL = 0
 
 ##
 # Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
 # for this great starting point!
 ##
 DEFAULT_CALIBRATION = [
-    [[704, 3392], [EVEN_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVEN_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVEN_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVEN_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVEN_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVEN_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVEN_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVEN_MIN_VAL, EVENT_MAX_VAL]],
+    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
 ]
 
 FUTABA_VENDOR_ID = 4101
@@ -60,14 +64,14 @@ PRODUCTS = {
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers"""
 
-    def getDeviceList(self):
+    def listAvailableDevices(self):
         """Returns an ordered list of devices
 
         Returns:
             tuple of string: Ordered list of available devices
         """
         return [
-            {"name": device.name, "state": device.getState()}
+            {"name": device.getName(), "state": device.getState()}
             for device in self.futabaDevices
         ]
 
@@ -80,9 +84,11 @@ class FutabaDeviceManager:
         Returns:
             string: "RUNNING" or "IDLE"
         """
-        if self._deviceIsRunning(self.futabaDevices[deviceIndex]):
-            return "RUNNING"
-        return "IDLE"
+        try:
+            return self.futabaDevices[deviceIndex].getState()
+        except Exception as e:
+            self.logger.warning(e)
+            return False
 
     def start(self, deviceIndex):
         """Start the devices at the given indexes
@@ -90,11 +96,15 @@ class FutabaDeviceManager:
         Args:
             deviceIndexes (list of int, optional): The devices you want to start. Defaults to [].
         """
-        if isinstance(deviceIndex, int):
-            self._startDriver(self.futabaDevices[deviceIndex])
-        elif hasattr("__iter__", deviceIndex):
-            for idx in deviceIndex:
-                self._startDriver(self.futabaDevices[idx])
+        try:
+            if isinstance(deviceIndex, int):
+                self.futabaDevices[deviceIndex].start()
+            elif hasattr("__iter__", deviceIndex):
+                for idx in deviceIndex:
+                    self.futabaDevices[idx].start()
+        except Exception as e:
+            self.logger.warning(e)
+        return self.listAvailableDevices()
 
     def stop(self, deviceIndex):
         """Stop the devices at the given indexes
@@ -102,20 +112,28 @@ class FutabaDeviceManager:
         Args:
             deviceIndexes (list of int, optional): The devices you want to stop. Defaults to [].
         """
-        if isinstance(deviceIndex, int):
-            self._stopDriver(self.futabaDevices[deviceIndex])
-        elif hasattr("__iter__", deviceIndex):
-            for idx in deviceIndex:
-                self._stopDriver(self.futabaDevices[idx])
+        try:
+            if isinstance(deviceIndex, int):
+                self.futabaDevices[deviceIndex].stop()
+            elif hasattr("__iter__", deviceIndex):
+                for idx in deviceIndex:
+                    self.futabaDevices[idx].stop()
+        except Exception as e:
+            self.logger.warning(e)
+        return self.listAvailableDevices()
 
     def stopAll(self):
         """Stops all running drivers"""
-        return self._stopDrivers(self.futabaDevices)
+        try:
+            for device in self.futabaDevices:
+                device.stop()
+        except Exception as e:
+            self.logger.warning(e)
+        return self.listAvailableDevices()
 
     def __init__(self):
         atexit.register(self.stopAll)
         self.logger = utils.getLogger("FutabaDeviceManager")
-        self.startCmds = []
         self.futabaDevices = [
             FutabaDeviceDriver(device)
             for device in usb.core.find(find_all=True)
@@ -125,104 +143,24 @@ class FutabaDeviceManager:
             raise Exception("No Futaba USB device detected!")
 
     @staticmethod
-    def _deviceIsRunning(futabaDevice):
+    def _deviceIsRunning(futabaDeviceDriver):
         """Function to determine if a given device is actively running
 
         Args:
-            futabaDevice (core.usb.Device): The device to check
+            futabaDeviceDriver (FutabaDeviceDriver): The device to check
 
         Returns:
             bool: True if the device has a subprocess
         """
-        return (
-            hasattr(futabaDevice, "subproc")  # Has device been initialized?
-            and futabaDevice.subproc is not None  # Is there a subproc attached to it?
-            and futabaDevice.poll() is None  # Is the subproc alive?
-        )
-
-    def _getIdleDevices(self, futabaDevices=None):
-        """Gets a list of devices that are not running
-
-        Args:
-            futabaDevices (array of usb.core.Device, optional): The devices to filter. Defaults to self.futabaDevices.
-
-        Returns:
-            list of usb.core.Device: Filtered list containing only devices that are not actively running
-        """
-        if futabaDevices is None:
-            futabaDevices = self.futabaDevices
-        return filter(not self._deviceIsRunning, futabaDevices)
-
-    def _getRunningDevices(self, futabaDevices=None):
-        """Returns a list of running futaba devices
-
-        Args:
-            futabaDevices (list of usb.core.Device, optional): List of devices to filter. Defaults to all found devices.
-
-        Returns:
-            _type_: _description_
-        """
-        if futabaDevices is None:
-            futabaDevices = self.futabaDevices
-        return filter(self._deviceIsRunning, futabaDevices)
-
-    def _startDriver(self, futabaDevice):
-        """start a single device"""
-        return futabaDevice.start()
-
-    def _startDrivers(self, futabaDevices):
-        """Starts all Futaba devices provided
-
-        Args:
-            futabaDevices (list of usb.core.Device): A list of Futaba USB device handles
-
-        Returns:
-            list of subprocess: A list of subprocesses each of which is responsable for
-            a single device driver
-        """
-        return [self._startDriver(device) for device in futabaDevices]
-
-    def _startAllDrivers(self):
-        """Starts a driver for all found futaba devices"""
-        return self._startDrivers(self.futabaDevices)
-
-    def _stopDriver(self, futabaDevice):
-        """Stops a single device driver
-
-        Args:
-            futabaDevice (usb.core.Device): a futaba device
-        """
-        if self._deviceIsRunning(futabaDevice):
-            # Ask nicely
-            try:
-                futabaDevice.subproc.terminate()
-                futabaDevice.subproc.wait(timeout=5)
-                futabaDevice.subproc = None
-            except Exception as e:
-                self.logger.error(e)
-
-        if self._deviceIsRunning(futabaDevice):
-            # Ask not so nicely
-            try:
-                futabaDevice.subproc.kill()
-                futabaDevice.subproc.wait(timeout=5)
-                futabaDevice.subproc = None
-            except Exception as e:
-                self.logger.error(e)
-        return futabaDevice
-
-    def _stopDrivers(self, futabaDevices):
-        """Takes a list of futaba devices and stops any driver subprocesses that are attached to them
-
-        Args:
-            futabaDevices (list of usb.core.Device): List of Futaba devices
-        """
-        # blocks waiting for each subproc to end
-        return map(self._stopDriver, filter(self._deviceIsRunning, futabaDevices))
+        return futabaDeviceDriver.getState() == "RUNNING"
 
 
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device"""
+
+    def getName(self):
+        """Gets the name of the device this driver was initialized for"""
+        return self.name
 
     def getState(self):
         """Gets the current state of the driver
