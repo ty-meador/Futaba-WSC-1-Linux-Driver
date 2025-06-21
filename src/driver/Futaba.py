@@ -3,8 +3,8 @@
 import array
 import atexit
 import json
+import multiprocessing
 import os
-from multiprocessing import Process
 
 import numpy as np
 import uinput
@@ -60,6 +60,8 @@ PRODUCTS = {
     999: "default",
 }
 
+multiprocessing.set_start_method("spawn")
+
 
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers"""
@@ -70,10 +72,10 @@ class FutabaDeviceManager:
         Returns:
             tuple of string: Ordered list of available devices
         """
-        return [
-            {"name": device.getName(), "state": device.getState()}
-            for device in self.futabaDevices
-        ]
+        return tuple(
+            {"name": device.getName(), "state": device.getState(), "key": i}
+            for i, device in enumerate(self.futabaDevices)
+        )
 
     def getDeviceStatus(self, deviceIndex):
         """Get the status of the device at the given index
@@ -134,11 +136,12 @@ class FutabaDeviceManager:
     def __init__(self):
         atexit.register(self.stopAll)
         self.logger = utils.getLogger("FutabaDeviceManager")
-        self.futabaDevices = [
+        self.futabaDevices = tuple(
             FutabaDeviceDriver(device)
             for device in usb.core.find(find_all=True)
             if device.manufacturer.lower() == "futaba"
-        ]
+        )
+        self.deviceList = tuple()
         if len(self.futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
 
@@ -176,22 +179,21 @@ class FutabaDeviceDriver:
 
     def start(self):
         """Start the driver if it is not running"""
-        if self.subProc.is_alive():
-            self.logger.warning("start method called but subproc is already running!")
-            return self.subProc
 
         if self.usbHandle.is_kernel_driver_active(0):
             self.usbHandle.detach_kernel_driver(0)
         self.usbHandle.set_configuration()
 
         try:
-            self.subProc.start()
-            self.logger.info(f"Driver started: {self.interruptEndpoint} -> {self.name}")
+            self._eventLoop()
+
         except usb.core.USBError:
             # Don't raise exception, pass through to finally block
             pass
         finally:
             self.stop()
+
+        return self.subProc.is_alive()
 
     def stop(self, exitCode=None):
         """Stop the driver if it is running
@@ -199,7 +201,6 @@ class FutabaDeviceDriver:
         Args:
             exitCode (int, optional): If provided the driver will exit with this code. Defaults to None.
         """
-        self.runFlag = False
         self._setState("STOPPING")
         logger = self.logger
 
@@ -233,6 +234,8 @@ class FutabaDeviceDriver:
         if exitCode is not None:
             exit(exitCode)
 
+        self._setState("IDLE")
+
     def _eventLoop(self):
         """The main event loop of the driver - INDEFINITELY BLOCKING OPERATION"""
         # Define variables before loop so we don't waste time creating
@@ -256,7 +259,7 @@ class FutabaDeviceDriver:
         readDevice = self.usbHandle.read
         reverseFlags = self.reverseFlags
         synchronize = self.virtualDevice.syn
-
+        logger.info(f"Driver started: {endpoint} -> {self.name}")
         while self.runFlag:
             try:
                 # - The transmitter may not send a new frame if the inputs remain static
@@ -320,9 +323,7 @@ class FutabaDeviceDriver:
         ##
         if coreDevice.manufacturer.lower() != "futaba":
             raise RuntimeError("NOT A Futaba DEVICE!")
-        self.name = (
-            f"{coreDevice.product}({coreDevice.bus},{coreDevice.port_numbers[0]})"
-        )
+        self.name = f"Futaba {coreDevice.product}({coreDevice.bus},{coreDevice.port_numbers[0]})"
 
         ##
         # Global flags
@@ -337,7 +338,9 @@ class FutabaDeviceDriver:
         self.usbHandle.port = coreDevice.port_numbers[0]
         self.logger = self._getLogger(name=self.usbHandle.product, state=self.state)
         self.interruptEndpoint = self._findEndpoint(self.usbHandle)
-        self.subProc = Process(target=self._eventLoop)
+        self.subProc = multiprocessing.Process(
+            name=f"{self.name} Driver", target=self._eventLoop
+        )
 
         # Configuration
         self.logger.debug("Attempting to load device configuration")
@@ -361,20 +364,10 @@ class FutabaDeviceDriver:
 
         # Create a virtual device using the events we just set up
         self.virtualDevice = uinput.Device(
-            tuple(
-                [
-                    event + (0, self.config["event_max_value"], 0, 0)
-                    for event in self.channelEvents
-                ]
-            ),
+            tuple([event + (0, EVENT_MAX_VAL, 0, 0) for event in self.channelEvents]),
             self.name,
             vendor=self.usbHandle.idVendor,
         )
-
-        ##
-        # External event registration
-        ##
-        atexit.register(self.stop)
 
         # Update logger, output some debug info
         self.logger = utils.getLogger(f"{self.name} -= IDLE =-")
@@ -387,6 +380,11 @@ class FutabaDeviceDriver:
         self.logger.debug(f"-> port={self.usbHandle.port}")
         self.logger.debug(f"-> reverseFlags: {self.reverseFlags}")
         self.logger.debug(f"-> virtualDevice: {self.virtualDevice}")
+
+        ##
+        # External event registration
+        ##
+        atexit.register(self.stop)
 
     def __str__(self):
         return f"{self.name} driver"
