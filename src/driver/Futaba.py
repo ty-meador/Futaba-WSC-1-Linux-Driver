@@ -21,7 +21,6 @@ PRODUCTS = {
 
 DEFAULT_CONFIG = {
     "frame_size": 16,
-    "event_max_value": 32768,
     "channel_events": [
         "ABS_X",
         "ABS_Y",
@@ -34,27 +33,30 @@ DEFAULT_CONFIG = {
     ],
 }
 
+EVENT_MAX_VALUE = 32768
+EVENT_MIN_VALUE = 0
+
 DEFAULT_CALIBRATION = [
-    [[704, 3392], [0, 32768]],
-    [[704, 3392], [0, 32768]],
-    [[704, 3392], [0, 32768]],
-    [[704, 3392], [0, 32768]],
-    [[704, 3392], [0, 32768]],
-    [[704, 3392], [0, 32768]],
-    [[704, 3392], [0, 32768]],
-    [[704, 3392], [0, 32768]],
+    [[704, 3392], [EVENT_MIN_VALUE, EVENT_MAX_VALUE]],
+    [[704, 3392], [EVENT_MIN_VALUE, EVENT_MAX_VALUE]],
+    [[704, 3392], [EVENT_MIN_VALUE, EVENT_MAX_VALUE]],
+    [[704, 3392], [EVENT_MIN_VALUE, EVENT_MAX_VALUE]],
+    [[704, 3392], [EVENT_MIN_VALUE, EVENT_MAX_VALUE]],
+    [[704, 3392], [EVENT_MIN_VALUE, EVENT_MAX_VALUE]],
+    [[704, 3392], [EVENT_MIN_VALUE, EVENT_MAX_VALUE]],
+    [[704, 3392], [EVENT_MIN_VALUE, EVENT_MAX_VALUE]],
 ]
 
 FUTABA_VENDOR_ID = 4101
 
 
-class FutabaUsbDevice:
+class FutabaDeviceDriver:
     """Provides a class-based interface for the Futaba device at the address specified"""
 
     def __init__(self, bus=None, port=None, name=None):
         self.runFlag = False
         self.logger = utils.getLogger("driver")
-        self.logger.debug("Attempting to instantiate FutabaUsbDevice")
+        self.logger.debug("Attempting to instantiate FutabaDeviceDriver")
         self.usbHandle = None
         for device in usb.core.find(find_all=True):
             if int(device.bus) == int(bus) and int(device.port_number) == int(port):
@@ -85,7 +87,7 @@ class FutabaUsbDevice:
 
         events = tuple(
             map(
-                lambda event: event + (0, self.config["event_max_value"], 0, 0),
+                lambda event: event + (0, EVENT_MAX_VALUE, 0, 0),
                 self.channelEvents,
             )
         )
