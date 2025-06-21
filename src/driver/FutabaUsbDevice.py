@@ -49,55 +49,9 @@ FUTABA_VENDOR_ID = 4101
 
 
 class FutabaUsbDevice:
-    """
-    Example:
-            # What a Futaba device looks like in LSPCI
-            DEVICE ID 1008:000a on Bus 001 Address 002 =================
-                bLength                :   0x12 (18 bytes)
-                bDescriptorType        :    0x1 Device
-                bcdUSB                 :  0x200 USB 2.0
-                bDeviceClass           :    0x0 Specified at interface
-                bDeviceSubClass        :    0x0
-                bDeviceProtocol        :    0x0
-                bMaxPacketSize0        :   0x40 (64 bytes)
-                idVendor               : 0x1008
-                idProduct              : 0x000a
-                bcdDevice              :  0x200 Device 2.0
-                iManufacturer          :    0x1 Futaba
-                iProduct               :    0x2 WSC-1
-                iSerialNumber          :    0x3 000000000
-                bNumConfigurations     :    0x1
-                    CONFIGURATION 1: 500 mA ==================================
-                    bLength              :    0x9 (9 bytes)
-                    bDescriptorType      :    0x2 Configuration
-                    wTotalLength         :   0x22 (34 bytes)
-                    bNumInterfaces       :    0x1
-                    bConfigurationValue  :    0x1
-                    iConfiguration       :    0x0
-                    bmAttributes         :   0x80 Bus Powered
-                    bMaxPower            :   0xfa (500 mA)
-                        INTERFACE 0: Human Interface Device ====================
-                        bLength            :    0x9 (9 bytes)
-                        bDescriptorType    :    0x4 Interface
-                        bInterfaceNumber   :    0x0
-                        bAlternateSetting  :    0x0
-                        bNumEndpoints      :    0x1
-                        bInterfaceClass    :    0x3 Human Interface Device
-                        bInterfaceSubClass :    0x0
-                        bInterfaceProtocol :    0x0
-                        iInterface         :    0x0
-                            ENDPOINT 0x87: Interrupt IN ==========================
-                            bLength          :    0x7 (7 bytes)
-                            bDescriptorType  :    0x5 Endpoint
-                            bEndpointAddress :   0x87 IN
-                            bmAttributes     :    0x3 Interrupt
-                            wMaxPacketSize   :   0x40 (64 bytes)
-                            bInterval        :    0x1
-
-    """
+    """Provides a class-based interface for the Futaba device at the address specified"""
 
     def __init__(self, bus=None, port=None, name=None):
-        atexit.register(self.stop)
         self.runFlag = False
         self.logger = utils.getLogger("driver")
         self.logger.debug("Attempting to instantiate FutabaUsbDevice")
@@ -151,6 +105,7 @@ class FutabaUsbDevice:
         self.logger.debug(f"-> port={port}")
         self.logger.debug(f"-> reverseFlags: {self.eventReverseFlags}")
         self.logger.debug(f"-> virtualDevice: {self.virtualDevice}")
+        atexit.register(self.stop)
 
     def __str__(self):
         return f"{self.name} driver"
@@ -353,7 +308,6 @@ class FutabaUsbDevice:
                 0,
             ).astype(int),
         )
-        # return np.round(np.interp(inputValues, inputRange, outputRange), 0).astype(int)
 
     def eventLoop(self):
         """The main event loop of the driver - INDEFINITELY BLOCKING OPERATION"""
@@ -425,17 +379,11 @@ class FutabaUsbDevice:
     def start(self):
         """Start the driver"""
 
-        endpoint = self.interruptEndpoint
+        if self.usbHandle.is_kernel_driver_active(0):
+            self.usbHandle.detach_kernel_driver(0)
+        self.usbHandle.set_configuration()
 
-        logger = self.logger
-        name = self.name
-
-        usbHandle = self.usbHandle
-        if usbHandle.is_kernel_driver_active(0):
-            usbHandle.detach_kernel_driver(0)
-        usbHandle.set_configuration()
-
-        logger.info(f"Driver started: {endpoint} -> {name}")
+        self.logger.info(f"Driver started: {self.interruptEndpoint} -> {self.name}")
         try:
             self.eventLoop()  # Block indefinitely
 
