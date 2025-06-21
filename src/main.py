@@ -12,7 +12,7 @@ from textual.events import Mount
 from textual.widgets import Footer, Header, Pretty, SelectionList
 from textual.widgets.selection_list import Selection
 
-import futaba_driver.utils as utils
+from driver import utils
 
 driverCmds = []
 
