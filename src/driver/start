@@ -26,13 +26,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--product-id",
-    dest="productID",
-    type=str,
-    help="Specify the product id of the Futaba USB device you want to start a driver for",
-)
-
-parser.add_argument(
     "--use-name",
     dest="name",
     type=str,
