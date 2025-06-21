@@ -238,13 +238,7 @@ class FutabaUsbDevice:
             calibratedChannels.append(self.calculateValueMap(inputRange, outputRange))
         return calibratedChannels
 
-    def calculateValueMap(
-        self,
-        # These values appear to work well for at least the WSC-1 and T16IZ
-        # making them the safest known values so far
-        inputRange=None,
-        outputRange=None,
-    ):
+    def calculateValueMap(self, inputRange, outputRange):
         """Generate a list of values that maps the input range to the output range
 
         Args:
@@ -255,16 +249,13 @@ class FutabaUsbDevice:
             list: A list of all possible output values given the range of input values
         """
         if not hasattr(inputRange, "__len__") or len(inputRange) != 2:
-            self.logger.error(
+            raise TypeError(
                 "inputRange must be an array of length 2, using defaults instead"
             )
-            inputRange = [600, 3500]
         if not hasattr(outputRange, "__len__") or len(outputRange) != 2:
-            self.logger.error(
+            raise TypeError(
                 "outputRange must be an array of length 2, using defaults instead"
             )
-            outputRange = [0, 32768]
-
         if not isinstance(inputRange[0], int):
             raise TypeError(
                 f"Expected inputRange[0] to be of type int, found {type(inputRange[0])}"
@@ -305,7 +296,7 @@ class FutabaUsbDevice:
                     inputRange,
                     outputRange,
                 ),
-                0,
+                0,  # Round to the nearest int
             ).astype(int),
         )
 
@@ -361,14 +352,16 @@ class FutabaUsbDevice:
                     channelData.append(calibration[rawValue])
                 channelData.reverse()
 
-                for data, event, reverseFlag in zip(  # Queue one event for each channel
+                # Queue one event for each channel
+                for data, event, reverseFlag in zip(
                     channelData, channelEvents, reverseFlags
                 ):
                     if reverseFlag:
                         data = eventMaxVal - data
                     emit(event, data, syn=False)
 
-                synchronize()  # fire all queued events
+                # fire all queued events
+                synchronize()
             except usb.core.USBError as e:
                 # kaboom?
                 if e.errno != 110:
