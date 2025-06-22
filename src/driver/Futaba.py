@@ -163,12 +163,12 @@ class FutabaDeviceDriver:
     def toDict(self):
         """Returns a dictionary representation of the driverf object"""
         return {
-            "channelEventsMap": self.channelEventsMap,
-            "channelValueMaps": self.channelCalibrationMaps,
             "config": self.config,
             "endpointAddress": self.interruptEndpoint,
+            "inputChannels": tuple(
+                [channel.toDict() for channel in self.deviceChannels]
+            ),
             "name": self.name,
-            "reverseFlags": self.reverseFlags,
         }
 
     def _setState(self, state):
@@ -298,8 +298,17 @@ class FutabaDeviceDriver:
 class InputChannel:
     """Provides a class based representation of a single input channel"""
 
+    def toDict(self):
+        """Returns a dictionary representation of this input channel"""
+        return {
+            "eventName": self.eventName,
+            "isReversed": self.isReversed,
+            "event": self.event,
+            "valueMap": self.valueMap,
+        }
+
     def __init__(self, eventName, calibration, reverseInputs=False):
-        self.name = eventName
+        self.eventName = eventName
         self.isReversed = reverseInputs
         self.event = getattr(uinput, eventName)
         self.calibration = ChannelCalibration(
@@ -307,12 +316,12 @@ class InputChannel:
             outputRange=calibration[1],
             reverse=self.isReversed,
         )
-        self.valueMap = self.calibration.toArray()
+        self.valueMap = self.calibration.getCalibratedValueMap()
 
     def __str__(self):
         return str(
             {
-                "name": self.name,
+                "eventName": self.eventName,
                 "isReversed": self.isReversed,
                 "event": self.event,
                 "calibration": self.calibration,
@@ -358,7 +367,7 @@ class ChannelCalibration:
         cost of 16kb of memory on an 8 channel device.
     """
 
-    def toArray(self):
+    def getCalibratedValueMap(self):
         """Returns the calibrated value mapping
 
         Returns:
