@@ -291,7 +291,7 @@ class FutabaDeviceDriver:
         return f"{self.name} Driver"
 
     def __repr__(self):
-        return str(self.usbHandle)
+        return str(self.toDict())
 
     @staticmethod
     def _findEndpoint(device):
@@ -441,7 +441,7 @@ def _EVENTLOOP(
     name=None,
     reverseFlags=None,
 ):
-    """The main event loop of the driver - INDEFINITELY BLOCKING OPERATION"""
+    """The target function for the drivers subprocess"""
     # Define variables before loop so we don't waste time creating
     # a new variable each iteration and the interpreter doesn't have
     # to evaluate dots, dict subscripts etc etc
@@ -546,3 +546,30 @@ def _EVENTLOOP(
                 # Yes Rico, kaboom.
                 logger.critical(e)
                 raise e
+        finally:
+            try:
+                logger.debug("Releasing the USB interface...")
+                usb.util.release_interface(usbHandle, 0)
+            except Exception as e:
+                logger.warning(
+                    "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+                )
+                logger.warning(e)
+
+            try:
+                logger.debug("Reattaching the kernel driver...")
+                usbHandle.attach_kernel_driver(0)
+            except Exception as e:
+                logger.warning(
+                    "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
+                )
+                logger.warning(e)
+
+            try:
+                logger.debug("Resetting device...")
+                usbHandle.reset()
+            except Exception as e:
+                logger.warning(
+                    "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+                )
+                logger.warning(e)
