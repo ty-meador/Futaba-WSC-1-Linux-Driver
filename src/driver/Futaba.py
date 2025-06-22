@@ -7,7 +7,7 @@ import os
 import uinput
 import usb
 
-from driver import DEFAULT_CALIBRATION, DEFAULT_CONFIG, EventDispatchWorker, utils
+import driver
 
 
 class FutabaDeviceManager:
@@ -82,7 +82,7 @@ class FutabaDeviceManager:
 
     def __init__(self):
         atexit.register(self.stopAll)
-        self.logger = utils.getLogger("FutabaDeviceManager")
+        self.logger = driver.getLogger("FutabaDeviceManager")
         self.futabaDevices = tuple(
             FutabaDeviceDriver(device.bus, device.port_numbers[0])
             for device in usb.core.find(find_all=True)
@@ -134,7 +134,7 @@ class FutabaDeviceDriver:
         try:
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
-                target=EventDispatchWorker.start,
+                target=driver.EventDispatchWorker.start,
                 args=(self.killswitch,),
                 kwargs=self.toDict(),
             )
@@ -169,11 +169,11 @@ class FutabaDeviceDriver:
         Args:
             state (string): The new state of the Object
         """
-        self.logger = utils.getLogger(f"{self.name} -= {state} =-")
+        self.logger = driver.getLogger(f"{self.name} -= {state} =-")
         self.state = state
 
     def __init__(self, bus, port, name=None):
-        coreDevice = utils.getCoreDevice(bus, port)
+        coreDevice = driver.getCoreDevice(bus, port)
 
         if not coreDevice:
             raise RuntimeError(f"No device found at bus {bus}, port {port}")
@@ -218,7 +218,7 @@ class FutabaDeviceDriver:
         )
         # Default to no reversed inputs
         self.reverseFlags = [False] * len(self.channelEvents)
-        self.logger = utils.getLogger(f"{self.name} -= IDLE =-")
+        self.logger = driver.getLogger(f"{self.name} -= IDLE =-")
         self.logger.debug(self.toDict())
         atexit.register(self.stop)
 
@@ -269,7 +269,7 @@ class FutabaDeviceDriver:
         Returns:
             logger.logger: The logger instantiated for this class
         """
-        return utils.getLogger(f"{name} -= {state} =-")
+        return driver.getLogger(f"{name} -= {state} =-")
 
     @classmethod
     def _generateChannelMaps(cls, channelCalibrations):
@@ -286,7 +286,7 @@ class FutabaDeviceDriver:
         for channelCalibration in channelCalibrations:
             inputRange = channelCalibration[0]
             outputRange = channelCalibration[1]
-            calibratedChannels.append(utils.generateValueMap(inputRange, outputRange))
+            calibratedChannels.append(driver.generateValueMap(inputRange, outputRange))
         return calibratedChannels
 
     @classmethod
@@ -300,18 +300,18 @@ class FutabaDeviceDriver:
         logger = cls._getLogger(name=productName)
         config = None
 
-        filePath = os.path.join(utils.CONFIG_PATH, f"{productName}.json")
-        defaultPath = os.path.join(utils.CONFIG_PATH, "default.json")
+        filePath = os.path.join(driver.CONFIG_PATH, f"{productName}.json")
+        defaultPath = os.path.join(driver.CONFIG_PATH, "default.json")
 
         logger.debug(f"loading {filePath}")
-        config = utils.loadJsonFile(filePath)
+        config = driver.loadJsonFile(filePath)
 
         if config is None:
             logger.debug(f"device config not found, loading {defaultPath}")
-            config = utils.loadJsonFile(defaultPath)
+            config = driver.loadJsonFile(defaultPath)
         if config is None:
             logger.debug("using hard-coded defaults")
-            config = DEFAULT_CONFIG
+            config = driver.DEFAULT_CONFIG
 
         logger.debug(f"config={config}")
         return config
@@ -328,18 +328,18 @@ class FutabaDeviceDriver:
         """
         logger = cls._getLogger(name=productName)
 
-        filePath = os.path.join(utils.CALIBRATION_PATH, f"{productName}.json")
-        defaultPath = os.path.join(utils.CALIBRATION_PATH, "default.json")
+        filePath = os.path.join(driver.CALIBRATION_PATH, f"{productName}.json")
+        defaultPath = os.path.join(driver.CALIBRATION_PATH, "default.json")
 
         logger.debug(f"loading {filePath}")
-        channelCalibrations = utils.loadJsonFile(filePath)
+        channelCalibrations = driver.loadJsonFile(filePath)
 
         if channelCalibrations is None:
             logger.debug(f"loading{defaultPath}")
-            channelCalibrations = utils.loadJsonFile(defaultPath)
+            channelCalibrations = driver.loadJsonFile(defaultPath)
         if channelCalibrations is None:
             logger.debug("using hard-coded defaults")
-            channelCalibrations = DEFAULT_CALIBRATION
+            channelCalibrations = driver.DEFAULT_CALIBRATION
 
         logger.debug(f"channelCalibrations={channelCalibrations}")
         return channelCalibrations

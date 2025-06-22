@@ -3,10 +3,7 @@
 import uinput
 import usb
 
-from driver import FUTABA_VENDOR_ID, utils
-
-EVENT_MAX_VAL = 32768
-EVENT_MIN_VAL = 0
+import driver
 
 
 def start(
@@ -37,12 +34,12 @@ def start(
     ):
         raise TypeError("All parameters are required")
 
-    logger = utils.getLogger(name)
+    logger = driver.getLogger(name)
     calibration = None
     channel = None
     endpointAddress = None
 
-    logger = utils.getLogger(f"{name}(SUBPROC)")
+    logger = driver.getLogger(f"{name}(SUBPROC)")
     logger.DEBUG(
         f"Subprocess started, searching for device {name} on bus {bus}, port {port}"
     )
@@ -74,9 +71,9 @@ def start(
 
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
-        tuple([event + (0, EVENT_MAX_VAL, 0, 0) for event in channelEvents]),
+        tuple([event + (0, driver.EVENT_MAX_VAL, 0, 0) for event in channelEvents]),
         name,
-        vendor=FUTABA_VENDOR_ID,
+        vendor=driver.FUTABA_VENDOR_ID,
     )
 
     # Create all variables outside the loop to avoid the overhead of
@@ -136,7 +133,7 @@ def start(
                 reverseFlags,
             ):
                 if reverseFlag:
-                    data = EVENT_MAX_VAL - data
+                    data = driver.EVENT_MAX_VAL - data
                 # Queue one event for each channel
                 emit(event, data, syn=False)
             # fire all queued events
