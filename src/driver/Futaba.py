@@ -1,12 +1,10 @@
 """Class representing a single Futaba USB adapater"""
 
-import array
 import atexit
 import json
 import multiprocessing
 import os
 
-import numpy as np
 import uinput
 import usb
 
@@ -59,8 +57,6 @@ PRODUCTS = {
     11: "T16IZ",
     999: "default",
 }
-
-multiprocessing.set_start_method("spawn")
 
 
 class FutabaDeviceManager:
@@ -171,7 +167,11 @@ class FutabaDeviceDriver:
         Returns:
             string: The current state of the driver
         """
-        if self.subProc.is_alive():
+        if (
+            self.subProc is not None
+            and isinstance(self.subProc, multiprocessing.Process)
+            and self.subProc.is_alive()
+        ):
             self.state = "RUNNING"
         else:
             self.state = "IDLE"
@@ -185,7 +185,12 @@ class FutabaDeviceDriver:
         self.usbHandle.set_configuration()
 
         try:
-            self._eventLoop()
+            self.subProc = multiprocessing.Process(
+                name=f"{self.name} Driver",
+                target=_EVENTLOOP,
+                kwargs=self.toDict(),
+            )
+            self.subProc.start()
 
         except usb.core.USBError:
             # Don't raise exception, pass through to finally block
@@ -236,77 +241,16 @@ class FutabaDeviceDriver:
 
         self._setState("IDLE")
 
-    def _eventLoop(self):
-        """The main event loop of the driver - INDEFINITELY BLOCKING OPERATION"""
-        # Define variables before loop so we don't waste time creating
-        # a new variable each iteration and the interpreter doesn't have
-        # to evaluate dots, dict subscripts etc etc
-        self.runFlag = True
-        self._setState("RUNNING")
-        logger = self.logger
-        calibration = None
-        calibrationMaps = self.channelMaps
-        channel = None
-        channelEvents = self.channelEvents
-        emit = self.virtualDevice.emit
-        endpoint = self.interruptEndpoint
-        eventMaxVal = self.config["event_max_value"]
-        frameSize = self.config["frame_size"]
-        fromBytes = int.from_bytes
-        logger = self.logger
-        maxInputVal = None
-        rawData = None
-        readDevice = self.usbHandle.read
-        reverseFlags = self.reverseFlags
-        synchronize = self.virtualDevice.syn
-        logger.info(f"Driver started: {endpoint} -> {self.name}")
-        while self.runFlag:
-            try:
-                # - The transmitter may not send a new frame if the inputs remain static
-                # - No reason to care about timeouts
-                # - - Long timeout length = less timeouts
-                # - - Less timeouts = fewer exceptions caught
-                # - - Fewer exceptions caught = less overhead
-                rawData = readDevice(
-                    endpoint,
-                    frameSize,
-                    timeout=1000,
-                )
-
-                channelData = []
-                for i in range(0, len(rawData), 2):
-                    channel = i // 2
-                    calibration = calibrationMaps[channel]
-
-                    rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
-
-                    # Avoid overflows and underflows
-                    # account for off-by-one
-                    maxInputVal = len(calibration) - 1
-                    if rawValue > maxInputVal:
-                        rawValue = maxInputVal
-                    # calibration map will always have an index 0, so we pull
-                    # the minimum value from that
-                    elif rawValue < 0:
-                        rawValue = 0
-                    # Extract calibrated value from map
-                    channelData.append(calibration[rawValue])
-                channelData.reverse()
-
-                for data, event, reverseFlag in zip(  # Queue one event for each channel
-                    channelData, channelEvents, reverseFlags
-                ):
-                    if reverseFlag:
-                        data = eventMaxVal - data
-                    emit(event, data, syn=False)
-
-                synchronize()  # fire all queued events
-            except usb.core.USBError as e:
-                # kaboom?
-                if e.errno != 110:
-                    # Yes Rico, kaboom.
-                    logger.critical(e)
-                    raise e
+    def toDict(self):
+        """Returns a dictionary representation of the driverf object"""
+        return {
+            "calibration": self.calibration,
+            "channelEvents": self.channelEvents,
+            "config": self.config,
+            "endpointAddress": self.interruptEndpoint,
+            "name": self.name,
+            "reverseFlags": self.reverseFlags,
+        }
 
     def _setState(self, state):
         """Set the state of the Object
@@ -318,146 +262,36 @@ class FutabaDeviceDriver:
         self.state = state
 
     def __init__(self, coreDevice):
-        ##
-        # Sanity checks
-        ##
         if coreDevice.manufacturer.lower() != "futaba":
             raise RuntimeError("NOT A Futaba DEVICE!")
         self.name = f"Futaba {coreDevice.product}({coreDevice.bus},{coreDevice.port_numbers[0]})"
-
-        ##
-        # Global flags
-        ##
-        self.runFlag = False
         self.state = "INITIALIZING"
-
-        ##
-        # Handles to external objects
-        ##
-        self.usbHandle = coreDevice
-        self.usbHandle.port = coreDevice.port_numbers[0]
-        self.logger = self._getLogger(name=self.usbHandle.product, state=self.state)
-        self.interruptEndpoint = self._findEndpoint(self.usbHandle)
-        self.subProc = multiprocessing.Process(
-            name=f"{self.name} Driver", target=self._eventLoop
-        )
-
-        # Configuration
+        self.logger = self._getLogger(name=coreDevice.product, state=self.state)
+        self.interruptEndpoint = self._findEndpoint(coreDevice)
+        self.subProc = None
         self.logger.debug("Attempting to load device configuration")
-        self.config = self._loadConfig(self.usbHandle.product)
+        self.config = self._loadConfig(coreDevice.product)
 
-        ##
-        # Calibration:
         # Each channel will have an array that maps the devices raw value to
         # a calibrated value
-        ##
         self.logger.debug("Attempting to load device calibration")
-        self.calibration = self._loadCalibration(self.usbHandle.product)
+        self.calibration = self._loadCalibration(coreDevice.product)
         self.channelMaps = self._generateChannelMaps(self.calibration)
-        self.channelEvents = (
-            tuple(  # Attribute names are stored directly in the config file as a string
-                getattr(uinput, evtName) for evtName in self.config["channel_events"]
-            )
+        # Attribute names are stored directly in the config file as a string
+        self.channelEvents = tuple(
+            getattr(uinput, evtName) for evtName in self.config["channel_events"]
         )
         # Default to no reversed inputs
         self.reverseFlags = [False] * len(self.channelEvents)
-
-        # Create a virtual device using the events we just set up
-        self.virtualDevice = uinput.Device(
-            tuple([event + (0, EVENT_MAX_VAL, 0, 0) for event in self.channelEvents]),
-            self.name,
-            vendor=self.usbHandle.idVendor,
-        )
-
-        # Update logger, output some debug info
         self.logger = utils.getLogger(f"{self.name} -= IDLE =-")
-        self.logger.debug("Userspace driver ready:")
-        self.logger.debug(f"-> bus={self.usbHandle.bus}")
-        self.logger.debug(f"-> channelEvents: {self.channelEvents}")
-        self.logger.debug(f"-> config: {self.config}")
-        self.logger.debug(f"-> interruptEndpoint: {self.interruptEndpoint}")
-        self.logger.debug(f"-> name: {self.name}")
-        self.logger.debug(f"-> port={self.usbHandle.port}")
-        self.logger.debug(f"-> reverseFlags: {self.reverseFlags}")
-        self.logger.debug(f"-> virtualDevice: {self.virtualDevice}")
-
-        ##
-        # External event registration
-        ##
+        self.logger.debug(self.toDict())
         atexit.register(self.stop)
 
     def __str__(self):
-        return f"{self.name} driver"
+        return f"{self.name} Driver"
 
     def __repr__(self):
         return str(self.usbHandle)
-
-    @staticmethod
-    def _calculateValueMap(inputRange=None, outputRange=None):
-        """Generate a list of values that maps the input range to the output range
-
-        Args:
-            inputRange (list, optional): This determines the size of the map. Defaults to [600, 3500].
-            outputRange (list, optional): This determines what values are generated in the map. Defaults to [0, 32768].
-
-        Returns:
-            list: A list of all possible output values given the range of input values
-        """
-        logger = utils.getLogger("FutabaDeviceDriver")
-        if not hasattr(inputRange, "__len__") or len(inputRange) != 2:
-            logger.error(
-                "inputRange must be an array of length 2, using defaults instead"
-            )
-            inputRange = [600, 3500]
-        if not hasattr(outputRange, "__len__") or len(outputRange) != 2:
-            logger.error(
-                "outputRange must be an array of length 2, using defaults instead"
-            )
-            outputRange = [0, 32768]
-
-        if not isinstance(inputRange[0], int):
-            raise TypeError(
-                f"Expected inputRange[0] to be of type int, found {type(inputRange[0])}"
-            )
-        if not isinstance(inputRange[1], int):
-            raise TypeError(
-                f"Expected inputRange[1] to be of type int, found {type(inputRange[1])}"
-            )
-        if not isinstance(outputRange[0], int):
-            raise TypeError(
-                f"Expected outputRange[0] to be of type int, found {type(outputRange[0])}"
-            )
-        if not isinstance(outputRange[1], int):
-            raise TypeError(
-                f"Expected outputRange[1] to be of type int, found {type(inputRange[1])}"
-            )
-
-        # Guarantee that we are working with ints
-        inputRange[0] = int(inputRange[0])
-        inputRange[1] = int(inputRange[1])
-        outputRange[0] = int(outputRange[0])
-        outputRange[1] = int(outputRange[1])
-
-        lowerInput = inputRange[0]
-        upperInput = inputRange[1]
-        lowerOutput = outputRange[0]
-
-        # Create a value map such that the index of the array represents
-        # the input value, and the contents at that index is the output
-        inputValues = np.array([lowerOutput] * upperInput, int)
-        for i in range(lowerInput, upperInput):
-            inputValues[i] = i
-        return array.array(
-            "I",  # int
-            np.round(
-                np.interp(
-                    inputValues,
-                    inputRange,
-                    outputRange,
-                ),
-                0,  # No decimals
-            ).astype(int),
-        )
 
     @staticmethod
     def _findEndpoint(device):
@@ -539,7 +373,7 @@ class FutabaDeviceDriver:
         for channelCalibration in channelCalibrations:
             inputRange = channelCalibration[0]
             outputRange = channelCalibration[1]
-            calibratedChannels.append(cls._calculateValueMap(inputRange, outputRange))
+            calibratedChannels.append(utils.generateValueMap(inputRange, outputRange))
         return calibratedChannels
 
     @classmethod
@@ -596,3 +430,119 @@ class FutabaDeviceDriver:
 
         logger.debug(f"channelCalibrations={channelCalibrations}")
         return channelCalibrations
+
+
+def _EVENTLOOP(
+    calibrationMaps=None,
+    channelEvents=None,
+    config=None,
+    bus=None,
+    port=None,
+    name=None,
+    reverseFlags=None,
+):
+    """The main event loop of the driver - INDEFINITELY BLOCKING OPERATION"""
+    # Define variables before loop so we don't waste time creating
+    # a new variable each iteration and the interpreter doesn't have
+    # to evaluate dots, dict subscripts etc etc
+    if (
+        bus is None
+        or calibrationMaps is None
+        or channelEvents is None
+        or config is None
+        or name is None
+        or port is None
+        or reverseFlags is None
+    ):
+        raise TypeError("All parameters are required")
+
+    logger = utils.getLogger(name)
+    calibration = None
+    channel = None
+    usbHandle = None
+    endpointAddress = None
+
+    # Find the device at the specified location
+    for _device in usb.core.find(find_all=True):
+        if int(_device.port_number) != int(port) or int(_device.bus_) != int(bus):
+            continue
+
+        for _config in _device:
+            for _interface in _config:
+                for _endpoint in _interface:
+                    if (
+                        usb.util.endpoint_direction(_endpoint.bEndpointAddress)
+                        == usb.util.ENDPOINT_IN
+                        and _endpoint.bmAttributes == 0x3
+                    ):
+                        usbHandle = _device
+                        endpointAddress = _endpoint.bEndpointAddress
+                        break
+    if usbHandle is None:
+        raise TypeError(
+            f"Unable to locate A device with an interrupt endpoint at {endpointAddress}"
+        )
+
+    # Create a virtual device for the found device
+    virtualDevice = uinput.Device(
+        tuple([event + (0, EVENT_MAX_VAL, 0, 0) for event in channelEvents]),
+        name,
+        vendor=FUTABA_VENDOR_ID,
+    )
+
+    # Create all variables outside the loop to avoid the overhead of
+    # recreating them each iteration
+    emit = virtualDevice.emit
+    frameSize = config["frame_size"]
+    fromBytes = int.from_bytes
+    logger = utils.getLogger(f"{name}(SUBPROC)")
+    maxInputVal = None
+    rawData = None
+    readDevice = usbHandle.read
+    synchronize = virtualDevice.syn
+
+    logger.info(f"Driver started: {endpointAddress} -> {name}")
+
+    while True:
+        try:
+            # - The transmitter may not send a new frame if the inputs remain static
+            # - No reason to care about timeouts
+            # - - Long timeout length = less timeouts
+            # - - Less timeouts = fewer exceptions caught
+            # - - Fewer exceptions caught = less overhead
+            rawData = readDevice(endpointAddress, frameSize, timeout=1000)
+
+            channelData = []
+            for i in range(0, len(rawData), 2):
+                channel = i // 2
+                calibration = calibrationMaps[channel]
+
+                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
+
+                # Avoid overflows and underflows
+                # account for off-by-one
+                maxInputVal = len(calibration) - 1
+                if rawValue > maxInputVal:
+                    rawValue = maxInputVal
+                # calibration map will always have an index 0, so we pull
+                # the minimum value from that
+                elif rawValue < 0:
+                    rawValue = 0
+                # Extract calibrated value from map
+                channelData.append(calibration[rawValue])
+            channelData.reverse()
+
+            for data, event, reverseFlag in zip(  # Queue one event for each channel
+                channelData, channelEvents, reverseFlags
+            ):
+                if reverseFlag:
+                    data = EVENT_MAX_VAL - data
+                emit(event, data, syn=False)
+
+            synchronize()  # fire all queued events
+        except usb.core.USBError as e:
+            # kaboom?
+            if e.errno != 110:
+                # Yes Rico, kaboom.
+                logger.critical(e)
+                raise e
