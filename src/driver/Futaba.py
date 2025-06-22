@@ -180,14 +180,11 @@ class FutabaDeviceDriver:
     def start(self):
         """Start the driver if it is not running"""
 
-        if self.usbHandle.is_kernel_driver_active(0):
-            self.usbHandle.detach_kernel_driver(0)
-        self.usbHandle.set_configuration()
-
         try:
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
                 target=_EVENTLOOP,
+                args=(self.killswitch,),
                 kwargs=self.toDict(),
             )
             self.subProc.start()
@@ -200,45 +197,10 @@ class FutabaDeviceDriver:
 
         return self.subProc.is_alive()
 
-    def stop(self, exitCode=None):
-        """Stop the driver if it is running
-
-        Args:
-            exitCode (int, optional): If provided the driver will exit with this code. Defaults to None.
-        """
-        self._setState("STOPPING")
-        logger = self.logger
-
-        try:
-            logger.debug("Releasing the USB interface...")
-            usb.util.release_interface(self.usbHandle, 0)
-        except Exception as e:
-            logger.warning(
-                "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
-            )
-            logger.warning(e)
-
-        try:
-            logger.debug("Reattaching the kernel driver...")
-            self.usbHandle.attach_kernel_driver(0)
-        except Exception as e:
-            logger.warning(
-                "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
-            )
-            logger.warning(e)
-
-        try:
-            logger.debug("Resetting device...")
-            self.usbHandle.reset()
-        except Exception as e:
-            logger.warning(
-                "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
-            )
-            logger.warning(e)
-
-        if exitCode is not None:
-            exit(exitCode)
-
+    def stop(self):
+        """Stop the driver"""
+        self.killswitch.set()
+        self.subProc.join()
         self._setState("IDLE")
 
     def toDict(self):
@@ -269,6 +231,7 @@ class FutabaDeviceDriver:
         self.logger = self._getLogger(name=coreDevice.product, state=self.state)
         self.interruptEndpoint = self._findEndpoint(coreDevice)
         self.subProc = None
+        self.killswitch = multiprocessing.Event()
         self.logger.debug("Attempting to load device configuration")
         self.config = self._loadConfig(coreDevice.product)
 
@@ -433,6 +396,7 @@ class FutabaDeviceDriver:
 
 
 def _EVENTLOOP(
+    killswitch,
     calibrationMaps=None,
     channelEvents=None,
     config=None,
@@ -462,23 +426,32 @@ def _EVENTLOOP(
     usbHandle = None
     endpointAddress = None
 
-    # Find the device at the specified location
-    for _device in usb.core.find(find_all=True):
-        if int(_device.port_number) != int(port) or int(_device.bus_) != int(bus):
-            continue
+    logger = utils.getLogger(f"{name}(SUBPROC)")
+    logger.DEBUG(
+        f"Subprocess started, searching for device {name} on bus {bus}, port {port}"
+    )
 
-        for _config in _device:
-            for _interface in _config:
-                for _endpoint in _interface:
-                    if (
-                        usb.util.endpoint_direction(_endpoint.bEndpointAddress)
-                        == usb.util.ENDPOINT_IN
-                        and _endpoint.bmAttributes == 0x3
-                    ):
-                        usbHandle = _device
-                        endpointAddress = _endpoint.bEndpointAddress
-                        break
-    if usbHandle is None:
+    coreDevice = [
+        device
+        for device in usb.core.find(find_all=True)
+        if int(device.port_number) == int(port) and int(device.bus_) == int(bus)
+    ][0]
+
+    logger.DEBUG(
+        f"--> device found ({coreDevice}), searching for interrupt endpoint address"
+    )
+    for _config in coreDevice:
+        for _interface in _config:
+            for _endpoint in _interface:
+                if (
+                    usb.util.endpoint_direction(_endpoint.bEndpointAddress)
+                    == usb.util.ENDPOINT_IN
+                    and _endpoint.bmAttributes == 0x3
+                ):
+                    endpointAddress = _endpoint.bEndpointAddress
+                    logger.DEBUG(f"----> address found ({endpointAddress})")
+                    break
+    if coreDevice is None:
         raise TypeError(
             f"Unable to locate A device with an interrupt endpoint at {endpointAddress}"
         )
@@ -495,15 +468,18 @@ def _EVENTLOOP(
     emit = virtualDevice.emit
     frameSize = config["frame_size"]
     fromBytes = int.from_bytes
-    logger = utils.getLogger(f"{name}(SUBPROC)")
+
     maxInputVal = None
     rawData = None
-    readDevice = usbHandle.read
+    readDevice = coreDevice.read
     synchronize = virtualDevice.syn
-
     logger.info(f"Driver started: {endpointAddress} -> {name}")
 
-    while True:
+    if coreDevice.is_kernel_driver_active(0):
+        coreDevice.detach_kernel_driver(0)
+    coreDevice.set_configuration()
+
+    while not killswitch.is_set():
         try:
             # - The transmitter may not send a new frame if the inputs remain static
             # - No reason to care about timeouts
@@ -532,14 +508,22 @@ def _EVENTLOOP(
                 channelData.append(calibration[rawValue])
             channelData.reverse()
 
-            for data, event, reverseFlag in zip(  # Queue one event for each channel
-                channelData, channelEvents, reverseFlags
+            # Queue one event for each channel
+            for (
+                data,
+                event,
+                reverseFlag,
+            ) in zip(
+                channelData,
+                channelEvents,
+                reverseFlags,
             ):
                 if reverseFlag:
                     data = EVENT_MAX_VAL - data
+                # Queue one event for each channel
                 emit(event, data, syn=False)
-
-            synchronize()  # fire all queued events
+            # fire all queued events
+            synchronize()
         except usb.core.USBError as e:
             # kaboom?
             if e.errno != 110:
@@ -549,7 +533,7 @@ def _EVENTLOOP(
         finally:
             try:
                 logger.debug("Releasing the USB interface...")
-                usb.util.release_interface(usbHandle, 0)
+                usb.util.release_interface(coreDevice, 0)
             except Exception as e:
                 logger.warning(
                     "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
@@ -558,7 +542,7 @@ def _EVENTLOOP(
 
             try:
                 logger.debug("Reattaching the kernel driver...")
-                usbHandle.attach_kernel_driver(0)
+                coreDevice.attach_kernel_driver(0)
             except Exception as e:
                 logger.warning(
                     "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
@@ -567,7 +551,7 @@ def _EVENTLOOP(
 
             try:
                 logger.debug("Resetting device...")
-                usbHandle.reset()
+                coreDevice.reset()
             except Exception as e:
                 logger.warning(
                     "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
