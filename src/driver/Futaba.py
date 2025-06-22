@@ -321,7 +321,6 @@ class InputChannel:
             {
                 "eventName": self.eventName,
                 "isReversed": self.isReversed,
-                "event": self.event,
                 "calibration": self.calibration,
             }
         )

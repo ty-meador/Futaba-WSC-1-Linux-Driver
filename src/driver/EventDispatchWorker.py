@@ -31,7 +31,6 @@ def start(
         raise TypeError("All parameters are required")
 
     logger = driver.getLogger(name)
-    calibration = None
     channel = None
     endpointAddress = None
 
