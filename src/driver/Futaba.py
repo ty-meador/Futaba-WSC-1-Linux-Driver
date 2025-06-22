@@ -10,7 +10,6 @@ import numpy as np
 import usb
 
 import driver
-from driver import EventDispatchWorker
 
 
 class FutabaDeviceManager:
@@ -52,6 +51,7 @@ class FutabaDeviceManager:
         self.logger.debug(f"Attempting to start device at index[s] {deviceIndex}")
         if isinstance(deviceIndex, int):
             result = self.futabaDevices[deviceIndex].start()
+
             if result:
                 self.logger.debug(f"-> {self.futabaDevices[deviceIndex]} started")
             else:
@@ -134,11 +134,7 @@ class FutabaDeviceDriver:
         Returns:
             string: The current state of the driver
         """
-        if (
-            self.subProc is not None
-            and isinstance(self.subProc, multiprocessing.Process)
-            and self.subProc.is_alive()
-        ):
+        if self.subProc is not None and self.subProc.is_alive():
             self.state = "RUNNING"
         else:
             self.state = "IDLE"
@@ -146,27 +142,17 @@ class FutabaDeviceDriver:
 
     def start(self):
         """Start the driver if it is not running"""
-
-        self.logger.debug("Attempting to start")
-        try:
-            if self.killswitch.is_set():
-                self.killswitch.clear()
-                self.logger.debug("-> Killswitch cleared")
-            self.subProc = multiprocessing.Process(
-                name=f"{self.name} Driver",
-                target=EventDispatchWorker.start,
-                args=(self.killswitch,),
-                kwargs=self.toDict(),
-            )
-            self.logger.debug("-> subprocess spawned")
-            self.subProc.start()
-            self.logger.debug("-> device started")
-        except usb.core.USBError:
-            # Don't raise exception, pass through to finally block
-            pass
-        finally:
-            self.stop()
-        return self.subProc.is_alive()
+        if self.killswitch.is_set():
+            self.killswitch.clear()
+            self.logger.debug("-> Killswitch cleared")
+        self.subProc = multiprocessing.Process(
+            name=f"{self.name} Driver",
+            target=driver.eventDispatchWorker,
+            args=(self.killswitch,),
+            kwargs=(self.toDict()),
+        )
+        self.subProc.start()
+        return self.getState()
 
     def stop(self):
         """Stop the driver"""

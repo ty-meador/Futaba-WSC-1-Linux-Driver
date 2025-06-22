@@ -6,7 +6,7 @@ import usb
 import driver
 
 
-def start(
+def EventDispatchWorker(
     killswitch,
     bus=None,
     config=None,
@@ -35,7 +35,7 @@ def start(
     endpointAddress = None
 
     logger = driver.getLogger(f"{name}(SUBPROC)")
-    logger.DEBUG(
+    logger.debug(
         f"Subprocess started, searching for device {name} on bus {bus}, port {port}"
     )
 
@@ -45,7 +45,7 @@ def start(
         if int(device.port_number) == int(port) and int(device.bus_) == int(bus)
     ][0]
 
-    logger.DEBUG(
+    logger.debug(
         f"--> device found ({coreDevice}), searching for interrupt endpoint address"
     )
     for _config in coreDevice:
@@ -57,7 +57,7 @@ def start(
                     and _endpoint.bmAttributes == 0x3
                 ):
                     endpointAddress = _endpoint.bEndpointAddress
-                    logger.DEBUG(f"----> address found ({endpointAddress})")
+                    logger.debug(f"----> address found ({endpointAddress})")
                     break
     if coreDevice is None:
         raise TypeError(
