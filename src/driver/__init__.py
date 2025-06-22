@@ -83,7 +83,37 @@ LOG_HANDLER = handlers.RotatingFileHandler(
 )
 
 
-def getCoreDevice(bus, port):
+def findInterruptEndpoint(device):
+    """Find the USB interrupt endpoint for the provided device
+
+    Args:
+        device (usb.core.Device): The device that we want to emulate
+
+    Raises:
+        ValueError: Raised if the provided device is not an of type usb.core.device
+        RuntimeError: Raised if the provided device does not have an endpoint
+
+    Returns:
+        int: The interrupt endpoint address
+    """
+    if not isinstance(device, usb.core.Device):
+        raise ValueError(
+            f"Expected first param to be of type usb.core.Device, found {type(device)}"
+        )
+    for config in device:
+        for interface in config:
+            for endpoint in interface:
+                if (
+                    usb.util.endpoint_direction(endpoint.bEndpointAddress)
+                    == usb.util.ENDPOINT_IN
+                    # 0x3 indicates interrupt endpoint
+                    and endpoint.bmAttributes == 0x3
+                ):
+                    return endpoint.bEndpointAddress
+    raise RuntimeError("No interrupt endpoint found!")
+
+
+def getCoreDeviceInfo(bus, port):
     """Finds the core device on the given bus and port
 
     Args:
@@ -94,15 +124,30 @@ def getCoreDevice(bus, port):
         usb.core.Device: The core device at the provided bus and port
     """
 
+    logger = getLogger("getCoreDevice")
+    logger.debug(f"looking for core device on bus {bus}, port {port}")
     results = [
         device
         for device in usb.core.find(find_all=True)
-        if int(device.port_number) == int(port) and int(device.bus_) == int(bus)
+        if device.manufacturer.lower() == "futaba"
+        and int(device.port_numbers[0]) == int(port)
+        and int(device.bus) == int(bus)
     ]
 
     if len(results) != 1:
+        logger.debug(f"Expected to find exactly 1 result, found {len(results)}")
         return False
-    return results[0]
+
+    device = results[0]
+    logger.debug(f"-> Found {results[0]}")
+    return {
+        "productID": device.idProduct,
+        "serialNumber": device.serial_number,
+        "product": device.product,
+        "manufacturer": device.manufacturer,
+        "speed": device.speed,
+        "interruptEndpoint": findInterruptEndpoint(device),
+    }
 
 
 def getLogger(

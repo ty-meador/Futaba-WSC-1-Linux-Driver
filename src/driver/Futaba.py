@@ -8,6 +8,7 @@ import uinput
 import usb
 
 import driver
+from driver import EventDispatchWorker
 
 
 class FutabaDeviceManager:
@@ -132,9 +133,11 @@ class FutabaDeviceDriver:
         """Start the driver if it is not running"""
 
         try:
+            if self.killswitch.is_set():
+                self.killswitch.clear()
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
-                target=driver.EventDispatchWorker.start,
+                target=EventDispatchWorker.start,
                 args=(self.killswitch,),
                 kwargs=self.toDict(),
             )
@@ -148,8 +151,10 @@ class FutabaDeviceDriver:
 
     def stop(self):
         """Stop the driver"""
-        self.killswitch.set()
-        self.subProc.join()
+        if not self.killswitch.is_set():
+            self.killswitch.set()
+        if self.subProc is not None and self.subProc.is_alive():
+            self.subProc.join()
         self._setState("IDLE")
 
     def toDict(self):
@@ -173,44 +178,43 @@ class FutabaDeviceDriver:
         self.state = state
 
     def __init__(self, bus, port, name=None):
-        coreDevice = driver.getCoreDevice(bus, port)
+        deviceInfo = driver.getCoreDeviceInfo(bus, port)
 
-        if not coreDevice:
+        if not deviceInfo:
             raise RuntimeError(f"No device found at bus {bus}, port {port}")
-        if not isinstance(coreDevice, usb.core.Device):
-            raise TypeError(
-                f"The device at bus {bus}, port {port} is not of type "
-                "usb.core.Device. This should not be possible!"
-            )
-        if coreDevice.manufacturer.lower() != "futaba":
+
+        if deviceInfo["manufacturer"].lower() != "futaba":
             raise TypeError(
                 f"The device at bus {bus}, port {port} does not appear to be a"
                 "Futaba device"
             )
 
         self.state = "INITIALIZING"
-
-        self.name = name
-        if self.name is None:
-            self.name = f"Futaba {coreDevice.product}({coreDevice.bus},{coreDevice.port_numbers[0]})"
-        self.productId = coreDevice.idProduct
-        self.serialNumber = coreDevice.serial_number
-        self.product = coreDevice.product
-        self.manufacturer = coreDevice.manufacturer
         self.bus = bus
         self.port = port
-        self.speed = coreDevice.speed
+        self.name = name
+        if self.name is None:
+            self.name = f"Futaba {deviceInfo['product']}({bus},{port})"
         self.logger = self._getLogger(name=self.name, state=self.state)
-        self.interruptEndpoint = self._findEndpoint(coreDevice)
+
+        self.productID = deviceInfo["productID"]
+        self.serialNumber = deviceInfo["serialNumber"]
+        self.product = deviceInfo["product"]
+        self.manufacturer = deviceInfo["manufacturer"]
+        self.speed = deviceInfo["speed"]
+        self.interruptEndpoint = deviceInfo["interruptEndpoint"]
+
+        # Append any additional info just in case
+        for key, value in deviceInfo.items():
+            setattr(self, key, value)
+
         self.subProc = None
         self.killswitch = multiprocessing.Event()
-        self.logger.debug("Attempting to load device configuration")
-        self.config = self._loadConfig(coreDevice.product)
+        self.config = self._loadConfig(self.product)
 
         # Each channel will have an array that maps the devices raw value to
         # a calibrated value
-        self.logger.debug("Attempting to load device calibration")
-        self.calibration = self._loadCalibration(coreDevice.product)
+        self.calibration = self._loadCalibration(self.product)
         self.channelMaps = self._generateChannelMaps(self.calibration)
         # Attribute names are stored directly in the config file as a string
         self.channelEvents = tuple(
@@ -227,36 +231,6 @@ class FutabaDeviceDriver:
 
     def __repr__(self):
         return str(self.toDict())
-
-    @staticmethod
-    def _findEndpoint(device):
-        """Find the USB interrupt endpoint for the provided device
-
-        Args:
-            device (usb.core.Device): The device that we want to emulate
-
-        Raises:
-            ValueError: Raised if the provided device is not an of type usb.core.device
-            RuntimeError: Raised if the provided device does not have an endpoint
-
-        Returns:
-            int: The interrupt endpoint address
-        """
-        if not isinstance(device, usb.core.Device):
-            raise ValueError(
-                f"Expected first param to be of type usb.core.Device, found {type(device)}"
-            )
-        for config in device:
-            for interface in config:
-                for endpoint in interface:
-                    if (
-                        usb.util.endpoint_direction(endpoint.bEndpointAddress)
-                        == usb.util.ENDPOINT_IN
-                        # 0x3 indicates interrupt endpoint
-                        and endpoint.bmAttributes == 0x3
-                    ):
-                        return endpoint.bEndpointAddress
-        raise RuntimeError("No interrupt endpoint found!")
 
     @staticmethod
     def _getLogger(name="FutabaDeviceDriver", state="CLASS"):
