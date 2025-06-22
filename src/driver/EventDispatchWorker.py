@@ -8,13 +8,11 @@ import driver
 
 def start(
     killswitch,
-    channelCalibrationMaps=None,
-    channelEventsMap=None,
-    config=None,
     bus=None,
+    config=None,
+    deviceChannels=None,
     port=None,
     name=None,
-    reverseFlags=None,
 ):
     """The target function for the drivers' subprocess
     NOTE main event loop optimization:
@@ -25,12 +23,10 @@ def start(
     """
     if (
         bus is None
-        or channelCalibrationMaps is None
-        or channelEventsMap is None
+        or deviceChannels is None
         or config is None
         or name is None
         or port is None
-        or reverseFlags is None
     ):
         raise TypeError("All parameters are required")
 
@@ -69,6 +65,17 @@ def start(
             f"Unable to locate A device with an interrupt endpoint at {endpointAddress}"
         )
 
+    channelEventsMap = []
+    channelReverseFlags = []
+    channelValueMaps = []
+    for channel in deviceChannels:
+        channelEventsMap.append(getattr(uinput, channel.eventName))
+        channelReverseFlags.append(channel.isReversed)
+        channelValueMaps.append(channelValueMaps)
+    channelEventsMap = tuple(channelEventsMap)
+    channelReverseFlags = tuple(channelReverseFlags)
+    channelReverseFlags = tuple(channelReverseFlags)
+
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
         tuple([event + (0, driver.EVENT_MAX_VAL, 0, 0) for event in channelEventsMap]),
@@ -105,13 +112,13 @@ def start(
             channelData = []
             for i in range(0, len(rawData), 2):
                 channel = i // 2
-                calibration = channelCalibrationMaps[channel]
+                valueMap = channelValueMaps[channel]
 
                 rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
 
                 # Avoid overflows and underflows
                 # account for off-by-one
-                maxInputVal = len(calibration) - 1
+                maxInputVal = len(valueMap) - 1
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
                 # calibration map will always have an index 0, so we pull
@@ -119,7 +126,7 @@ def start(
                 elif rawValue < 0:
                     rawValue = 0
                 # Extract calibrated value from map
-                channelData.append(calibration[rawValue])
+                channelData.append(valueMap[rawValue])
             channelData.reverse()
 
             # Queue one event for each channel
@@ -130,7 +137,7 @@ def start(
             ) in zip(
                 channelData,
                 channelEventsMap,
-                reverseFlags,
+                channelReverseFlags,
             ):
                 if reverseFlag:
                     data = driver.EVENT_MAX_VAL - data

@@ -7,7 +7,6 @@ import os
 import sys
 
 import numpy as np
-import uinput
 import usb
 
 import driver
@@ -162,12 +161,13 @@ class FutabaDeviceDriver:
 
     def toDict(self):
         """Returns a dictionary representation of the driverf object"""
+
         return {
             "config": self.config,
-            "endpointAddress": self.interruptEndpoint,
-            "inputChannels": tuple(
+            "deviceChannels": tuple(
                 [channel.toDict() for channel in self.deviceChannels]
             ),
+            "endpointAddress": self.interruptEndpoint,
             "name": self.name,
         }
 
@@ -303,14 +303,12 @@ class InputChannel:
         return {
             "eventName": self.eventName,
             "isReversed": self.isReversed,
-            "event": self.event,
             "valueMap": self.valueMap,
         }
 
     def __init__(self, eventName, calibration, reverseInputs=False):
         self.eventName = eventName
         self.isReversed = reverseInputs
-        self.event = getattr(uinput, eventName)
         self.calibration = ChannelCalibration(
             inputRange=calibration[0],
             outputRange=calibration[1],
