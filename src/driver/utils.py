@@ -1,26 +1,29 @@
 """Utility functions for the project"""
 
 import array
+import json
 import logging
 import os
 from logging import handlers
 from pathlib import Path
 
 import numpy as np
+import usb
 
 CALIBRATION_PATH = None
 CONFIG_PATH = None
 LOG_PATH = None
-ROOT_DIR = None
+SRC_PATH = None
 
 for parent in Path(__file__).resolve().parents:
     if (parent / ".pylintrc").exists():
-        ROOT_DIR = os.path.abspath(os.path.join(parent, "src"))
-        LOG_PATH = os.path.abspath((os.path.join(parent, "logs")))
-        CONFIG_PATH = os.path.abspath(os.path.join(ROOT_DIR, "driver", "configs"))
-        CALIBRATION_PATH = os.path.abspath(
-            os.path.join(ROOT_DIR, "driver", "calibrations")
-        )
+        PARENT = os.path.abspath(parent)
+        SRC_PATH = os.path.join(PARENT, "src")
+        LOG_PATH = os.path.join(PARENT, "logs")
+        DRIVER_PATH = os.path.join(SRC_PATH, "driver")
+        CONFIG_PATH = os.path.join(DRIVER_PATH, "configs")
+        CALIBRATION_PATH = os.path.join(DRIVER_PATH, "calibrations")
+
         os.makedirs(LOG_PATH, exist_ok=True)
         os.makedirs(CONFIG_PATH, exist_ok=True)
         os.makedirs(CALIBRATION_PATH, exist_ok=True)
@@ -31,6 +34,28 @@ LOG_HANDLER = handlers.RotatingFileHandler(
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
 )
+
+
+def getCoreDevice(bus, port):
+    """Finds the core device on the given bus and port
+
+    Args:
+        bus (int): The bus of the device
+        port (int): The port of the device
+
+    Returns:
+        usb.core.Device: The core device at the provided bus and port
+    """
+
+    results = [
+        device
+        for device in usb.core.find(find_all=True)
+        if int(device.port_number) == int(port) and int(device.bus_) == int(bus)
+    ]
+
+    if len(results) != 1:
+        return False
+    return results[0]
 
 
 def getLogger(
@@ -119,3 +144,27 @@ def generateValueMap(inputRange=None, outputRange=None):
             0,  # No decimals
         ).astype(int),
     )
+
+
+def loadJsonFile(filePath):
+    """Generic function to load a JSON file into a dictionary
+
+    Args:
+        filePath (str): The path to the json file you want to load
+
+    Returns:
+        dict: The parsed json
+    """
+    logger = getLogger("loadJsonFile")
+    parsedJson = None
+
+    try:
+        logger.debug(f"> Looking for {filePath}")
+        with open(filePath, "r", encoding="utf-8") as jsonFile:
+            parsedJson = json.load(jsonFile)
+        logger.debug("--> loaded!")
+    except FileNotFoundError:
+        # parsedJson defaults to None
+        logger.debug("--> not found, returning >None<")
+
+    return parsedJson

@@ -1,7 +1,6 @@
 """Class representing a single Futaba USB adapater"""
 
 import atexit
-import json
 import multiprocessing
 import os
 
@@ -223,12 +222,35 @@ class FutabaDeviceDriver:
         self.logger = utils.getLogger(f"{self.name} -= {state} =-")
         self.state = state
 
-    def __init__(self, coreDevice):
+    def __init__(self, bus, port, name=None):
+        coreDevice = utils.getCoreDevice(bus, port)
+
+        if not coreDevice:
+            raise RuntimeError(f"No device found at bus {bus}, port {port}")
+        if not isinstance(coreDevice, usb.core.Device):
+            raise TypeError(
+                f"The device at bus {bus}, port {port} is not of type "
+                "usb.core.Device. This should not be possible!"
+            )
         if coreDevice.manufacturer.lower() != "futaba":
-            raise RuntimeError("NOT A Futaba DEVICE!")
-        self.name = f"Futaba {coreDevice.product}({coreDevice.bus},{coreDevice.port_numbers[0]})"
+            raise TypeError(
+                f"The device at bus {bus}, port {port} does not appear to be a"
+                "Futaba device"
+            )
+
         self.state = "INITIALIZING"
-        self.logger = self._getLogger(name=coreDevice.product, state=self.state)
+
+        self.name = name
+        if self.name is None:
+            self.name = f"Futaba {coreDevice.product}({coreDevice.bus},{coreDevice.port_numbers[0]})"
+        self.productId = coreDevice.idProduct
+        self.serialNumber = coreDevice.serial_number
+        self.product = coreDevice.product
+        self.manufacturer = coreDevice.manufacturer
+        self.bus = bus
+        self.port = port
+        self.speed = coreDevice.speed
+        self.logger = self._getLogger(name=self.name, state=self.state)
         self.interruptEndpoint = self._findEndpoint(coreDevice)
         self.subProc = None
         self.killswitch = multiprocessing.Event()
@@ -268,10 +290,12 @@ class FutabaDeviceDriver:
             RuntimeError: Raised if the provided device does not have an endpoint
 
         Returns:
-            : The endpoint object used to capture frames from the physical device
+            int: The interrupt endpoint address
         """
         if not isinstance(device, usb.core.Device):
-            raise ValueError("Expected first param to be of type usb.core.Device")
+            raise ValueError(
+                f"Expected first param to be of type usb.core.Device, found {type(device)}"
+            )
         for config in device:
             for interface in config:
                 for endpoint in interface:
@@ -283,30 +307,6 @@ class FutabaDeviceDriver:
                     ):
                         return endpoint.bEndpointAddress
         raise RuntimeError("No interrupt endpoint found!")
-
-    @staticmethod
-    def _loadJsonFile(filePath):
-        """Generic function to load a JSON file into a dictionary
-
-        Args:
-            filePath (str): The path to the json file you want to load
-
-        Returns:
-            dict: The parsed json
-        """
-        logger = utils.getLogger("FutabaDeviceDriver")
-        parsedJson = None
-
-        try:
-            logger.debug(f"> Looking for {filePath}")
-            with open(filePath, "r", encoding="utf-8") as jsonFile:
-                parsedJson = json.load(jsonFile)
-            logger.debug("--> loaded!")
-        except FileNotFoundError:
-            # parsedJson defaults to None
-            logger.debug("--> not found, returning >None<")
-
-        return parsedJson
 
     @staticmethod
     def _getLogger(name="FutabaDeviceDriver", state="CLASS"):
@@ -354,11 +354,11 @@ class FutabaDeviceDriver:
         defaultPath = os.path.join(utils.CONFIG_PATH, "default.json")
 
         logger.debug(f"loading {filePath}")
-        config = cls._loadJsonFile(filePath)
+        config = utils.loadJsonFile(filePath)
 
         if config is None:
             logger.debug(f"device config not found, loading {defaultPath}")
-            config = cls._loadJsonFile(defaultPath)
+            config = utils.loadJsonFile(defaultPath)
         if config is None:
             logger.debug("using hard-coded defaults")
             config = DEFAULT_CONFIG
@@ -382,11 +382,11 @@ class FutabaDeviceDriver:
         defaultPath = os.path.join(utils.CALIBRATION_PATH, "default.json")
 
         logger.debug(f"loading {filePath}")
-        channelCalibrations = cls._loadJsonFile(filePath)
+        channelCalibrations = utils.loadJsonFile(filePath)
 
         if channelCalibrations is None:
             logger.debug(f"loading{defaultPath}")
-            channelCalibrations = cls._loadJsonFile(defaultPath)
+            channelCalibrations = utils.loadJsonFile(defaultPath)
         if channelCalibrations is None:
             logger.debug("using hard-coded defaults")
             channelCalibrations = DEFAULT_CALIBRATION
