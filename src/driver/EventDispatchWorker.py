@@ -8,8 +8,8 @@ import driver
 
 def start(
     killswitch,
-    calibrationMaps=None,
-    channelEvents=None,
+    channelCalibrationMaps=None,
+    channelEventsMap=None,
     config=None,
     bus=None,
     port=None,
@@ -25,8 +25,8 @@ def start(
     """
     if (
         bus is None
-        or calibrationMaps is None
-        or channelEvents is None
+        or channelCalibrationMaps is None
+        or channelEventsMap is None
         or config is None
         or name is None
         or port is None
@@ -71,7 +71,7 @@ def start(
 
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
-        tuple([event + (0, driver.EVENT_MAX_VAL, 0, 0) for event in channelEvents]),
+        tuple([event + (0, driver.EVENT_MAX_VAL, 0, 0) for event in channelEventsMap]),
         name,
         vendor=driver.FUTABA_VENDOR_ID,
     )
@@ -105,7 +105,7 @@ def start(
             channelData = []
             for i in range(0, len(rawData), 2):
                 channel = i // 2
-                calibration = calibrationMaps[channel]
+                calibration = channelCalibrationMaps[channel]
 
                 rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
 
@@ -129,7 +129,7 @@ def start(
                 reverseFlag,
             ) in zip(
                 channelData,
-                channelEvents,
+                channelEventsMap,
                 reverseFlags,
             ):
                 if reverseFlag:

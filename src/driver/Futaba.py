@@ -1,9 +1,12 @@
 """Class representing a single Futaba USB adapater"""
 
+import array
 import atexit
 import multiprocessing
 import os
+import sys
 
+import numpy as np
 import uinput
 import usb
 
@@ -160,8 +163,8 @@ class FutabaDeviceDriver:
     def toDict(self):
         """Returns a dictionary representation of the driverf object"""
         return {
-            "calibration": self.calibration,
-            "channelEvents": self.channelEvents,
+            "channelEventsMap": self.channelEventsMap,
+            "channelValueMaps": self.channelCalibrationMaps,
             "config": self.config,
             "endpointAddress": self.interruptEndpoint,
             "name": self.name,
@@ -185,43 +188,34 @@ class FutabaDeviceDriver:
 
         if deviceInfo["manufacturer"].lower() != "futaba":
             raise TypeError(
-                f"The device at bus {bus}, port {port} does not appear to be a"
-                "Futaba device"
+                f"The device at bus {bus}, port {port} does not appear to be aFutaba device"
             )
 
         self.state = "INITIALIZING"
         self.bus = bus
         self.port = port
+
         self.name = name
         if self.name is None:
             self.name = f"Futaba {deviceInfo['product']}({bus},{port})"
-        self.logger = self._getLogger(name=self.name, state=self.state)
 
+        self.logger = self._getLogger(name=self.name, state=self.state)
         self.productID = deviceInfo["productID"]
         self.serialNumber = deviceInfo["serialNumber"]
         self.product = deviceInfo["product"]
         self.manufacturer = deviceInfo["manufacturer"]
         self.speed = deviceInfo["speed"]
         self.interruptEndpoint = deviceInfo["interruptEndpoint"]
-
-        # Append any additional info just in case
-        for key, value in deviceInfo.items():
-            setattr(self, key, value)
-
         self.subProc = None
         self.killswitch = multiprocessing.Event()
         self.config = self._loadConfig(self.product)
-
-        # Each channel will have an array that maps the devices raw value to
-        # a calibrated value
-        self.calibration = self._loadCalibration(self.product)
-        self.channelMaps = self._generateChannelMaps(self.calibration)
-        # Attribute names are stored directly in the config file as a string
-        self.channelEvents = tuple(
-            getattr(uinput, evtName) for evtName in self.config["channel_events"]
-        )
-        # Default to no reversed inputs
-        self.reverseFlags = [False] * len(self.channelEvents)
+        self.deviceChannels = [
+            InputChannel(eventName, calibration, False)
+            for eventName, calibration in zip(
+                self.config["channel_events"],
+                self._loadCalibration(self.product),
+            )
+        ]
         self.logger = driver.getLogger(f"{self.name} -= IDLE =-")
         self.logger.debug(self.toDict())
         atexit.register(self.stop)
@@ -244,24 +238,6 @@ class FutabaDeviceDriver:
             logger.logger: The logger instantiated for this class
         """
         return driver.getLogger(f"{name} -= {state} =-")
-
-    @classmethod
-    def _generateChannelMaps(cls, channelCalibrations):
-        """Use the channelCalibrations to generate a calibrated map for each channel
-
-        Args:
-            channelCalibrations (Array of Array): The first will contain exactly 2 values, the start and end of the spectrum of possible input values. The second will contain exactly 2 values, the start and end of the spectrum of possible output values. Defaults to self.channelCalibrations
-
-        Returns:
-            Array of Array of Array: The calibrated channel maps
-        """
-
-        calibratedChannels = []
-        for channelCalibration in channelCalibrations:
-            inputRange = channelCalibration[0]
-            outputRange = channelCalibration[1]
-            calibratedChannels.append(driver.generateValueMap(inputRange, outputRange))
-        return calibratedChannels
 
     @classmethod
     def _loadConfig(cls, productName):
@@ -317,3 +293,147 @@ class FutabaDeviceDriver:
 
         logger.debug(f"channelCalibrations={channelCalibrations}")
         return channelCalibrations
+
+
+class InputChannel:
+    """Provides a class based representation of a single input channel"""
+
+    def __init__(self, eventName, calibration, reverseInputs=False):
+        self.name = eventName
+        self.isReversed = reverseInputs
+        self.event = getattr(uinput, eventName)
+        self.calibration = ChannelCalibration(
+            inputRange=calibration[0],
+            outputRange=calibration[1],
+            reverse=self.isReversed,
+        )
+        self.valueMap = self.calibration.toArray()
+
+    def __str__(self):
+        return str(
+            {
+                "name": self.name,
+                "isReversed": self.isReversed,
+                "event": self.event,
+                "calibration": self.calibration,
+            }
+        )
+
+
+class ChannelCalibration:
+    """Provides a class based representation of a channel calibration.
+
+    Why:
+        - The range of values that is output on a given channel is different
+        for each device manufactured.
+        - To account for this difference, we use a process known as
+        "calibrating" the device. Calibrating a device is simply the process
+        of determining your devices unique range of values, and then mapping
+        that range of values to a standardized range of values.
+            - This requires a 1-d interpolation from the raw device values to
+            the standardized output values. This must be done every single time
+            we read data from the device (hundreds of times per second+).
+
+    What:
+        - Provide an interface that allows for on the fly interpolation of the
+        devices input range to the standardized output range
+
+    How:
+        - Interpolate all possible input values ahead of time
+        - Create an array with a length equal to that of the upper output limit
+        - For each value in the input range, interpolate the value and store the
+        interpolated_value at array[value]
+        - To prevent out of bounds errors and ensure output continuity:
+            - Fill all values below "min input value" with "min output value"
+            - Fill all values above "max input value" with "max output value"
+
+    Rationale:
+        - Assume the following:
+            - our calibration mapping array has already been generated and
+            is stored in a variable named "calMap".
+            - assume we have just read the raw input value from the device and
+            stored it to a variable named "rawV".
+        - Translating the raw value to the calibrated value is as simple as calMap[rawV]
+        - Therefore, we are providing an interface with O(1) runtime at the
+        cost of 16kb of memory on an 8 channel device.
+    """
+
+    def toArray(self):
+        """Returns the calibrated value mapping
+
+        Returns:
+            array.array of int: The integer array that maps a given index to
+            the corresponding calibrated outpute valued stored at that index
+        """
+        return self.valueMap
+
+    def __init__(
+        self,
+        inputRange=None,
+        outputRange=None,
+        reverse=False,
+    ):
+        if inputRange is None:
+            inputRange = [driver.DEFAULT_DEVICE_MIN_VAL, driver.DEFAULT_DEVICE_MAX_VAL]
+        if outputRange is None:
+            outputRange = [driver.EVENT_MIN_VAL, driver.EVENT_MAX_VAL]
+
+        self.reverse = reverse
+        self.inputRange = inputRange
+        self.outputRange = outputRange
+        self.valueMap = self._generateValueMap(inputRange, outputRange, self.reverse)
+
+    def __str__(self):
+        return str(
+            {
+                "reverse": self.reverse,
+                "inputRange": self.inputRange,
+                "outputRange": self.outputRange,
+                "valueMap": f"Generated {len(self.valueMap)} values consuming {sys.getsizeof(self.valueMap)} bytes of memory",
+            }
+        )
+
+    @staticmethod
+    def _generateValueMap(inputRange, outputRange, reverse=False):
+        """Generate a list of values that maps the input range to the output range
+
+        Args:
+            inputRange (list, optional): This determines the size of the map. Defaults to [600, 3500].
+            outputRange (list, optional): This determines what values are generated in the map. Defaults to [0, 32768].
+
+        Returns:
+            list: A list of all possible output values given the range of input values
+        """
+
+        # Guarantee that we are working with ints
+        inputRange[0] = int(inputRange[0])
+        inputRange[1] = int(inputRange[1])
+        outputRange[0] = int(outputRange[0])
+        outputRange[1] = int(outputRange[1])
+
+        lowerInput = inputRange[0]
+        upperInput = inputRange[1]
+        lowerOutput = outputRange[0]
+
+        # Create a value map such that the index of the array represents
+        # the input value, and the contents at that index is the output
+        inputValues = np.array([lowerOutput] * upperInput, int)
+
+        arrayRange = range(lowerInput, upperInput)
+        if reverse:
+            reversed(arrayRange)
+
+        for i in arrayRange:
+            inputValues[i] = i
+
+        return array.array(
+            "I",  # int
+            np.round(
+                np.interp(
+                    inputValues,
+                    inputRange,
+                    outputRange,
+                ),
+                0,  # No decimals
+            ).astype(int),
+        )

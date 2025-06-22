@@ -22,27 +22,24 @@ DEFAULT_CONFIG = {
     ],
 }
 
-##
-# An array of length EVENT_MAX_VAL will be used
-# to map the raw device inputs to values between EVENT_MIN_VAL
-# and EVENT_MAX_VAL
-##
 EVENT_MAX_VAL = 32768
 EVENT_MIN_VAL = 0
+DEFAULT_DEVICE_MIN_VAL = 704
+DEFAULT_DEVICE_MAX_VAL = 3392
 
 ##
 # Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
 # for this great starting point!
 ##
 DEFAULT_CALIBRATION = [
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
 ]
 
 FUTABA_VENDOR_ID = 4101
@@ -96,10 +93,16 @@ def findInterruptEndpoint(device):
     Returns:
         int: The interrupt endpoint address
     """
+    logger = getLogger("findInterruptEndpoint")
+    logger.debug("looking for endpoint for device provided")
+
     if not isinstance(device, usb.core.Device):
-        raise ValueError(
+        err = (
             f"Expected first param to be of type usb.core.Device, found {type(device)}"
         )
+        logger.critical(err)
+        raise ValueError(err)
+
     for config in device:
         for interface in config:
             for endpoint in interface:
@@ -173,69 +176,6 @@ def getLogger(
     logger.setLevel(level)
     logger.addHandler(handler)
     return logger
-
-
-def generateValueMap(inputRange=None, outputRange=None):
-    """Generate a list of values that maps the input range to the output range
-
-    Args:
-        inputRange (list, optional): This determines the size of the map. Defaults to [600, 3500].
-        outputRange (list, optional): This determines what values are generated in the map. Defaults to [0, 32768].
-
-    Returns:
-        list: A list of all possible output values given the range of input values
-    """
-    logger = getLogger("generateValueMap")
-    if not hasattr(inputRange, "__len__") or len(inputRange) != 2:
-        logger.error("inputRange must be an array of length 2, using defaults instead")
-        inputRange = [600, 3500]
-    if not hasattr(outputRange, "__len__") or len(outputRange) != 2:
-        logger.error("outputRange must be an array of length 2, using defaults instead")
-        outputRange = [0, 32768]
-
-    if not isinstance(inputRange[0], int):
-        raise TypeError(
-            f"Expected inputRange[0] to be of type int, found {type(inputRange[0])}"
-        )
-    if not isinstance(inputRange[1], int):
-        raise TypeError(
-            f"Expected inputRange[1] to be of type int, found {type(inputRange[1])}"
-        )
-    if not isinstance(outputRange[0], int):
-        raise TypeError(
-            f"Expected outputRange[0] to be of type int, found {type(outputRange[0])}"
-        )
-    if not isinstance(outputRange[1], int):
-        raise TypeError(
-            f"Expected outputRange[1] to be of type int, found {type(inputRange[1])}"
-        )
-
-    # Guarantee that we are working with ints
-    inputRange[0] = int(inputRange[0])
-    inputRange[1] = int(inputRange[1])
-    outputRange[0] = int(outputRange[0])
-    outputRange[1] = int(outputRange[1])
-
-    lowerInput = inputRange[0]
-    upperInput = inputRange[1]
-    lowerOutput = outputRange[0]
-
-    # Create a value map such that the index of the array represents
-    # the input value, and the contents at that index is the output
-    inputValues = np.array([lowerOutput] * upperInput, int)
-    for i in range(lowerInput, upperInput):
-        inputValues[i] = i
-    return array.array(
-        "I",  # int
-        np.round(
-            np.interp(
-                inputValues,
-                inputRange,
-                outputRange,
-            ),
-            0,  # No decimals
-        ).astype(int),
-    )
 
 
 def loadJsonFile(filePath):
