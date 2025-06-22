@@ -7,55 +7,7 @@ import os
 import uinput
 import usb
 
-from driver import EventDispatchWorker, utils
-
-DEFAULT_CONFIG = {
-    "frame_size": 16,
-    "channel_events": [
-        "ABS_X",
-        "ABS_Y",
-        "ABS_RX",
-        "ABS_RY",
-        "ABS_THROTTLE",
-        "ABS_RUDDER",
-        "ABS_TILT_X",
-        "ABS_TILT_Y",
-    ],
-}
-
-##
-# An array of length EVENT_MAX_VAL will be used
-# to map the raw device inputs to values between EVENT_MIN_VAL
-# and EVENT_MAX_VAL
-##
-EVENT_MAX_VAL = 32768
-EVENT_MIN_VAL = 0
-
-##
-# Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
-# for this great starting point!
-##
-DEFAULT_CALIBRATION = [
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[704, 3392], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-]
-
-FUTABA_VENDOR_ID = 4101
-
-PRODUCTS = {
-    "default": 999,
-    "WSC-1": 10,
-    "T16IZ": 11,
-    10: "WSC-1",
-    11: "T16IZ",
-    999: "default",
-}
+from driver import DEFAULT_CALIBRATION, DEFAULT_CONFIG, EventDispatchWorker, utils
 
 
 class FutabaDeviceManager:
@@ -187,13 +139,11 @@ class FutabaDeviceDriver:
                 kwargs=self.toDict(),
             )
             self.subProc.start()
-
         except usb.core.USBError:
             # Don't raise exception, pass through to finally block
             pass
         finally:
             self.stop()
-
         return self.subProc.is_alive()
 
     def stop(self):

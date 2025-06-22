@@ -3,8 +3,10 @@
 import uinput
 import usb
 
-from driver import utils
-from driver.Futaba import EVENT_MAX_VAL, FUTABA_VENDOR_ID
+from driver import FUTABA_VENDOR_ID, utils
+
+EVENT_MAX_VAL = 32768
+EVENT_MIN_VAL = 0
 
 
 def start(
@@ -17,10 +19,13 @@ def start(
     name=None,
     reverseFlags=None,
 ):
-    """The target function for the drivers subprocess"""
-    # Define variables before loop so we don't waste time creating
-    # a new variable each iteration and the interpreter doesn't have
-    # to evaluate dots, dict subscripts etc etc
+    """The target function for the drivers' subprocess
+    NOTE main event loop optimization:
+        we initialize a local version of everything that will be used inside
+        the main event loop. By doing this, the interpreter:
+        - Does not have to re-create variables each iteration
+        - Does not have to interpret dots, subscripts, etc
+    """
     if (
         bus is None
         or calibrationMaps is None
@@ -90,6 +95,7 @@ def start(
         coreDevice.detach_kernel_driver(0)
     coreDevice.set_configuration()
 
+    # -- MAIN LOOP --
     while not killswitch.is_set():
         try:
             # - The transmitter may not send a new frame if the inputs remain static
