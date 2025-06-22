@@ -48,14 +48,27 @@ class FutabaDeviceManager:
         Args:
             deviceIndexes (list of int, optional): The devices you want to start. Defaults to [].
         """
-        try:
-            if isinstance(deviceIndex, int):
-                self.futabaDevices[deviceIndex].start()
-            elif hasattr("__iter__", deviceIndex):
-                for idx in deviceIndex:
-                    self.futabaDevices[idx].start()
-        except Exception as e:
-            self.logger.warning(e)
+
+        self.logger.debug(f"Attempting to start device at index[s] {deviceIndex}")
+        if isinstance(deviceIndex, int):
+            result = self.futabaDevices[deviceIndex].start()
+            if result:
+                self.logger.debug(f"-> {self.futabaDevices[deviceIndex]} started")
+            else:
+                raise RuntimeError(
+                    f"Start requested failed for item at index {deviceIndex}"
+                )
+        elif hasattr("__iter__", deviceIndex):
+            self.logger.debug("-> Iterable detected, attempting to start multiple...")
+            for idx in deviceIndex:
+                result = self.futabaDevices[idx].start()
+                if result:
+                    self.logger.debug(f"--> {self.futabaDevices[deviceIndex]} started")
+                else:
+                    raise RuntimeError(
+                        f"Start requested failed for item at index {idx}"
+                    )
+
         return self.listDevices()
 
     def stop(self, deviceIndex):
@@ -134,16 +147,20 @@ class FutabaDeviceDriver:
     def start(self):
         """Start the driver if it is not running"""
 
+        self.logger.debug("Attempting to start")
         try:
             if self.killswitch.is_set():
                 self.killswitch.clear()
+                self.logger.debug("-> Killswitch cleared")
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
                 target=EventDispatchWorker.start,
                 args=(self.killswitch,),
                 kwargs=self.toDict(),
             )
+            self.logger.debug("-> subprocess spawned")
             self.subProc.start()
+            self.logger.debug("-> device started")
         except usb.core.USBError:
             # Don't raise exception, pass through to finally block
             pass
@@ -217,7 +234,7 @@ class FutabaDeviceDriver:
             )
         ]
         self.logger = driver.getLogger(f"{self.name} -= IDLE =-")
-        self.logger.debug(self.toDict())
+        # self.logger.debug(self.toDict())
         atexit.register(self.stop)
 
     def __str__(self):
