@@ -142,16 +142,16 @@ class FutabaDeviceDriver:
 
     def start(self):
         """Start the driver if it is not running"""
-        if self.killswitch.is_set():
-            self.killswitch.clear()
-            self.logger.debug("-> Killswitch cleared")
-        self.subProc = multiprocessing.Process(
-            name=f"{self.name} Driver",
-            target=driver.eventDispatchWorker,
-            args=(self.killswitch,),
-            # kwargs=(self.toDict()),
-        )
-        self.subProc.start()
+        if self.getState() != "RUNNING":
+            if self.killswitch.is_set():
+                self.killswitch.clear()
+                self.logger.debug("-> Killswitch cleared")
+            self.subProc = multiprocessing.Process(
+                name=f"{self.name} Driver",
+                target=driver.eventDispatchWorker,
+                args=self._toSubprocTuple(),
+            )
+            self.subProc.start()
         return self.getState()
 
     def stop(self):
@@ -270,17 +270,22 @@ class FutabaDeviceDriver:
         self.logger.debug(f"channelCalibrations={channelCalibrations}")
         return channelCalibrations
 
+    def _toSubprocTuple(self):
+        return (
+            self.killswitch,
+            self.config["frame_size"],
+            list(map(lambda channel: channel.toDict(), self.deviceChannels)),
+            self.name,
+            self.interruptEndpoint,
+        )
+
 
 class InputChannel:
     """Provides a class based representation of a single input channel"""
 
     def toDict(self):
         """Returns a dictionary representation of this input channel"""
-        return {
-            "eventName": self.eventName,
-            "isReversed": self.isReversed,
-            "valueMap": self.valueMap,
-        }
+        return {"eventName": self.eventName, "valueMap": self.valueMap}
 
     def __init__(self, eventName, calibration, reverseInputs=False):
         self.eventName = eventName
@@ -293,13 +298,7 @@ class InputChannel:
         self.valueMap = self.calibration.getCalibratedValueMap()
 
     def __str__(self):
-        return str(
-            {
-                "eventName": self.eventName,
-                "isReversed": self.isReversed,
-                "calibration": self.calibration,
-            }
-        )
+        return str(self.toDict())
 
 
 class ChannelCalibration:

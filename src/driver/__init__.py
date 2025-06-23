@@ -34,7 +34,7 @@ DEFAULT_CALIBRATION = [
     [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]]
     * len(DEFAULT_CONFIG["channel_events"])  # one calibration mapping per channel
 ]
-FUTABA_VENDOR_ID = 4101
+FUTABA_VENDOR_ID = 4104
 PRODUCTS = {
     "default": 999,
     "WSC-1": 10,
@@ -69,7 +69,7 @@ DEFAULT_LOG_HANDLER.setFormatter(
     logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
 )
 DEFAULT_LOGGER = logging.getLogger("driver")
-DEFAULT_LOGGER.setLevel("debug")
+DEFAULT_LOGGER.setLevel(logging.DEBUG)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
 
 
@@ -86,6 +86,7 @@ def findInterruptEndpoint(device):
     Returns:
         int: The interrupt endpoint address
     """
+    logger = DEFAULT_LOGGER
     logger.debug("looking for endpoint for device provided")
 
     if not isinstance(device, usb.core.Device):
@@ -202,14 +203,7 @@ def loadJsonFile(filePath):
     return parsedJson
 
 
-def eventDispatchWorker(
-    killswitch,
-    bus=None,
-    config=None,
-    deviceChannels=None,
-    port=None,
-    name=None,
-):
+def eventDispatchWorker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
     """The target function for the drivers' subprocess
     NOTE main event loop optimization:
         we initialize a local version of everything that will be used inside
@@ -217,64 +211,44 @@ def eventDispatchWorker(
         - Does not have to re-create variables each iteration
         - Does not have to interpret dots, subscripts, etc
     """
-    if (
-        bus is None
-        or deviceChannels is None
-        or config is None
-        or name is None
-        or port is None
-    ):
-        raise TypeError("All parameters are required")
-
     channel = None
     coreDevice = None
-    endpointAddress = None
     logger = newLogger(f"{name}_subproc")
     logger.debug("Subprocess started")
-    logger.debug(
-        {
-            "bus": bus,
-            "config": config,
-            "deviceChannels": deviceChannels,
-            "name": name,
-            "port": port,
-        }
-    )
-
-    for device in usb.core.find(find_all=True):
-        if int(device.port_numbers[0]) == int(port) and int(device.bus) == int(bus):
-            coreDevice = device
-            logger.debug(f"--> device found ({coreDevice})")
-            break
+    for _device in usb.core.find(find_all=True):
+        if _device.idVendor != FUTABA_VENDOR_ID:
+            continue
+        for _config in _device:
+            for _interface in _config:
+                for _endpoint in _interface:
+                    if (
+                        usb.util.endpoint_direction(_endpoint.bEndpointAddress)
+                        == usb.util.ENDPOINT_IN
+                        and _endpoint.bmAttributes == 0x3
+                        and _endpoint.bEndpointAddress == interruptEndpoint
+                    ):
+                        interruptEndpoint = _endpoint.bEndpointAddress
+                        coreDevice = _device
+                        logger.debug(
+                            f"Device at endpoint {interruptEndpoint}: {coreDevice}"
+                        )
+                        break
 
     if coreDevice is None:
-        raise TypeError(f"No device found at bus {bus} port {port}")
-
-    for _config in coreDevice:
-        for _interface in _config:
-            for _endpoint in _interface:
-                if (
-                    usb.util.endpoint_direction(_endpoint.bEndpointAddress)
-                    == usb.util.ENDPOINT_IN
-                    and _endpoint.bmAttributes == 0x3
-                ):
-                    endpointAddress = _endpoint.bEndpointAddress
-                    logger.debug(f"--> interrupt endpoint found ({endpointAddress})")
-                    break
-
-    if endpointAddress is None:
-        raise TypeError("Unable to determine interrupt endpoint address")
+        raise TypeError(
+            f"No Futaba device found at interrupt endpoint {interruptEndpoint}"
+        )
 
     channelEventsMap = []
-    channelReverseFlags = []
     channelValueMaps = []
     for channel in deviceChannels:
+        logger.critical(f"checking {channel.eventName}")
         channelEventsMap.append(getattr(uinput, channel.eventName))
-        channelReverseFlags.append(channel.isReversed)
-        channelValueMaps.append(channelValueMaps)
+        channelValueMaps.append(channel.valueMap)
     channelEventsMap = tuple(channelEventsMap)
-    channelReverseFlags = tuple(channelReverseFlags)
     channelValueMaps = tuple(channelValueMaps)
+
+    logger.debug("maps created")
 
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
@@ -283,10 +257,11 @@ def eventDispatchWorker(
         vendor=FUTABA_VENDOR_ID,
     )
 
+    logger.debug("virtual device set up")
+
     # Create all variables outside the loop to avoid the overhead of
     # recreating them each iteration
     emit = virtualDevice.emit
-    frameSize = config["frame_size"]
     fromBytes = int.from_bytes
     maxInputVal = None
     rawData = None
@@ -297,7 +272,7 @@ def eventDispatchWorker(
         coreDevice.detach_kernel_driver(0)
     coreDevice.set_configuration()
 
-    logger.info(f"Driver started: {endpointAddress} -> {name}")
+    logger.info(f"Driver started: {interruptEndpoint} -> {name}")
     # -- MAIN LOOP --
     while not killswitch.is_set():
         try:
@@ -306,7 +281,7 @@ def eventDispatchWorker(
             # - - Long timeout length = less timeouts
             # - - Less timeouts = fewer exceptions raised
             # - - Fewer exceptions raised = less overhead
-            rawData = readDevice(endpointAddress, frameSize, timeout=1000)
+            rawData = readDevice(interruptEndpoint, frameSize, timeout=1000)
 
             channelData = []
             for i in range(0, len(rawData), 2):
