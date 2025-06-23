@@ -10,6 +10,10 @@ import numpy as np
 import uinput
 import usb
 
+##
+# Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
+# for this great starting point!
+##
 DEFAULT_CONFIG = {
     "frame_size": 16,
     "channel_events": [
@@ -28,25 +32,11 @@ EVENT_MAX_VAL = 32768
 EVENT_MIN_VAL = 0
 DEFAULT_DEVICE_MIN_VAL = 704
 DEFAULT_DEVICE_MAX_VAL = 3392
-
-##
-# Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
-# for this great starting point!
-##
 DEFAULT_CALIBRATION = [
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]],
+    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]]
+    * len(DEFAULT_CONFIG["channel_events"])  # one calibration mapping per channel
 ]
-
 FUTABA_VENDOR_ID = 4101
-
-
 PRODUCTS = {
     "default": 999,
     "WSC-1": 10,
@@ -227,14 +217,21 @@ def eventDispatchWorker(
     ):
         raise TypeError("All parameters are required")
 
-    logger = newLogger(name)
+    logger = newLogger(f"{name}_subproc")
     channel = None
     coreDevice = None
     endpointAddress = None
 
     logger = newLogger(f"{name}(SUBPROC)")
+    logger.debug("Subprocess started")
     logger.debug(
-        f"Subprocess started, searching for device {name} on bus {bus}, port {port}"
+        {
+            "bus": bus,
+            "config": config,
+            "deviceChannels": deviceChannels,
+            "name": name,
+            "port": port,
+        }
     )
 
     for device in usb.core.find(find_all=True):
@@ -284,25 +281,24 @@ def eventDispatchWorker(
     emit = virtualDevice.emit
     frameSize = config["frame_size"]
     fromBytes = int.from_bytes
-
     maxInputVal = None
     rawData = None
     readDevice = coreDevice.read
     synchronize = virtualDevice.syn
-    logger.info(f"Driver started: {endpointAddress} -> {name}")
 
     if coreDevice.is_kernel_driver_active(0):
         coreDevice.detach_kernel_driver(0)
     coreDevice.set_configuration()
 
+    logger.info(f"Driver started: {endpointAddress} -> {name}")
     # -- MAIN LOOP --
     while not killswitch.is_set():
         try:
             # - The transmitter may not send a new frame if the inputs remain static
             # - No reason to care about timeouts
             # - - Long timeout length = less timeouts
-            # - - Less timeouts = fewer exceptions caught
-            # - - Fewer exceptions caught = less overhead
+            # - - Less timeouts = fewer exceptions raised
+            # - - Fewer exceptions raised = less overhead
             rawData = readDevice(endpointAddress, frameSize, timeout=1000)
 
             channelData = []

@@ -160,7 +160,7 @@ class FutabaDeviceDriver:
             self.killswitch.set()
         if self.subProc is not None and self.subProc.is_alive():
             self.subProc.join()
-        self._setState("IDLE")
+        self.state = "IDLE"
 
     def toDict(self):
         """Returns a dictionary representation of the driverf object"""
@@ -173,15 +173,6 @@ class FutabaDeviceDriver:
             "endpointAddress": self.interruptEndpoint,
             "name": self.name,
         }
-
-    def _setState(self, state):
-        """Set the state of the Object
-
-        Args:
-            state (string): The new state of the Object
-        """
-        self.logger = driver.newLogger(f"{self.name} -= {state} =-")
-        self.state = state
 
     def __init__(self, bus, port, name=None):
         deviceInfo = driver.getCoreDeviceInfo(bus, port)
@@ -202,7 +193,7 @@ class FutabaDeviceDriver:
         if self.name is None:
             self.name = f"Futaba {deviceInfo['product']}({bus},{port})"
 
-        self.logger = self._getLogger(name=self.name, state=self.state)
+        self.logger = driver.newLogger(f"{deviceInfo['product']}_driver")
         self.productID = deviceInfo["productID"]
         self.serialNumber = deviceInfo["serialNumber"]
         self.product = deviceInfo["product"]
@@ -219,7 +210,6 @@ class FutabaDeviceDriver:
                 self._loadCalibration(self.product),
             )
         ]
-        self.logger = driver.newLogger(f"{self.name} -= IDLE =-")
         # self.logger.debug(self.toDict())
         atexit.register(self.stop)
 
@@ -229,48 +219,32 @@ class FutabaDeviceDriver:
     def __repr__(self):
         return str(self.toDict())
 
-    @staticmethod
-    def _getLogger(name="FutabaDeviceDriver", state="CLASS"):
-        """Properly namespace the logger and return it
-
-        Args:
-            name (str, optional): The name used as a label in the log file. Defaults to "FutabaDeviceDriver".
-            state (str, optional): Appended to the name in the log file inside of parenthesis. Defaults to "CLASS".
-
-        Returns:
-            logger.logger: The logger instantiated for this class
-        """
-        return driver.newLogger(f"{name} -= {state} =-")
-
-    @classmethod
-    def _loadConfig(cls, productName):
+    def _loadConfig(self, productName):
         """Loads the settings for this particular device and falls back
         to the default config file if one doesn't exist
 
         Returns:
             dict: A dictionary containing the driver settings
         """
-        logger = cls._getLogger(name=productName)
         config = None
 
         filePath = os.path.join(driver.CONFIG_PATH, f"{productName}.json")
         defaultPath = os.path.join(driver.CONFIG_PATH, "default.json")
 
-        logger.debug(f"loading {filePath}")
+        self.logger.debug(f"loading {filePath}")
         config = driver.loadJsonFile(filePath)
 
         if config is None:
-            logger.debug(f"device config not found, loading {defaultPath}")
+            self.logger.debug(f"device config not found, loading {defaultPath}")
             config = driver.loadJsonFile(defaultPath)
         if config is None:
-            logger.debug("using hard-coded defaults")
+            self.logger.debug("using hard-coded defaults")
             config = driver.DEFAULT_CONFIG
 
-        logger.debug(f"config={config}")
+        self.logger.debug(f"config={config}")
         return config
 
-    @classmethod
-    def _loadCalibration(cls, productName):
+    def _loadCalibration(self, productName):
         """Loads the calibration file for the given product
 
         Args:
@@ -279,22 +253,21 @@ class FutabaDeviceDriver:
         Returns:
             list of list: Each inner list will contain exactly 2 items, each of which are lists.
         """
-        logger = cls._getLogger(name=productName)
 
         filePath = os.path.join(driver.CALIBRATION_PATH, f"{productName}.json")
         defaultPath = os.path.join(driver.CALIBRATION_PATH, "default.json")
 
-        logger.debug(f"loading {filePath}")
+        self.logger.debug(f"loading {filePath}")
         channelCalibrations = driver.loadJsonFile(filePath)
 
         if channelCalibrations is None:
-            logger.debug(f"loading{defaultPath}")
+            self.logger.debug(f"loading{defaultPath}")
             channelCalibrations = driver.loadJsonFile(defaultPath)
         if channelCalibrations is None:
-            logger.debug("using hard-coded defaults")
+            self.logger.debug("using hard-coded defaults")
             channelCalibrations = driver.DEFAULT_CALIBRATION
 
-        logger.debug(f"channelCalibrations={channelCalibrations}")
+        self.logger.debug(f"channelCalibrations={channelCalibrations}")
         return channelCalibrations
 
 
