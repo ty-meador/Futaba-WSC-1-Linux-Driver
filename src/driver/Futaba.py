@@ -149,7 +149,7 @@ class FutabaDeviceDriver:
             name=f"{self.name} Driver",
             target=driver.eventDispatchWorker,
             args=(self.killswitch,),
-            kwargs=(self.toDict()),
+            # kwargs=(self.toDict()),
         )
         self.subProc.start()
         return self.getState()

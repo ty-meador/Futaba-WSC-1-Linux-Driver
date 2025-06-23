@@ -1,4 +1,3 @@
-import array
 import json
 import logging
 import os
@@ -6,7 +5,6 @@ import re
 from logging import handlers
 from pathlib import Path
 
-import numpy as np
 import uinput
 import usb
 
@@ -62,6 +60,18 @@ for parent in Path(__file__).resolve().parents:
         os.makedirs(LOG_PATH, exist_ok=True)
         break
 
+DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
+    os.path.join(LOG_PATH, "driver.txt"),
+    maxBytes=5 * 1024 * 1024,  # 5 megabytes
+    backupCount=5,
+)
+DEFAULT_LOG_HANDLER.setFormatter(
+    logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
+)
+DEFAULT_LOGGER = logging.getLogger("driver")
+DEFAULT_LOGGER.setLevel("debug")
+DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
+
 
 def findInterruptEndpoint(device):
     """Find the USB interrupt endpoint for the provided device
@@ -76,7 +86,6 @@ def findInterruptEndpoint(device):
     Returns:
         int: The interrupt endpoint address
     """
-    logger = newLogger("findInterruptEndpoint")
     logger.debug("looking for endpoint for device provided")
 
     if not isinstance(device, usb.core.Device):
@@ -110,7 +119,7 @@ def getCoreDeviceInfo(bus, port):
         usb.core.Device: The core device at the provided bus and port
     """
 
-    logger = newLogger("getCoreDevice")
+    logger = DEFAULT_LOGGER
     logger.debug(f"looking for core device on bus {bus}, port {port}")
     results = [
         device
@@ -178,7 +187,7 @@ def loadJsonFile(filePath):
     Returns:
         dict: The parsed json
     """
-    logger = newLogger("loadJsonFile")
+    logger = DEFAULT_LOGGER
     parsedJson = None
 
     try:
@@ -217,12 +226,10 @@ def eventDispatchWorker(
     ):
         raise TypeError("All parameters are required")
 
-    logger = newLogger(f"{name}_subproc")
     channel = None
     coreDevice = None
     endpointAddress = None
-
-    logger = newLogger(f"{name}(SUBPROC)")
+    logger = newLogger(f"{name}_subproc")
     logger.debug("Subprocess started")
     logger.debug(
         {
