@@ -98,7 +98,7 @@ class FutabaDeviceManager:
 
     def __init__(self):
         atexit.register(self.stopAll)
-        self.logger = driver.getLogger("FutabaDeviceManager")
+        self.logger = driver.newLogger("FutabaDeviceManager")
         self.futabaDevices = tuple(
             FutabaDeviceDriver(device.bus, device.port_numbers[0])
             for device in usb.core.find(find_all=True)
@@ -180,7 +180,7 @@ class FutabaDeviceDriver:
         Args:
             state (string): The new state of the Object
         """
-        self.logger = driver.getLogger(f"{self.name} -= {state} =-")
+        self.logger = driver.newLogger(f"{self.name} -= {state} =-")
         self.state = state
 
     def __init__(self, bus, port, name=None):
@@ -219,7 +219,7 @@ class FutabaDeviceDriver:
                 self._loadCalibration(self.product),
             )
         ]
-        self.logger = driver.getLogger(f"{self.name} -= IDLE =-")
+        self.logger = driver.newLogger(f"{self.name} -= IDLE =-")
         # self.logger.debug(self.toDict())
         atexit.register(self.stop)
 
@@ -240,7 +240,7 @@ class FutabaDeviceDriver:
         Returns:
             logger.logger: The logger instantiated for this class
         """
-        return driver.getLogger(f"{name} -= {state} =-")
+        return driver.newLogger(f"{name} -= {state} =-")
 
     @classmethod
     def _loadConfig(cls, productName):

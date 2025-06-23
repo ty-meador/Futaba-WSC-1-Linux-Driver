@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 
 from driver import Futaba, utils
 
-logger = utils.getLogger("start_script")
+logger = utils.newLogger("start_script")
 
 parser = ArgumentParser()
 

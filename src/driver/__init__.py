@@ -86,7 +86,7 @@ def findInterruptEndpoint(device):
     Returns:
         int: The interrupt endpoint address
     """
-    logger = getLogger("findInterruptEndpoint")
+    logger = newLogger("findInterruptEndpoint")
     logger.debug("looking for endpoint for device provided")
 
     if not isinstance(device, usb.core.Device):
@@ -120,7 +120,7 @@ def getCoreDeviceInfo(bus, port):
         usb.core.Device: The core device at the provided bus and port
     """
 
-    logger = getLogger("getCoreDevice")
+    logger = newLogger("getCoreDevice")
     logger.debug(f"looking for core device on bus {bus}, port {port}")
     results = [
         device
@@ -146,7 +146,7 @@ def getCoreDeviceInfo(bus, port):
     }
 
 
-def getLogger(
+def newLogger(
     name="logs",
     fileName=None,
     level=logging.DEBUG,
@@ -188,7 +188,7 @@ def loadJsonFile(filePath):
     Returns:
         dict: The parsed json
     """
-    logger = getLogger("loadJsonFile")
+    logger = newLogger("loadJsonFile")
     parsedJson = None
 
     try:
@@ -227,20 +227,20 @@ def eventDispatchWorker(
     ):
         raise TypeError("All parameters are required")
 
-    logger = getLogger(name)
+    logger = newLogger(name)
     channel = None
     endpointAddress = None
 
-    logger = getLogger(f"{name}(SUBPROC)")
+    logger = newLogger(f"{name}(SUBPROC)")
     logger.debug(
         f"Subprocess started, searching for device {name} on bus {bus}, port {port}"
     )
 
-    coreDevice = [
-        device
-        for device in usb.core.find(find_all=True)
-        if int(device.port_number) == int(port) and int(device.bus_) == int(bus)
-    ][0]
+    coreDevice = None
+    for device in usb.core.find(find_all=True):
+        if int(device.port_number) == int(port) and int(device.bus) == int(bus):
+            coreDevice = device
+            break
 
     logger.debug(
         f"--> device found ({coreDevice}), searching for interrupt endpoint address"

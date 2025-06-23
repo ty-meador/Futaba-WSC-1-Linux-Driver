@@ -30,11 +30,11 @@ def EventDispatchWorker(
     ):
         raise TypeError("All parameters are required")
 
-    logger = driver.getLogger(name)
+    logger = driver.newLogger(name)
     channel = None
     endpointAddress = None
 
-    logger = driver.getLogger(f"{name}(SUBPROC)")
+    logger = driver.newLogger(f"{name}(SUBPROC)")
     logger.debug(
         f"Subprocess started, searching for device {name} on bus {bus}, port {port}"
     )
