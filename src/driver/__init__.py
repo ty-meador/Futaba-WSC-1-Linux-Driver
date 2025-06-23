@@ -69,8 +69,8 @@ for parent in Path(__file__).resolve().parents:
         DRIVER_PATH = os.path.join(SRC_PATH, "driver")
         CONFIG_PATH = os.path.join(DRIVER_PATH, "configs")
         CALIBRATION_PATH = os.path.join(DRIVER_PATH, "calibrations")
-
         os.makedirs(LOG_PATH, exist_ok=True)
+        break
 
 
 def findInterruptEndpoint(device):
@@ -229,6 +229,7 @@ def eventDispatchWorker(
 
     logger = newLogger(name)
     channel = None
+    coreDevice = None
     endpointAddress = None
 
     logger = newLogger(f"{name}(SUBPROC)")
@@ -236,15 +237,15 @@ def eventDispatchWorker(
         f"Subprocess started, searching for device {name} on bus {bus}, port {port}"
     )
 
-    coreDevice = None
     for device in usb.core.find(find_all=True):
-        if int(device.port_number) == int(port) and int(device.bus) == int(bus):
+        if int(device.port_numbers[0]) == int(port) and int(device.bus) == int(bus):
             coreDevice = device
+            logger.debug(f"--> device found ({coreDevice})")
             break
 
-    logger.debug(
-        f"--> device found ({coreDevice}), searching for interrupt endpoint address"
-    )
+    if coreDevice is None:
+        raise TypeError(f"No device found at bus {bus} port {port}")
+
     for _config in coreDevice:
         for _interface in _config:
             for _endpoint in _interface:
@@ -254,12 +255,11 @@ def eventDispatchWorker(
                     and _endpoint.bmAttributes == 0x3
                 ):
                     endpointAddress = _endpoint.bEndpointAddress
-                    logger.debug(f"----> address found ({endpointAddress})")
+                    logger.debug(f"--> interrupt endpoint found ({endpointAddress})")
                     break
-    if coreDevice is None:
-        raise TypeError(
-            f"Unable to locate A device with an interrupt endpoint at {endpointAddress}"
-        )
+
+    if endpointAddress is None:
+        raise TypeError("Unable to determine interrupt endpoint address")
 
     channelEventsMap = []
     channelReverseFlags = []
@@ -270,7 +270,7 @@ def eventDispatchWorker(
         channelValueMaps.append(channelValueMaps)
     channelEventsMap = tuple(channelEventsMap)
     channelReverseFlags = tuple(channelReverseFlags)
-    channelReverseFlags = tuple(channelReverseFlags)
+    channelValueMaps = tuple(channelValueMaps)
 
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
