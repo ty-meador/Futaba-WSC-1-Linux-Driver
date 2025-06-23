@@ -242,9 +242,8 @@ def eventDispatchWorker(killswitch, frameSize, deviceChannels, name, interruptEn
     channelEventsMap = []
     channelValueMaps = []
     for channel in deviceChannels:
-        logger.critical(f"checking {channel.eventName}")
-        channelEventsMap.append(getattr(uinput, channel.eventName))
-        channelValueMaps.append(channel.valueMap)
+        channelEventsMap.append(getattr(uinput, channel["eventName"]))
+        channelValueMaps.append(channel["valueMap"])
     channelEventsMap = tuple(channelEventsMap)
     channelValueMaps = tuple(channelValueMaps)
 
@@ -282,14 +281,12 @@ def eventDispatchWorker(killswitch, frameSize, deviceChannels, name, interruptEn
             # - - Less timeouts = fewer exceptions raised
             # - - Fewer exceptions raised = less overhead
             rawData = readDevice(interruptEndpoint, frameSize, timeout=1000)
-
             channelData = []
             for i in range(0, len(rawData), 2):
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
 
                 rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
-
                 # Avoid overflows and underflows
                 # account for off-by-one
                 maxInputVal = len(valueMap) - 1
@@ -302,43 +299,39 @@ def eventDispatchWorker(killswitch, frameSize, deviceChannels, name, interruptEn
                 # Extract calibrated value from map
                 channelData.append(valueMap[rawValue])
             channelData.reverse()
-
             # Queue one event for each channel
             for data, event in zip(channelData, channelEventsMap):
                 # Queue one event for each channel
                 emit(event, data, syn=False)
             # fire all queued events
             synchronize()
-        except usb.core.USBError as e:
-            # kaboom?
-            if e.errno != 110:
-                # Yes Rico, kaboom.
-                logger.critical(e)
-                raise e
-        finally:
-            try:
-                logger.debug("Releasing the USB interface...")
-                usb.util.release_interface(coreDevice, 0)
-            except Exception as e:
-                logger.warning(
-                    "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
-                )
-                logger.warning(e)
+        except usb.core.USBTimeoutError:
+            pass
+        except Exception as e:
+            logger.critical(e)
+    try:
+        logger.debug("Releasing the USB interface...")
+        usb.util.release_interface(coreDevice, 0)
+    except Exception as e:
+        logger.warning(
+            "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+        )
+        logger.warning(e)
 
-            try:
-                logger.debug("Reattaching the kernel driver...")
-                coreDevice.attach_kernel_driver(0)
-            except Exception as e:
-                logger.warning(
-                    "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
-                )
-                logger.warning(e)
+    try:
+        logger.debug("Reattaching the kernel driver...")
+        coreDevice.attach_kernel_driver(0)
+    except Exception as e:
+        logger.warning(
+            "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
+        )
+        logger.warning(e)
 
-            try:
-                logger.debug("Resetting device...")
-                coreDevice.reset()
-            except Exception as e:
-                logger.warning(
-                    "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
-                )
-                logger.warning(e)
+    try:
+        logger.debug("Resetting device...")
+        coreDevice.reset()
+    except Exception as e:
+        logger.warning(
+            "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+        )
+        logger.warning(e)

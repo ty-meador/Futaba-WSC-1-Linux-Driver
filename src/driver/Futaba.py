@@ -274,7 +274,7 @@ class FutabaDeviceDriver:
         return (
             self.killswitch,
             self.config["frame_size"],
-            list(map(lambda channel: channel.toDict(), self.deviceChannels)),
+            [channel.toDict() for channel in self.deviceChannels],
             self.name,
             self.interruptEndpoint,
         )
