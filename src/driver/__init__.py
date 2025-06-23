@@ -309,6 +309,7 @@ def eventDispatchWorker(killswitch, frameSize, deviceChannels, name, interruptEn
             pass
         except Exception as e:
             logger.critical(e)
+            raise e
     try:
         logger.debug("Releasing the USB interface...")
         usb.util.release_interface(coreDevice, 0)
