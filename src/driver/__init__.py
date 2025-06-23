@@ -2,6 +2,7 @@ import array
 import json
 import logging
 import os
+import re
 from logging import handlers
 from pathlib import Path
 
@@ -70,15 +71,6 @@ for parent in Path(__file__).resolve().parents:
         CALIBRATION_PATH = os.path.join(DRIVER_PATH, "calibrations")
 
         os.makedirs(LOG_PATH, exist_ok=True)
-        os.makedirs(CONFIG_PATH, exist_ok=True)
-        os.makedirs(CALIBRATION_PATH, exist_ok=True)
-
-
-LOG_HANDLER = handlers.RotatingFileHandler(
-    os.path.join(LOG_PATH, "log.txt"),
-    maxBytes=5 * 1024 * 1024,  # 5 megabytes
-    backupCount=5,
-)
 
 
 def findInterruptEndpoint(device):
@@ -156,6 +148,7 @@ def getCoreDeviceInfo(bus, port):
 
 def getLogger(
     name="logs",
+    fileName=None,
     level=logging.DEBUG,
 ):
     """Generates a logger
@@ -169,9 +162,16 @@ def getLogger(
     Returns:
         logger: The generated logger
     """
-    handler = LOG_HANDLER
+    if fileName is None:
+        fileName = re.sub(r"\W", "_", name) + ".txt"
+
+    handler = handlers.RotatingFileHandler(
+        os.path.join(LOG_PATH, fileName),
+        maxBytes=5 * 1024 * 1024,  # 5 megabytes
+        backupCount=5,
+    )
     handler.setFormatter(
-        logging.Formatter(f"%(asctime)s - {name} %(levelname)s\t: %(message)s")
+        logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
     )
     logger = logging.getLogger(name)
     logger.setLevel(level)
