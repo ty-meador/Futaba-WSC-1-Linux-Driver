@@ -60,6 +60,7 @@ for parent in Path(__file__).resolve().parents:
         os.makedirs(LOG_PATH, exist_ok=True)
         break
 
+LOGLEVEL = logging.WARNING
 DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
     os.path.join(LOG_PATH, "driver.txt"),
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
@@ -69,7 +70,7 @@ DEFAULT_LOG_HANDLER.setFormatter(
     logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
 )
 DEFAULT_LOGGER = logging.getLogger("driver")
-DEFAULT_LOGGER.setLevel(logging.DEBUG)
+DEFAULT_LOGGER.setLevel(LOGLEVEL)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
 
 
@@ -149,7 +150,7 @@ def getCoreDeviceInfo(bus, port):
 def newLogger(
     name="logs",
     fileName=None,
-    level=logging.DEBUG,
+    level=LOGLEVEL,
 ):
     """Generates a logger
 
