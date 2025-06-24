@@ -2,3 +2,4 @@ textual
 scipy
 pyusb==1.2.1
 python-uinput==0.11.2
+multiprocess

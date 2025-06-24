@@ -28,7 +28,7 @@ sudo pip3 install -r requirements.txt
 # Make sure you are in the projects folder
 cd /path/to/futaba-usb-rc-linux-driver
 # Start the UI
-sudo ./start.sh 
+sudo ./run.sh 
 ```
 
 - This will start a text-based UI
@@ -36,7 +36,7 @@ sudo ./start.sh
   - Navigate with the arrow keys
   - Spacebar to select/deselect
 - To start or stop a device, simply select or de-select it respectively
-- Each device that you start will run in a **seperate subprocess**
+- Each device that you start will run in a **separate subprocess**
   - This ensures that each device gets the maximum bandwidth possible
   - This prevents the entire driver from crashing if a single device crashes
 - **Leave the terminal running while you game**
