@@ -7,6 +7,7 @@ import os
 import sys
 
 import numpy as np
+import uinput
 import usb
 
 import driver
@@ -148,7 +149,7 @@ class FutabaDeviceDriver:
                 self.logger.debug("-> Killswitch cleared")
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
-                target=driver.eventDispatchWorker,
+                target=_worker,
                 args=self._toSubprocTuple(),
             )
             self.subProc.start()
@@ -417,3 +418,139 @@ class ChannelCalibration:
                 0,  # No decimals
             ).astype(int),
         )
+
+
+def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
+    """The target function for the drivers' subprocess
+    NOTE main event loop optimization:
+        we initialize a local version of everything that will be used inside
+        the main event loop. By doing this, the interpreter:
+        - Does not have to re-create variables each iteration
+        - Does not have to interpret dots, subscripts, etc
+    """
+    channel = None
+    coreDevice = None
+    logger = driver.newLogger(f"{name}_subproc")
+    logger.debug("Subprocess started")
+    for _device in usb.core.find(find_all=True):
+        if _device.idVendor != driver.FUTABA_VENDOR_ID:
+            continue
+        for _config in _device:
+            for _interface in _config:
+                for _endpoint in _interface:
+                    if (
+                        usb.util.endpoint_direction(_endpoint.bEndpointAddress)
+                        == usb.util.ENDPOINT_IN
+                        and _endpoint.bmAttributes == 0x3
+                        and _endpoint.bEndpointAddress == interruptEndpoint
+                    ):
+                        interruptEndpoint = _endpoint.bEndpointAddress
+                        coreDevice = _device
+                        logger.debug(
+                            f"Device at endpoint {interruptEndpoint}: {coreDevice}"
+                        )
+                        break
+
+    if coreDevice is None:
+        raise TypeError(
+            f"No Futaba device found at interrupt endpoint {interruptEndpoint}"
+        )
+
+    channelEventsMap = []
+    channelValueMaps = []
+    for channel in deviceChannels:
+        channelEventsMap.append(getattr(uinput, channel["eventName"]))
+        channelValueMaps.append(channel["valueMap"])
+    channelEventsMap = tuple(channelEventsMap)
+    channelValueMaps = tuple(channelValueMaps)
+
+    logger.debug("maps created")
+
+    # Create a virtual device for the found device
+    virtualDevice = uinput.Device(
+        tuple([event + (0, driver.EVENT_MAX_VAL, 0, 0) for event in channelEventsMap]),
+        name,
+        vendor=driver.FUTABA_VENDOR_ID,
+    )
+
+    logger.debug("virtual device set up")
+
+    # Create all variables outside the loop to avoid the overhead of
+    # recreating them each iteration
+    emit = virtualDevice.emit
+    fromBytes = int.from_bytes
+    maxInputVal = None
+    rawData = None
+    readDevice = coreDevice.read
+    synchronize = virtualDevice.syn
+
+    if coreDevice.is_kernel_driver_active(0):
+        coreDevice.detach_kernel_driver(0)
+    coreDevice.set_configuration()
+
+    logger.info(f"Driver started: {interruptEndpoint} -> {name}")
+    # -- MAIN LOOP --
+    while not killswitch.is_set():
+        try:
+            # - The transmitter may not send a new frame if the inputs remain static
+            # - No reason to care about timeouts
+            # - - Long timeout length = less timeouts
+            # - - Less timeouts = fewer exceptions raised
+            # - - Fewer exceptions raised = less overhead
+            rawData = readDevice(interruptEndpoint, frameSize, timeout=1000)
+            channelData = []
+            for i in range(0, len(rawData), 2):
+                channel = i // 2
+                valueMap = channelValueMaps[channel]
+
+                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
+                # Avoid overflows and underflows
+                # account for off-by-one
+                maxInputVal = len(valueMap) - 1
+                if rawValue > maxInputVal:
+                    rawValue = maxInputVal
+                # calibration map will always have an index 0, so we pull
+                # the minimum value from that
+                elif rawValue < 0:
+                    rawValue = 0
+                # Extract calibrated value from map
+                channelData.append(valueMap[rawValue])
+            channelData.reverse()
+            # Queue one event for each channel
+            for data, event in zip(channelData, channelEventsMap):
+                # Queue one event for each channel
+                emit(event, data, syn=False)
+            # fire all queued events
+            synchronize()
+        except usb.core.USBTimeoutError:
+            pass
+        except Exception as e:
+            logger.critical(e)
+            raise e
+
+    logger.debug("Releasing the USB interface...")
+    try:
+        usb.util.release_interface(coreDevice, 0)
+    except Exception as e:
+        logger.warning(
+            "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+        )
+        logger.warning(e)
+
+    logger.debug("Reattaching the kernel driver...")
+    try:
+        coreDevice.attach_kernel_driver(0)
+    except Exception as e:
+        logger.warning(
+            "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
+        )
+        logger.warning(e)
+
+    logger.debug("Resetting device...")
+    try:
+        coreDevice.reset()
+    except Exception as e:
+        logger.warning(
+            "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+        )
+        logger.warning(e)
