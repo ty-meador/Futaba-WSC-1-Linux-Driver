@@ -28,26 +28,24 @@ sudo pip3 install -r requirements.txt
 # Make sure you are in the projects folder
 cd /path/to/futaba-usb-rc-linux-driver
 # Start the UI
-sudo ./run.sh 
+sudo ./run.sh --text-ui
 ```
 
 - This will start a text-based UI
 - The UI will show a list of available Futaba USB devices
-  - Navigate with the arrow keys
-  - Spacebar to select/deselect
-- To start or stop a device, simply select or de-select it respectively
-- Each device that you start will run in a **separate subprocess**
+  - Click the button for the device you want to start
+- Each device that you start will run in a **separate process**
   - This ensures that each device gets the maximum bandwidth possible
   - This prevents the entire driver from crashing if a single device crashes
 - **Leave the terminal running while you game**
 
 
 ```shell
-┌─ Driver for Futaba R/C -> USB Receivers ─────────────────────────────────┐┌─ Running Drivers ────────────────────────────────────────────────────────┐
-│                                                                          ││['Futaba WSC-1 (bus-1, port-1)']                                          │
-│ ▐X▌ Futaba WSC-1 (bus-1, port-1)                                         │└──────────────────────────────────────────────────────────────────────────┘
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
+                                                                                                                                                                                              
+                                            ┌─ Running Drivers ───────────────────────────────────────────────┐                   
+                     ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔  │[{'name': 'Futaba WSC-1(1,1)', 'state': 'RUNNING', 'key': 0}]    │                   
+                      Futaba WSC-1(1,1) ⏹   └─────────────────────────────────────────────────────────────────┘                   
+                     ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
 ```
 - If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
 
