@@ -21,10 +21,10 @@ class FutabaDeviceManager:
         Returns:
             tuple of string: Ordered list of available devices
         """
-        return tuple(
-            {"name": device.getName(), "state": device.getState(), "key": i}
+        return [
+            {"key": i, "state": self.getDeviceStatus(i), "name": device.name}
             for i, device in enumerate(self.futabaDevices)
-        )
+        ]
 
     def getDeviceStatus(self, deviceIndex):
         """Get the status of the device at the given index
@@ -99,12 +99,10 @@ class FutabaDeviceManager:
     def __init__(self):
         atexit.register(self.stopAll)
         self.logger = driver.newLogger("FutabaDeviceManager")
-        self.futabaDevices = tuple(
-            FutabaDeviceDriver(device.bus, device.port_numbers[0])
-            for device in usb.core.find(find_all=True)
-            if device.manufacturer.lower() == "futaba"
-        )
-        self.deviceList = tuple()
+        self.futabaDevices = [
+            FutabaDeviceDriver(device) for device in self._findFutabaDevices()
+        ]
+
         if len(self.futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
 
@@ -120,9 +118,88 @@ class FutabaDeviceManager:
         """
         return futabaDeviceDriver.getState() == "RUNNING"
 
+    @staticmethod
+    def _findFutabaDevices():
+        """Generate a list of Futaba devices that are of interface class "Human Interface Device"
+        and have a USB interrupt endpoint
+
+        Args:
+            deviceList (list of usb.core.Device): list of devices to filter
+
+        Returns:
+            list of usb.core.Device: _description_
+        """
+        tempList = []
+        for device in tuple(usb.core.find(find_all=True)):
+            if device.idVendor != driver.FUTABA_VENDOR_ID:
+                continue
+            for _config in device:
+                for _interface in _config:
+                    # 0x3 interface class = Human Interface Device
+                    if _interface.bInterfaceClass != 0x3:
+                        continue
+                    for _endpoint in _interface:
+                        if (
+                            usb.util.endpoint_direction(_endpoint.bEndpointAddress)
+                            == usb.util.ENDPOINT_IN
+                            # 0x3 attribute indicates interrupt endpoint
+                            and _endpoint.bmAttributes == 0x3
+                        ):
+                            tempList.append(
+                                {
+                                    "bus": device.bus,
+                                    "ports": device.port_numbers,
+                                    "productID": device.idProduct,
+                                    "serialNumber": device.serial_number,
+                                    "vendorID": device.idVendor,
+                                    "product": device.product,
+                                    "manufacturer": device.manufacturer,
+                                    "speed": device.speed,
+                                    "interruptEndpoint": _endpoint.bEndpointAddress,
+                                }
+                            )
+        return tuple(tempList)
+
 
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device"""
+
+    def __init__(self, deviceInfo):
+        self.state = "INITIALIZING"
+
+        if deviceInfo["vendorID"] != driver.FUTABA_VENDOR_ID:
+            raise TypeError(f"This does not appear to be a Futaba device {deviceInfo}")
+
+        # Metadata storage
+        self.bus = deviceInfo["bus"]
+        self.endpointAddress = deviceInfo["interruptEndpoint"]
+        self.interruptEndpoint = deviceInfo["interruptEndpoint"]
+        self.killswitch = multiprocessing.Event()
+        self.manufacturer = deviceInfo["manufacturer"]
+        self.name = f"Futaba {deviceInfo['product']}({deviceInfo['interruptEndpoint']})"
+        self.product = deviceInfo["product"]
+        self.productID = deviceInfo["productID"]
+        self.serialNumber = deviceInfo["serialNumber"]
+        self.speed = deviceInfo["speed"]
+        self.subProc = None
+
+        # Device setup
+        self.logger = driver.newLogger(f"{deviceInfo['product']}_driver")
+        self.config = self._loadConfig(self.product)
+        self.deviceChannels = [
+            InputChannel(eventName, calibration, False)
+            for eventName, calibration in zip(
+                self.config["channel_events"],
+                self._loadCalibration(self.product),
+            )
+        ]
+        atexit.register(self.stop)
+
+    def __str__(self):
+        return f"{self.name} Driver"
+
+    def __repr__(self):
+        return str(self.toDict())
 
     def getName(self):
         """Gets the name of the device this driver was initialized for"""
@@ -173,50 +250,6 @@ class FutabaDeviceDriver:
             "endpointAddress": self.interruptEndpoint,
             "name": self.name,
         }
-
-    def __init__(self, bus, port, name=None):
-        deviceInfo = driver.getCoreDeviceInfo(bus, port)
-
-        if not deviceInfo:
-            raise RuntimeError(f"No device found at bus {bus}, port {port}")
-
-        if deviceInfo["manufacturer"].lower() != "futaba":
-            raise TypeError(
-                f"The device at bus {bus}, port {port} does not appear to be a Futaba device"
-            )
-
-        self.state = "INITIALIZING"
-        self.bus = bus
-        self.port = port
-
-        self.name = name
-        if self.name is None:
-            self.name = f"Futaba {deviceInfo['product']}({bus},{port})"
-
-        self.logger = driver.newLogger(f"{deviceInfo['product']}_driver")
-        self.productID = deviceInfo["productID"]
-        self.serialNumber = deviceInfo["serialNumber"]
-        self.product = deviceInfo["product"]
-        self.manufacturer = deviceInfo["manufacturer"]
-        self.speed = deviceInfo["speed"]
-        self.interruptEndpoint = deviceInfo["interruptEndpoint"]
-        self.subProc = None
-        self.killswitch = multiprocessing.Event()
-        self.config = self._loadConfig(self.product)
-        self.deviceChannels = [
-            InputChannel(eventName, calibration, False)
-            for eventName, calibration in zip(
-                self.config["channel_events"],
-                self._loadCalibration(self.product),
-            )
-        ]
-        atexit.register(self.stop)
-
-    def __str__(self):
-        return f"{self.name} Driver"
-
-    def __repr__(self):
-        return str(self.toDict())
 
     def _loadConfig(self, productName):
         """Loads the settings for this particular device and falls back

@@ -60,7 +60,7 @@ for parent in Path(__file__).resolve().parents:
         os.makedirs(LOG_PATH, exist_ok=True)
         break
 
-LOGLEVEL = logging.WARNING
+LOGLEVEL = logging.DEBUG
 DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
     os.path.join(LOG_PATH, "driver.txt"),
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
@@ -97,54 +97,20 @@ def findInterruptEndpoint(device):
         logger.critical(err)
         raise ValueError(err)
 
-    for config in device:
-        for interface in config:
-            for endpoint in interface:
+    for _config in device:
+        for _interface in _config:
+            # 0x3 interface class = Human Interface Device
+            if _interface.bInterfaceClass != 0x3:
+                continue
+            for _endpoint in _interface:
                 if (
-                    usb.util.endpoint_direction(endpoint.bEndpointAddress)
+                    usb.util.endpoint_direction(_endpoint.bEndpointAddress)
                     == usb.util.ENDPOINT_IN
-                    # 0x3 indicates interrupt endpoint
-                    and endpoint.bmAttributes == 0x3
+                    # 0x3 attribute indicates interrupt endpoint
+                    and _endpoint.bmAttributes == 0x3
                 ):
-                    return endpoint.bEndpointAddress
-    raise RuntimeError("No interrupt endpoint found!")
-
-
-def getCoreDeviceInfo(bus, port):
-    """Finds the core device on the given bus and port
-
-    Args:
-        bus (int): The bus of the device
-        port (int): The port of the device
-
-    Returns:
-        usb.core.Device: The core device at the provided bus and port
-    """
-
-    logger = DEFAULT_LOGGER
-    logger.debug(f"looking for core device on bus {bus}, port {port}")
-    results = [
-        device
-        for device in usb.core.find(find_all=True)
-        if device.manufacturer.lower() == "futaba"
-        and int(device.port_numbers[0]) == int(port)
-        and int(device.bus) == int(bus)
-    ]
-
-    if len(results) != 1:
-        logger.debug(f"Expected to find exactly 1 result, found {len(results)}")
-        return False
-
-    device = results[0]
-    logger.debug(f"-> Found {results[0]}")
-    return {
-        "productID": device.idProduct,
-        "serialNumber": device.serial_number,
-        "product": device.product,
-        "manufacturer": device.manufacturer,
-        "speed": device.speed,
-        "interruptEndpoint": findInterruptEndpoint(device),
-    }
+                    return _endpoint.bEndpointAddress
+    return None
 
 
 def newLogger(
