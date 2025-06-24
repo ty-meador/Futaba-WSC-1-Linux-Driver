@@ -1,6 +1,5 @@
 {
     "frame_size": 16,
-    "event_max_value": 32768,
     "channel_events": [
         "ABS_X",
         "ABS_Y",
