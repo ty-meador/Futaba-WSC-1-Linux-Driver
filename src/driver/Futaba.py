@@ -149,7 +149,7 @@ class FutabaDeviceDriver:
                 self.logger.debug("-> Killswitch cleared")
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
-                target=__worker,
+                target=_worker,
                 args=self._toSubprocTuple(),
             )
             self.subProc.start()
@@ -420,7 +420,7 @@ class ChannelCalibration:
         )
 
 
-def __worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
+def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
     """The target function for the drivers' subprocess
     NOTE main event loop optimization:
         we initialize a local version of everything that will be used inside
