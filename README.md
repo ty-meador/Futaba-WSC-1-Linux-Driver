@@ -40,12 +40,11 @@ sudo ./run.sh --text-ui
 - **Leave the terminal running while you game**
 
 
-```shell
-                                                                                                                                                                                              
-                                            ┌─ Running Drivers ───────────────────────────────────────────────┐                   
-                     ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔  │[{'name': 'Futaba WSC-1(1,1)', 'state': 'RUNNING', 'key': 0}]    │                   
-                      Futaba WSC-1(1,1) ⏹   └─────────────────────────────────────────────────────────────────┘                   
-                     ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+```shell               
+                        ┌─ Running Drivers ───────────────────────────────────────────────┐                   
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │[{'name': 'Futaba WSC-1(1,1)', 'state': 'RUNNING', 'key': 0}]    │                   
+  Futaba WSC-1(1,1) ⏹   └─────────────────────────────────────────────────────────────────┘                   
+  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
 ```
 - If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
 
