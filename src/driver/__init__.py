@@ -310,8 +310,9 @@ def eventDispatchWorker(killswitch, frameSize, deviceChannels, name, interruptEn
         except Exception as e:
             logger.critical(e)
             raise e
+
+    logger.debug("Releasing the USB interface...")
     try:
-        logger.debug("Releasing the USB interface...")
         usb.util.release_interface(coreDevice, 0)
     except Exception as e:
         logger.warning(
@@ -319,8 +320,8 @@ def eventDispatchWorker(killswitch, frameSize, deviceChannels, name, interruptEn
         )
         logger.warning(e)
 
+    logger.debug("Reattaching the kernel driver...")
     try:
-        logger.debug("Reattaching the kernel driver...")
         coreDevice.attach_kernel_driver(0)
     except Exception as e:
         logger.warning(
@@ -328,8 +329,8 @@ def eventDispatchWorker(killswitch, frameSize, deviceChannels, name, interruptEn
         )
         logger.warning(e)
 
+    logger.debug("Resetting device...")
     try:
-        logger.debug("Resetting device...")
         coreDevice.reset()
     except Exception as e:
         logger.warning(
