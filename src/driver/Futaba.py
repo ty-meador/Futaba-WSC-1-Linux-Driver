@@ -182,7 +182,7 @@ class FutabaDeviceDriver:
 
         if deviceInfo["manufacturer"].lower() != "futaba":
             raise TypeError(
-                f"The device at bus {bus}, port {port} does not appear to be aFutaba device"
+                f"The device at bus {bus}, port {port} does not appear to be a Futaba device"
             )
 
         self.state = "INITIALIZING"
@@ -210,7 +210,6 @@ class FutabaDeviceDriver:
                 self._loadCalibration(self.product),
             )
         ]
-        # self.logger.debug(self.toDict())
         atexit.register(self.stop)
 
     def __str__(self):

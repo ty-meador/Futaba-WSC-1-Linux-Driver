@@ -6,6 +6,7 @@ from textual.containers import Horizontal
 from textual.events import Mount
 from textual.widgets import Button, Footer, Header, Pretty
 
+import driver
 from driver.Futaba import FutabaDeviceManager
 
 driverCmds = []
@@ -24,12 +25,10 @@ class DriverUI(App):
         super().__init__()
 
         self.fdm = FutabaDeviceManager()
+
         atexit.register(self.fdm.stopAll)
         futabaDevices = self.fdm.listDevices()
-
-        # self.selectionList = [
-        #     Selection(f"{device['name']}", i) for i, device in enumerate(futabaDevices)
-        # ]
+        self.logger = driver.newLogger("text-ui")
 
         if len(futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
@@ -39,7 +38,7 @@ class DriverUI(App):
         with Horizontal():
             for i, device in enumerate(self.fdm.listDevices()):
                 yield Button(
-                    label=f"{device['name']} {PLAY_ICON}",
+                    label=f"{device['name']} {PLAY_ICON if device['state'] == 'IDLE' else STOP_ICON}",
                     variant="primary",
                     name=str(i),
                     id=f"BTN_{i}",
@@ -69,6 +68,12 @@ class DriverUI(App):
             self.fdm.stop(device["key"])
         else:
             raise TypeError(f"Unknown driver state encountered: {device.state}")
+
+        event.button.label = f"{device['name']} {PLAY_ICON if device['state'] == 'RUNNING' else STOP_ICON}"
+
+        self.query_one(Pretty).update(
+            list(filter(lambda d: d["state"] == "RUNNING", self.fdm.listDevices()))
+        )
 
     @on(Mount)
     def update_selected_view(self):  # noqa: C0103
