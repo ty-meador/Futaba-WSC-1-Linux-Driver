@@ -74,7 +74,27 @@ DEFAULT_LOGGER.setLevel(LOGLEVEL)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
 
 
-def findInterruptEndpoint(device):
+def findHIDInterface(coreDevice):
+    for config in coreDevice:
+        for interface in config:
+            if interface.bInterfaceClass == 0x3:  # Human Interface Device
+                return interface
+    return None
+
+
+def findInterruptEndpoint(hidInterface):
+    for endpoint in hidInterface:
+        if (
+            usb.util.endpoint_direction(endpoint.bEndpointAddress)
+            == usb.util.ENDPOINT_IN
+            # 0x3 indicates interrupt endpoint
+            and endpoint.bmAttributes == 0x3
+        ):
+            return endpoint.bEndpointAddress
+    return None
+
+
+def getInterruptEndpoint(coreDevice):
     """Find the USB interrupt endpoint for the provided device
 
     Args:
@@ -90,24 +110,15 @@ def findInterruptEndpoint(device):
     logger = DEFAULT_LOGGER
     logger.debug("looking for endpoint for device provided")
 
-    if not isinstance(device, usb.core.Device):
-        err = (
-            f"Expected first param to be of type usb.core.Device, found {type(device)}"
-        )
+    if not isinstance(coreDevice, usb.core.Device):
+        err = f"Expected first param to be of type usb.core.Device, found {type(coreDevice)}"
         logger.critical(err)
         raise ValueError(err)
 
-    for config in device:
-        for interface in config:
-            for endpoint in interface:
-                if (
-                    usb.util.endpoint_direction(endpoint.bEndpointAddress)
-                    == usb.util.ENDPOINT_IN
-                    # 0x3 indicates interrupt endpoint
-                    and endpoint.bmAttributes == 0x3
-                ):
-                    return endpoint.bEndpointAddress
-    raise RuntimeError("No interrupt endpoint found!")
+    hidInterface = findHIDInterface(coreDevice)
+    if hidInterface is None:
+        return None
+    return findInterruptEndpoint(hidInterface)
 
 
 def getCoreDeviceInfo(endpoint):

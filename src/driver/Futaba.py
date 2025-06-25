@@ -214,35 +214,15 @@ class FutabaDeviceDriver:
         if coreDevice.idVendor != driver.FUTABA_VENDOR_ID:
             return False
 
-        hidInterface = cls.getHIDInterface(coreDevice)
+        hidInterface = driver.findHIDInterface(coreDevice)
         if hidInterface is None:
             return False
 
-        endpoint = cls.getInterruptEndpoint(hidInterface)
+        endpoint = driver.findInterruptEndpoint(hidInterface)
         if endpoint is None:
             return False
 
         return True
-
-    @staticmethod
-    def getInterruptEndpoint(hidInterface):
-        for endpoint in hidInterface:
-            if (
-                usb.util.endpoint_direction(endpoint.bEndpointAddress)
-                == usb.util.ENDPOINT_IN
-                # 0x3 indicates interrupt endpoint
-                and endpoint.bmAttributes == 0x3
-            ):
-                return endpoint.bEndpointAddress
-        return None
-
-    @staticmethod
-    def getHIDInterface(coreDevice):
-        for config in coreDevice:
-            for interface in config:
-                if interface.bInterfaceClass == 0x3:  # Human Interface Device
-                    return interface
-        return None
 
     def _loadConfig(self, productName):
         """Loads the settings for this particular device and falls back
