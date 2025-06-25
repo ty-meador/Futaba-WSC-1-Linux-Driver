@@ -101,9 +101,9 @@ class FutabaDeviceManager:
         atexit.register(self.stopAll)
         self.logger = driver.newLogger("FutabaDeviceManager")
         self.futabaDevices = tuple(
-            FutabaDeviceDriver(device.bus, device.port_numbers[0])
+            FutabaDeviceDriver(device)
             for device in usb.core.find(find_all=True)
-            if device.manufacturer.lower() == "futaba"
+            if FutabaDeviceDriver.deviceIsSupported(device)
         )
         self.deviceList = tuple()
         if len(self.futabaDevices) == 0:
@@ -175,24 +175,14 @@ class FutabaDeviceDriver:
             "name": self.name,
         }
 
-    def __init__(self, bus, port, name=None):
-        deviceInfo = driver.getCoreDeviceInfo(bus, port)
-
-        if not deviceInfo:
-            raise RuntimeError(f"No device found at bus {bus}, port {port}")
-
-        if deviceInfo["manufacturer"].lower() != "futaba":
-            raise TypeError(
-                f"The device at bus {bus}, port {port} does not appear to be a Futaba device"
-            )
-
+    def __init__(self, device):
         self.state = "INITIALIZING"
-        self.bus = bus
-        self.port = port
 
-        self.name = name
-        if self.name is None:
-            self.name = f"Futaba {deviceInfo['product']}({bus},{port})"
+        self.endpoint = driver.findInterruptEndpoint(device)
+        deviceInfo = driver.getCoreDeviceInfo(self.endpoint)
+        if self.endpoint is None:
+            raise TypeError("Unable to find interrupt endpoint for device")
+        self.name = f"Futaba {deviceInfo['product']}({self.endpoint})"
 
         self.logger = driver.newLogger(f"{deviceInfo['product']}_driver")
         self.productID = deviceInfo["productID"]
@@ -218,6 +208,41 @@ class FutabaDeviceDriver:
 
     def __repr__(self):
         return str(self.toDict())
+
+    @classmethod
+    def deviceIsSupported(cls, coreDevice):
+        if coreDevice.idVendor != driver.FUTABA_VENDOR_ID:
+            return False
+
+        hidInterface = cls.getHIDInterface(coreDevice)
+        if hidInterface is None:
+            return False
+
+        endpoint = cls.getInterruptEndpoint(hidInterface)
+        if endpoint is None:
+            return False
+
+        return True
+
+    @staticmethod
+    def getInterruptEndpoint(hidInterface):
+        for endpoint in hidInterface:
+            if (
+                usb.util.endpoint_direction(endpoint.bEndpointAddress)
+                == usb.util.ENDPOINT_IN
+                # 0x3 indicates interrupt endpoint
+                and endpoint.bmAttributes == 0x3
+            ):
+                return endpoint.bEndpointAddress
+        return None
+
+    @staticmethod
+    def getHIDInterface(coreDevice):
+        for config in coreDevice:
+            for interface in config:
+                if interface.bInterfaceClass == 0x3:  # Human Interface Device
+                    return interface
+        return None
 
     def _loadConfig(self, productName):
         """Loads the settings for this particular device and falls back

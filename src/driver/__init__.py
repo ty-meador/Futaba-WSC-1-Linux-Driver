@@ -110,7 +110,7 @@ def findInterruptEndpoint(device):
     raise RuntimeError("No interrupt endpoint found!")
 
 
-def getCoreDeviceInfo(bus, port):
+def getCoreDeviceInfo(endpoint):
     """Finds the core device on the given bus and port
 
     Args:
@@ -122,13 +122,14 @@ def getCoreDeviceInfo(bus, port):
     """
 
     logger = DEFAULT_LOGGER
-    logger.debug(f"looking for core device on bus {bus}, port {port}")
+    logger.debug(
+        f"looking for core device with an interrupt endpoint address of {endpoint}"
+    )
     results = [
         device
         for device in usb.core.find(find_all=True)
-        if device.manufacturer.lower() == "futaba"
-        and int(device.port_numbers[0]) == int(port)
-        and int(device.bus) == int(bus)
+        if device.idVendor == FUTABA_VENDOR_ID
+        and findInterruptEndpoint(device) == endpoint
     ]
 
     if len(results) != 1:
