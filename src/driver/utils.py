@@ -54,9 +54,7 @@ def getLogger(
         logger: The generated logger
     """
     handler = HANDLER
-    handler.setFormatter(
-        logging.Formatter(f"%(asctime)s - {name} %(levelname)s\t: %(message)s")
-    )
+    handler.setFormatter(logging.Formatter(f"%(asctime)s - {name} %(levelname)s\t: %(message)s"))
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
@@ -105,8 +103,7 @@ def getInterruptAddress(device):
         for interface in config:
             for endpoint in interface:
                 if (
-                    usb.util.endpoint_direction(endpoint.bEndpointAddress)
-                    == usb.util.ENDPOINT_IN
+                    usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
                     # 0x3 indicates interrupt endpoint
                     and endpoint.bmAttributes == 0x3
                 ):
@@ -125,29 +122,17 @@ def generateValueMap(inputRange, outputRange):
         list: A list of all possible output values given the range of input values
     """
     if not hasattr(inputRange, "__len__") or len(inputRange) != 2:
-        raise TypeError(
-            "inputRange must be an array of length 2, using defaults instead"
-        )
+        raise TypeError("inputRange must be an array of length 2, using defaults instead")
     if not hasattr(outputRange, "__len__") or len(outputRange) != 2:
-        raise TypeError(
-            "outputRange must be an array of length 2, using defaults instead"
-        )
+        raise TypeError("outputRange must be an array of length 2, using defaults instead")
     if not isinstance(inputRange[0], int):
-        raise TypeError(
-            f"Expected inputRange[0] to be of type int, found {type(inputRange[0])}"
-        )
+        raise TypeError(f"Expected inputRange[0] to be of type int, found {type(inputRange[0])}")
     if not isinstance(inputRange[1], int):
-        raise TypeError(
-            f"Expected inputRange[1] to be of type int, found {type(inputRange[1])}"
-        )
+        raise TypeError(f"Expected inputRange[1] to be of type int, found {type(inputRange[1])}")
     if not isinstance(outputRange[0], int):
-        raise TypeError(
-            f"Expected outputRange[0] to be of type int, found {type(outputRange[0])}"
-        )
+        raise TypeError(f"Expected outputRange[0] to be of type int, found {type(outputRange[0])}")
     if not isinstance(outputRange[1], int):
-        raise TypeError(
-            f"Expected outputRange[1] to be of type int, found {type(inputRange[1])}"
-        )
+        raise TypeError(f"Expected outputRange[1] to be of type int, found {type(inputRange[1])}")
 
     # Guarantee that we are working with ints
     inputRange[0] = int(inputRange[0])

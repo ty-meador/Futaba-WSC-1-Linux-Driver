@@ -1,4 +1,4 @@
-"""Class representing a single Futaba USB adapater"""
+"""Futaba driver package."""
 
 import array
 import atexit
@@ -14,13 +14,32 @@ import driver
 
 
 class FutabaDeviceManager:
-    """Provides a class-based interface for starting and stopping Futaba USB device drivers"""
+    """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
+
+    def __init__(self):
+        """Create an object that manages Futaba drivers.
+
+        Raises:
+            RuntimeError: Raised if no Futaba USB devices are detected
+
+        """
+        atexit.register(self.stopAll)
+        self.logger = driver.newLogger("FutabaDeviceManager")
+        self.futabaDevices = tuple(
+            FutabaDeviceDriver(device)
+            for device in usb.core.find(find_all=True)
+            if FutabaDeviceDriver.deviceIsSupported(device)
+        )
+        self.deviceList = tuple()
+        if len(self.futabaDevices) == 0:
+            raise RuntimeError("No Futaba USB device detected!")
 
     def listDevices(self):
-        """Returns an ordered list of devices
+        """Get an ordered list of available devices.
 
         Returns:
             tuple of string: Ordered list of available devices
+
         """
         return tuple(
             {"name": device.getName(), "state": device.getState(), "key": i}
@@ -28,13 +47,14 @@ class FutabaDeviceManager:
         )
 
     def getDeviceStatus(self, deviceIndex):
-        """Get the status of the device at the given index
+        """Get the status of the device at the given index.
 
         Args:
             deviceIndex (int): The device that you want the status of
 
         Returns:
             string: "RUNNING" or "IDLE"
+
         """
         try:
             return self.futabaDevices[deviceIndex].getState()
@@ -43,12 +63,12 @@ class FutabaDeviceManager:
             return False
 
     def start(self, deviceIndex):
-        """Start the devices at the given indexes
+        """Start the devices at the given indexes.
 
         Args:
-            deviceIndexes (list of int, optional): The devices you want to start. Defaults to [].
-        """
+            deviceIndex (int or list of int, optional): The devices you want to start. Defaults to [].
 
+        """
         self.logger.debug(f"Attempting to start device at index[s] {deviceIndex}")
         if isinstance(deviceIndex, int):
             result = self.futabaDevices[deviceIndex].start()
@@ -57,7 +77,7 @@ class FutabaDeviceManager:
                 self.logger.debug(f"-> {self.futabaDevices[deviceIndex]} started")
             else:
                 raise RuntimeError(
-                    f"Start requested failed for item at index {deviceIndex}"
+                    f"Start requested failed for item at index {deviceIndex}",
                 )
         elif hasattr("__iter__", deviceIndex):
             self.logger.debug("-> Iterable detected, attempting to start multiple...")
@@ -67,16 +87,17 @@ class FutabaDeviceManager:
                     self.logger.debug(f"--> {self.futabaDevices[deviceIndex]} started")
                 else:
                     raise RuntimeError(
-                        f"Start requested failed for item at index {idx}"
+                        f"Start requested failed for item at index {idx}",
                     )
 
         return self.listDevices()
 
     def stop(self, deviceIndex):
-        """Stop the devices at the given indexes
+        """Stop the devices at the given indexes.
 
         Args:
-            deviceIndexes (list of int, optional): The devices you want to stop. Defaults to [].
+            deviceIndex (int or list of int, optional): The devices you want to stop. Defaults to [].
+
         """
         try:
             if isinstance(deviceIndex, int):
@@ -89,7 +110,7 @@ class FutabaDeviceManager:
         return self.listDevices()
 
     def stopAll(self):
-        """Stops all running drivers"""
+        """Stop all running drivers."""
         try:
             for device in self.futabaDevices:
                 device.stop()
@@ -97,43 +118,33 @@ class FutabaDeviceManager:
             self.logger.warning(e)
         return self.listDevices()
 
-    def __init__(self):
-        atexit.register(self.stopAll)
-        self.logger = driver.newLogger("FutabaDeviceManager")
-        self.futabaDevices = tuple(
-            FutabaDeviceDriver(device)
-            for device in usb.core.find(find_all=True)
-            if FutabaDeviceDriver.deviceIsSupported(device)
-        )
-        self.deviceList = tuple()
-        if len(self.futabaDevices) == 0:
-            raise Exception("No Futaba USB device detected!")
-
     @staticmethod
     def _deviceIsRunning(futabaDeviceDriver):
-        """Function to determine if a given device is actively running
+        """Determine if the provided driver is currently running or not.
 
         Args:
             futabaDeviceDriver (FutabaDeviceDriver): The device to check
 
         Returns:
             bool: True if the device has a subprocess
+
         """
         return futabaDeviceDriver.getState() == "RUNNING"
 
 
 class FutabaDeviceDriver:
-    """Provides a class based interface for a single Futaba USB device"""
+    """Provides a class based interface for a single Futaba USB device."""
 
     def getName(self):
-        """Gets the name of the device this driver was initialized for"""
+        """Get the name of the device this driver was initialized for."""
         return self.name
 
     def getState(self):
-        """Gets the current state of the driver
+        """Get the current state of the driver.
 
         Returns:
             string: The current state of the driver
+
         """
         if self.subProc is not None and self.subProc.is_alive():
             self.state = "RUNNING"
@@ -142,7 +153,7 @@ class FutabaDeviceDriver:
         return self.state
 
     def start(self):
-        """Start the driver if it is not running"""
+        """Start the driver if it is not running."""
         if self.getState() != "RUNNING":
             if self.killswitch.is_set():
                 self.killswitch.clear()
@@ -156,7 +167,7 @@ class FutabaDeviceDriver:
         return self.getState()
 
     def stop(self):
-        """Stop the driver"""
+        """Stop the driver."""
         if not self.killswitch.is_set():
             self.killswitch.set()
         if self.subProc is not None and self.subProc.is_alive():
@@ -164,18 +175,26 @@ class FutabaDeviceDriver:
         self.state = "IDLE"
 
     def toDict(self):
-        """Returns a dictionary representation of the driverf object"""
-
+        """Create a dictionary representation of this driver."""
         return {
             "config": self.config,
             "deviceChannels": tuple(
-                [channel.toDict() for channel in self.deviceChannels]
+                [channel.toDict() for channel in self.deviceChannels],
             ),
             "endpointAddress": self.interruptEndpoint,
             "name": self.name,
         }
 
     def __init__(self, device):
+        """Create an object that drives a single device on it's own process.
+
+        Args:
+            device (usb.core.Device): The device you want to spawn a driver for
+
+        Raises:
+            TypeError: If device is not of type usb.core.Device
+
+        """
         self.state = "INITIALIZING"
 
         self.endpoint = driver.findInterruptEndpoint(device)
@@ -199,18 +218,34 @@ class FutabaDeviceDriver:
             for eventName, calibration in zip(
                 self.config["channel_events"],
                 self._loadCalibration(self.product),
+                strict=False,
             )
         ]
         atexit.register(self.stop)
 
     def __str__(self):
+        """Generate a string representation of this driver."""
         return f"{self.name} Driver"
 
     def __repr__(self):
+        """Generate a machine-readable representation of this driver."""
         return str(self.toDict())
 
     @classmethod
     def deviceIsSupported(cls, coreDevice):
+        """Determine if the following conditions are true for the provided device.
+
+        - Provided device is a Futaba device
+        - Device has a HID interface
+        - HID interface has a suitable interrupt endpoint
+
+        Args:
+            coreDevice (usb.core.Device): The device to check
+
+        Returns:
+            bool: True if all conditions are met, false otherwise
+
+        """
         if coreDevice.idVendor != driver.FUTABA_VENDOR_ID:
             return False
 
@@ -225,11 +260,11 @@ class FutabaDeviceDriver:
         return True
 
     def _loadConfig(self, productName):
-        """Loads the settings for this particular device and falls back
-        to the default config file if one doesn't exist
+        """Load the settings for this particular device and falls back to the default config file if one doesn't exist.
 
         Returns:
             dict: A dictionary containing the driver settings
+
         """
         config = None
 
@@ -250,15 +285,15 @@ class FutabaDeviceDriver:
         return config
 
     def _loadCalibration(self, productName):
-        """Loads the calibration file for the given product
+        """Load the calibration file for the given product.
 
         Args:
             productName (str, optional): The name of the product to load the calibration for. Defaults to None.
 
         Returns:
             list of list: Each inner list will contain exactly 2 items, each of which are lists.
-        """
 
+        """
         filePath = os.path.join(driver.CALIBRATION_PATH, f"{productName}.json")
         defaultPath = os.path.join(driver.CALIBRATION_PATH, "default.json")
 
@@ -276,7 +311,13 @@ class FutabaDeviceDriver:
         return channelCalibrations
 
     def _toSubprocTuple(self):
-        return (
+        """Create a tuple that is compatable with the worker function.
+
+        Returns:
+            tuple: The tuple that you will pass to the worker function
+
+        """
+        return tuple(
             self.killswitch,
             self.config["frame_size"],
             [channel.toDict() for channel in self.deviceChannels],
@@ -286,13 +327,21 @@ class FutabaDeviceDriver:
 
 
 class InputChannel:
-    """Provides a class based representation of a single input channel"""
+    """Provides a class based representation of a single input channel."""
 
     def toDict(self):
-        """Returns a dictionary representation of this input channel"""
+        """Generate a dictionary representation of this input channel."""
         return {"eventName": self.eventName, "valueMap": self.valueMap}
 
     def __init__(self, eventName, calibration, reverseInputs=False):
+        """Create an InputChannel object.
+
+        Args:
+            eventName (str): Any valid uinput event
+            calibration (ChannelCalibration): A calibration object used to calibrate this input channel
+            reverseInputs (bool, optional): If true the value map will be generated in reverse to reverse the inputs. Defaults to False.
+
+        """
         self.eventName = eventName
         self.isReversed = reverseInputs
         self.calibration = ChannelCalibration(
@@ -303,6 +352,7 @@ class InputChannel:
         self.valueMap = self.calibration.getCalibratedValueMap()
 
     def __str__(self):
+        """Create a string representation of this IputChannel."""
         return str(self.toDict())
 
 
@@ -310,12 +360,8 @@ class ChannelCalibration:
     """Provides a class based representation of a channel calibration.
 
     Why:
-        - The range of values that is output on a given channel is different
-        for each device manufactured.
-        - To account for this difference, we use a process known as
-        "calibrating" the device. Calibrating a device is simply the process
-        of determining your devices unique range of values, and then mapping
-        that range of values to a standardized range of values.
+        - The range of values that is output on a given channel is different for each device manufactured.
+        - To account for this difference, we use a process known as "calibrating" the device. Calibrating a device is simply the process of determining your devices unique range of values, and then mapping that range of values to a standardized range of values.
             - This requires a 1-d interpolation from the raw device values to
             the standardized output values. This must be done every single time
             we read data from the device (hundreds of times per second+).
@@ -345,11 +391,11 @@ class ChannelCalibration:
     """
 
     def getCalibratedValueMap(self):
-        """Returns the calibrated value mapping
+        """Get an array where each index of the array represents a possible device input and the value stored at that index is the calibrated output value.
 
         Returns:
-            array.array of int: The integer array that maps a given index to
-            the corresponding calibrated outpute valued stored at that index
+            array.array of int: The integer array that maps a given index to the corresponding calibrated outpute valued stored at that index
+
         """
         return self.valueMap
 
@@ -359,6 +405,14 @@ class ChannelCalibration:
         outputRange=None,
         reverse=False,
     ):
+        """Create a ChannelCalibration object.
+
+        Args:
+            inputRange (iterable of length 2, optional): A list, tuple, or array where the first value is the lowest possible input value and the second value is the highest possible input value. Defaults to None.
+            outputRange (_type_, optional): A list, tuple, or array where the first value is the lowest possible output value and the second value is the highest possible output value. Defaults to None.
+            reverse (bool, optional): If reverse the calibrated values will be inserted into the resulting array backwards. This will reverse the direction of the input. Defaults to False.
+
+        """
         if inputRange is None:
             inputRange = [driver.DEFAULT_DEVICE_MIN_VAL, driver.DEFAULT_DEVICE_MAX_VAL]
         if outputRange is None:
@@ -370,27 +424,29 @@ class ChannelCalibration:
         self.valueMap = self._generateValueMap(inputRange, outputRange, self.reverse)
 
     def __str__(self):
+        """Create a string representation of this calibration object."""
         return str(
             {
                 "reverse": self.reverse,
                 "inputRange": self.inputRange,
                 "outputRange": self.outputRange,
                 "valueMap": f"Generated {len(self.valueMap)} values consuming {sys.getsizeof(self.valueMap)} bytes of memory",
-            }
+            },
         )
 
     @staticmethod
     def _generateValueMap(inputRange, outputRange, reverse=False):
-        """Generate a list of values that maps the input range to the output range
+        """Generate a list of values that maps the input range to the output range.
 
         Args:
             inputRange (list, optional): This determines the size of the map. Defaults to [600, 3500].
             outputRange (list, optional): This determines what values are generated in the map. Defaults to [0, 32768].
+            reverse (bool, optional): If set to true the map will be generated backwards. This will reverse the direction of the input
 
         Returns:
             list: A list of all possible output values given the range of input values
-        """
 
+        """
         # Guarantee that we are working with ints
         inputRange[0] = int(inputRange[0])
         inputRange[1] = int(inputRange[1])
@@ -425,13 +481,27 @@ class ChannelCalibration:
         )
 
 
-def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
-    """The target function for the drivers' subprocess
+##
+# Disabled mccabe linting as this function is specifically meant to be the target of a separate process. As such the function is more complex and contains more statments that would otherwise be tolerated
+##
+def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa: C901, PLR0915, PLR0912
+    """Start a worker for the given device with the given settings.
+
+    This is meant to be run in a seperate process via `multiprocessing.Process(target=_worker,...)`
+
+    Args:
+        killswitch (multiprocessing.Event): This worker will run an infinite loop until this event is set
+        frameSize (int): The number of bytes to request from the usb device at one time
+        deviceChannels (tuple of dict): a tuple where each value contained is a calibrated value map for its corresponding channel
+        name (str): The name the device will show up as
+        interruptEndpoint (int): The usb interrupt endpoint of the device that you want to start a driver for
+
     NOTE main event loop optimization:
         we initialize a local version of everything that will be used inside
         the main event loop. By doing this, the interpreter:
         - Does not have to re-create variables each iteration
         - Does not have to interpret dots, subscripts, etc
+
     """
     channel = None
     coreDevice = None
@@ -444,21 +514,20 @@ def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
             for _interface in _config:
                 for _endpoint in _interface:
                     if (
-                        usb.util.endpoint_direction(_endpoint.bEndpointAddress)
-                        == usb.util.ENDPOINT_IN
-                        and _endpoint.bmAttributes == 0x3
+                        usb.util.endpoint_direction(_endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
+                        and _endpoint.bmAttributes == driver.INTERRUPT_ENDPOINT_ATTRIBUTE
                         and _endpoint.bEndpointAddress == interruptEndpoint
                     ):
                         interruptEndpoint = _endpoint.bEndpointAddress
                         coreDevice = _device
                         logger.debug(
-                            f"Device at endpoint {interruptEndpoint}: {coreDevice}"
+                            f"Device at endpoint {interruptEndpoint}: {coreDevice}",
                         )
                         break
 
     if coreDevice is None:
         raise TypeError(
-            f"No Futaba device found at interrupt endpoint {interruptEndpoint}"
+            f"No Futaba device found at interrupt endpoint {interruptEndpoint}",
         )
 
     channelEventsMap = []
@@ -522,7 +591,7 @@ def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
                 channelData.append(valueMap[rawValue])
             channelData.reverse()
             # Queue one event for each channel
-            for data, event in zip(channelData, channelEventsMap):
+            for data, event in zip(channelData, channelEventsMap, strict=False):
                 # Queue one event for each channel
                 emit(event, data, syn=False)
             # fire all queued events
@@ -538,7 +607,7 @@ def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
         usb.util.release_interface(coreDevice, 0)
     except Exception as e:
         logger.warning(
-            "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+            "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)",
         )
         logger.warning(e)
 
@@ -547,7 +616,7 @@ def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
         coreDevice.attach_kernel_driver(0)
     except Exception as e:
         logger.warning(
-            "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)"
+            "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)",
         )
         logger.warning(e)
 
@@ -556,6 +625,6 @@ def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
         coreDevice.reset()
     except Exception as e:
         logger.warning(
-            "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)"
+            "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)",
         )
         logger.warning(e)

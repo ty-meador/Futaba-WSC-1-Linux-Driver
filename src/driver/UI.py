@@ -71,14 +71,10 @@ class DriverUI(App):
 
         event.button.label = f"{device['name']} {PLAY_ICON if device['state'] == 'RUNNING' else STOP_ICON}"
 
-        self.query_one(Pretty).update(
-            list(filter(lambda d: d["state"] == "RUNNING", self.fdm.listDevices()))
-        )
+        self.query_one(Pretty).update(list(filter(lambda d: d["state"] == "RUNNING", self.fdm.listDevices())))
 
     @on(Mount)
     def update_selected_view(self):  # noqa: C0103
         """callback"""
 
-        self.query_one(Pretty).update(
-            list(filter(lambda d: d["state"] == "RUNNING", self.fdm.listDevices()))
-        )
+        self.query_one(Pretty).update(list(filter(lambda d: d["state"] == "RUNNING", self.fdm.listDevices())))

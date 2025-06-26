@@ -1,3 +1,5 @@
+"""Driver and manager for Futaba RC to USB adapters."""
+
 import json
 import logging
 import os
@@ -5,7 +7,6 @@ import re
 from logging import handlers
 from pathlib import Path
 
-import uinput
 import usb
 
 ##
@@ -66,81 +67,70 @@ DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
 )
-DEFAULT_LOG_HANDLER.setFormatter(
-    logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
-)
+DEFAULT_LOG_HANDLER.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
 DEFAULT_LOGGER = logging.getLogger("driver")
 DEFAULT_LOGGER.setLevel(LOGLEVEL)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
 
+# These being the same value is a coincidence, they need to be sperate variables in case this chanes or is expanded upon
+INTERRUPT_ENDPOINT_ATTRIBUTE = 0x3
+HID_INTERFACE = 0x3
+
 
 def findHIDInterface(coreDevice):
+    """Find the HID interface for the given device.
+
+    Args:
+        coreDevice (usb.core.Device): The device to search
+
+    Returns:
+        usb.core.Device.interface: The HID interface if one exists, none if
+        none exist
+
+    """
     for config in coreDevice:
         for interface in config:
-            if interface.bInterfaceClass == 0x3:  # Human Interface Device
+            if interface.bInterfaceClass == HID_INTERFACE:
                 return interface
     return None
 
 
 def findInterruptEndpoint(hidInterface):
+    """Find the USB interrupt endpoint for the given HID interface.
+
+    Args:
+        hidInterface (usb.core.Device.intercface): The HID interface to search
+
+    Returns:
+        int: The address of the endpoint if one exists, None if none exist
+
+    """
     for endpoint in hidInterface:
         if (
-            usb.util.endpoint_direction(endpoint.bEndpointAddress)
-            == usb.util.ENDPOINT_IN
+            usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
             # 0x3 indicates interrupt endpoint
-            and endpoint.bmAttributes == 0x3
+            and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
         ):
             return endpoint.bEndpointAddress
     return None
 
 
-def getInterruptEndpoint(coreDevice):
-    """Find the USB interrupt endpoint for the provided device
-
-    Args:
-        device (usb.core.Device): The device that we want to emulate
-
-    Raises:
-        ValueError: Raised if the provided device is not an of type usb.core.device
-        RuntimeError: Raised if the provided device does not have an endpoint
-
-    Returns:
-        int: The interrupt endpoint address
-    """
-    logger = DEFAULT_LOGGER
-    logger.debug("looking for endpoint for device provided")
-
-    if not isinstance(coreDevice, usb.core.Device):
-        err = f"Expected first param to be of type usb.core.Device, found {type(coreDevice)}"
-        logger.critical(err)
-        raise ValueError(err)
-
-    hidInterface = findHIDInterface(coreDevice)
-    if hidInterface is None:
-        return None
-    return findInterruptEndpoint(hidInterface)
-
-
 def getCoreDeviceInfo(endpoint):
-    """Finds the core device on the given bus and port
+    """Find the core device on the given bus and port.
 
     Args:
-        bus (int): The bus of the device
-        port (int): The port of the device
+        endpoint (int): The endpoint address of the device you want info for
 
     Returns:
-        usb.core.Device: The core device at the provided bus and port
-    """
+        usb.core.Device: The core device at the provided bus and port0
 
+    """
     logger = DEFAULT_LOGGER
-    logger.debug(
-        f"looking for core device with an interrupt endpoint address of {endpoint}"
-    )
+    logger.debug(f"looking for core device with an interrupt endpoint address of {endpoint}")
     results = [
         device
         for device in usb.core.find(find_all=True)
-        if device.idVendor == FUTABA_VENDOR_ID
-        and findInterruptEndpoint(device) == endpoint
+        if device.idVendor == FUTABA_VENDOR_ID and findInterruptEndpoint(device) == endpoint
     ]
 
     if len(results) != 1:
@@ -164,16 +154,16 @@ def newLogger(
     fileName=None,
     level=LOGLEVEL,
 ):
-    """Generates a logger
+    """Generate a logger.
 
     Args:
-        name (str): _description_
-        maxSize (int, optional): Max file size of log files. Defaults to 5*1024*1024.
-        backupCount (int, optional): Number of backup logs to keep in rotation. Defaults to 5
+        name (str): The label to insert after the timestamp on each line in the logs
+        fileName (str): The name of the log file the logger will log to
         level (loglevel, optional): The level the logger should output. Defaults to logging.WARNING.
 
     Returns:
         logger: The generated logger
+
     """
     if fileName is None:
         fileName = re.sub(r"\W", "_", name) + ".txt"
@@ -183,9 +173,7 @@ def newLogger(
         maxBytes=5 * 1024 * 1024,  # 5 megabytes
         backupCount=5,
     )
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
-    )
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
@@ -193,13 +181,14 @@ def newLogger(
 
 
 def loadJsonFile(filePath):
-    """Generic function to load a JSON file into a dictionary
+    """Load a json file into a dictionary.
 
     Args:
         filePath (str): The path to the json file you want to load
 
     Returns:
         dict: The parsed json
+
     """
     logger = DEFAULT_LOGGER
     parsedJson = None
