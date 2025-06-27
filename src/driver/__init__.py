@@ -35,7 +35,7 @@ DEFAULT_CALIBRATION = [
     [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]]
     * len(DEFAULT_CONFIG["channel_events"])  # one calibration mapping per channel
 ]
-FUTABA_VENDOR_ID = 4104
+FUTABA_VENDOR_ID = 4104  # 0x1008
 PRODUCTS = {
     "default": 999,
     "WSC-1": 10,
@@ -95,7 +95,7 @@ def findHIDInterface(coreDevice):
     return None
 
 
-def findInterruptEndpoint(hidInterface):
+def findInterruptEndpoint(coreDevice):
     """Find the USB interrupt endpoint for the given HID interface.
 
     Args:
@@ -105,10 +105,10 @@ def findInterruptEndpoint(hidInterface):
         int: The address of the endpoint if one exists, None if none exist
 
     """
+    hidInterface = findHIDInterface(coreDevice)
     for endpoint in hidInterface:
         if (
             usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
-            # 0x3 indicates interrupt endpoint
             and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
         ):
             return endpoint.bEndpointAddress

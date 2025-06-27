@@ -26,11 +26,13 @@ class FutabaDeviceManager:
         atexit.register(self.stopAll)
         self.logger = driver.newLogger("FutabaDeviceManager")
         self.futabaDevices = tuple(
-            FutabaDeviceDriver(device)
-            for device in usb.core.find(find_all=True)
-            if FutabaDeviceDriver.deviceIsSupported(device)
+            [
+                FutabaDeviceDriver(device)
+                for device in usb.core.find(find_all=True)
+                if FutabaDeviceDriver.deviceIsSupported(device)
+            ]
         )
-        self.deviceList = tuple()
+
         if len(self.futabaDevices) == 0:
             raise RuntimeError("No Futaba USB device detected!")
 
@@ -42,8 +44,10 @@ class FutabaDeviceManager:
 
         """
         return tuple(
-            {"name": device.getName(), "state": device.getState(), "key": i}
-            for i, device in enumerate(self.futabaDevices)
+            [
+                {"name": device.getName(), "state": device.getState(), "key": i}
+                for i, device in enumerate(self.futabaDevices)
+            ]
         )
 
     def getDeviceStatus(self, deviceIndex):
@@ -160,7 +164,7 @@ class FutabaDeviceDriver:
                 self.logger.debug("-> Killswitch cleared")
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
-                target=_worker,
+                target=_workerProcess,
                 args=self._toSubprocTuple(),
             )
             self.subProc.start()
@@ -231,8 +235,8 @@ class FutabaDeviceDriver:
         """Generate a machine-readable representation of this driver."""
         return str(self.toDict())
 
-    @classmethod
-    def deviceIsSupported(cls, coreDevice):
+    @staticmethod
+    def deviceIsSupported(coreDevice):
         """Determine if the following conditions are true for the provided device.
 
         - Provided device is a Futaba device
@@ -249,11 +253,13 @@ class FutabaDeviceDriver:
         if coreDevice.idVendor != driver.FUTABA_VENDOR_ID:
             return False
 
+        print(coreDevice)
+
         hidInterface = driver.findHIDInterface(coreDevice)
         if hidInterface is None:
             return False
 
-        endpoint = driver.findInterruptEndpoint(hidInterface)
+        endpoint = driver.findInterruptEndpoint(coreDevice)
         if endpoint is None:
             return False
 
@@ -318,11 +324,13 @@ class FutabaDeviceDriver:
 
         """
         return tuple(
-            self.killswitch,
-            self.config["frame_size"],
-            [channel.toDict() for channel in self.deviceChannels],
-            self.name,
-            self.interruptEndpoint,
+            [
+                self.killswitch,
+                self.config["frame_size"],
+                [channel.toDict() for channel in self.deviceChannels],
+                self.name,
+                self.interruptEndpoint,
+            ]
         )
 
 
@@ -482,12 +490,13 @@ class ChannelCalibration:
 
 
 ##
-# Disabled mccabe linting as this function is specifically meant to be the target of a separate process. As such the function is more complex and contains more statments that would otherwise be tolerated
+# Disabled mccabe linting as this function is specifically meant to be the target of a separate process. As such the function is
+# more complex and contains more statments that would otherwise be tolerated
 ##
-def _worker(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa: C901, PLR0915, PLR0912
+def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa: C901, PLR0915, PLR0912
     """Start a worker for the given device with the given settings.
 
-    This is meant to be run in a seperate process via `multiprocessing.Process(target=_worker,...)`
+    This is meant to be run in a seperate process via `multiprocessing.Process(target=_workerProcess,...)`
 
     Args:
         killswitch (multiprocessing.Event): This worker will run an infinite loop until this event is set
