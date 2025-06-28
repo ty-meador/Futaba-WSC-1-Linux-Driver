@@ -253,8 +253,6 @@ class FutabaDeviceDriver:
         if coreDevice.idVendor != driver.FUTABA_VENDOR_ID:
             return False
 
-        print(coreDevice)
-
         hidInterface = driver.findHIDInterface(coreDevice)
         if hidInterface is None:
             return False
