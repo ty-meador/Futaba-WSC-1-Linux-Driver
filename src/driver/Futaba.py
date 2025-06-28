@@ -89,7 +89,8 @@ class FutabaDeviceManager:
         """Start the devices at the given indexes.
 
         Args:
-            deviceIndex (int or list of int, optional): The devices you want to start. Defaults to [].
+            deviceIndex (int or list of int, optional): The devices you want to
+            start. Defaults to [].
 
         """
         self.logger.debug(
@@ -127,7 +128,8 @@ class FutabaDeviceManager:
         """Stop the devices at the given indexes.
 
         Args:
-            deviceIndex (int or list of int, optional): The devices you want to stop. Defaults to [].
+            deviceIndex (int or list of int, optional): The devices you want to
+            stop. Defaults to [].
 
         """
         try:
@@ -295,7 +297,8 @@ class FutabaDeviceDriver:
 
     @staticmethod
     def deviceIsSupported(coreDevice):
-        """Determine if the following conditions are true for the provided device.
+        """Determine if the following conditions are true for the provided
+        device.
 
         - Provided device is a Futaba device
         - Device has a HID interface
@@ -316,13 +319,12 @@ class FutabaDeviceDriver:
             return False
 
         endpoint = driver.findInterruptEndpoint(coreDevice)
-        if endpoint is None:
-            return False
 
-        return True
+        return endpoint is not None
 
     def _loadConfig(self, productName):
-        """Load the settings for this particular device and falls back to the default config file if one doesn't exist.
+        """Load the settings for this particular device and falls back to the
+        default config file if one doesn't exist.
 
         Returns:
             dict: A dictionary containing the driver settings
@@ -350,10 +352,12 @@ class FutabaDeviceDriver:
         """Load the calibration file for the given product.
 
         Args:
-            productName (str, optional): The name of the product to load the calibration for. Defaults to None.
+            productName (str, optional): The name of the product to load the
+            calibration for. Defaults to None.
 
         Returns:
-            list of list: Each inner list will contain exactly 2 items, each of which are lists.
+            list of list: Each inner list will contain exactly 2 items, each of
+            which are lists.
 
         """
         filePath = os.path.join(driver.CALIBRATION_PATH, f"{productName}.json")
@@ -402,8 +406,10 @@ class InputChannel:
 
         Args:
             eventName (str): Any valid uinput event
-            calibration (ChannelCalibration): A calibration object used to calibrate this input channel
-            reverseInputs (bool, optional): If true the value map will be generated in reverse to reverse the inputs. Defaults to False.
+            calibration (ChannelCalibration): A calibration object used to
+            calibrate this input channel
+            reverseInputs (bool, optional): If true the value map will be
+            generated in reverse to reverse the inputs. Defaults to False.
 
         """
         self.eventName = eventName
@@ -424,8 +430,12 @@ class ChannelCalibration:
     """Provides a class based representation of a channel calibration.
 
     Why:
-        - The range of values that is output on a given channel is different for each device manufactured.
-        - To account for this difference, we use a process known as "calibrating" the device. Calibrating a device is simply the process of determining your devices unique range of values, and then mapping that range of values to a standardized range of values.
+        - The range of values that is output on a given channel is different for
+         each device manufactured.
+        - To account for this difference, we use a process known as
+        "calibrating" the device. Calibrating a device is simply the process of
+        determining your devices unique range of values, and then mapping that
+        range of values to a standardized range of values.
             - This requires a 1-d interpolation from the raw device values to
             the standardized output values. This must be done every single time
             we read data from the device (hundreds of times per second+).
@@ -449,16 +459,20 @@ class ChannelCalibration:
             is stored in a variable named "calMap".
             - assume we have just read the raw input value from the device and
             stored it to a variable named "rawV".
-        - Translating the raw value to the calibrated value is as simple as calMap[rawV]
+        - Translating the raw value to the calibrated value is as simple as
+        calMap[rawV]
         - Therefore, we are providing an interface with O(1) runtime at the
         cost of 16kb of memory on an 8 channel device.
     """
 
     def getCalibratedValueMap(self):
-        """Get an array where each index of the array represents a possible device input and the value stored at that index is the calibrated output value.
+        """Get an array where each index of the array represents a possible
+        device input and the value stored at that index is the calibrated output
+        value.
 
         Returns:
-            array.array of int: The integer array that maps a given index to the corresponding calibrated outpute valued stored at that index
+            array.array of int: The integer array that maps a given index to the
+            corresponding calibrated outpute valued stored at that index
 
         """
         return self.valueMap
@@ -472,10 +486,15 @@ class ChannelCalibration:
         """Create a ChannelCalibration object.
 
         Args:
-            inputRange (iterable of length 2, optional): A list, tuple, or array where the first value is the lowest possible input value and the second value is the highest possible input value. Defaults to None.
-            outputRange (_type_, optional): A list, tuple, or array where the first value is the lowest possible output value and the second value is the highest possible output value. Defaults to None.
-            reverse (bool, optional): If reverse the calibrated values will be inserted into the resulting array backwards. This will reverse the direction of the input. Defaults to False.
-
+            inputRange (iterable of length 2, optional): A list, tuple, or array
+            where the first value is the lowest possible input value and the
+            second value is the highest possible input value. Defaults to None.
+            outputRange (_type_, optional): A list, tuple, or array where the
+            first value is the lowest possible output value and the second value
+            is the highest possible output value. Defaults to None.
+            reverse (bool, optional): If reverse the calibrated values will be
+            inserted into the resulting array backwards. This will reverse the
+            direction of the input. Defaults to False.
         """
         if inputRange is None:
             inputRange = [
@@ -499,21 +518,27 @@ class ChannelCalibration:
                 "reverse": self.reverse,
                 "inputRange": self.inputRange,
                 "outputRange": self.outputRange,
-                "valueMap": f"Generated {len(self.valueMap)} values consuming {sys.getsizeof(self.valueMap)} bytes of memory",
+                "valueMap": f"Generated {len(self.valueMap)} values consuming"
+                f"{sys.getsizeof(self.valueMap)} bytes of memory",
             },
         )
 
     @staticmethod
     def _generateValueMap(inputRange, outputRange, reverse=False):
-        """Generate a list of values that maps the input range to the output range.
+        """Generate a list of values that maps the input range to the output
+        range.
 
         Args:
-            inputRange (list, optional): This determines the size of the map. Defaults to [600, 3500].
-            outputRange (list, optional): This determines what values are generated in the map. Defaults to [0, 32768].
-            reverse (bool, optional): If set to true the map will be generated backwards. This will reverse the direction of the input
+            inputRange (list, optional): This determines the size of the map.
+            Defaults to [600, 3500].
+            outputRange (list, optional): This determines what values are
+            generated in the map. Defaults to [0, 32768].
+            reverse (bool, optional): If set to true the map will be generated
+            backwards. This will reverse the direction of the input
 
         Returns:
-            list: A list of all possible output values given the range of input values
+            list: A list of all possible output values given the range of input
+            values
 
         """
         # Guarantee that we are working with ints
@@ -564,11 +589,15 @@ def _workerProcess(
     `multiprocessing.Process(target=_workerProcess,...)`
 
     Args:
-        killswitch (multiprocessing.Event): This worker will run an infinite loop until this event is set
-        frameSize (int): The number of bytes to request from the usb device at one time
-        deviceChannels (tuple of dict): a tuple where each value contained is a calibrated value map for its corresponding channel
+        killswitch (multiprocessing.Event): This worker will run an infinite
+        loop until this event is set
+        frameSize (int): The number of bytes to request from the usb device at
+        one time
+        deviceChannels (tuple of dict): a tuple where each value contained is a
+        calibrated value map for its corresponding channel
         name (str): The name the device will show up as
-        interruptEndpoint (int): The usb interrupt endpoint of the device that you want to start a driver for
+        interruptEndpoint (int): The usb interrupt endpoint of the device that
+        you want to start a driver for
 
     NOTE main event loop optimization:
         we initialize a local version of everything that will be used inside
@@ -586,6 +615,8 @@ def _workerProcess(
             continue
         for _config in _device:
             for _interface in _config:
+                if _interface.bInterfaceClass != driver.HID_INTERFACE:
+                    continue
                 for _endpoint in _interface:
                     if (
                         usb.util.endpoint_direction(_endpoint.bEndpointAddress)
@@ -597,7 +628,8 @@ def _workerProcess(
                         interruptEndpoint = _endpoint.bEndpointAddress
                         coreDevice = _device
                         logger.debug(
-                            f"Device at endpoint {interruptEndpoint}: {coreDevice}",
+                            f"Device at endpoint {interruptEndpoint}: "
+                            f"{coreDevice}",
                         )
                         break
 
@@ -647,7 +679,8 @@ def _workerProcess(
     # -- MAIN LOOP --
     while not killswitch.is_set():
         try:
-            # - The transmitter may not send a new frame if the inputs remain static
+            # - The transmitter may not send a new frame if the inputs remain
+            # static
             # - No reason to care about timeouts
             # - - Long timeout length = less timeouts
             # - - Less timeouts = fewer exceptions raised
@@ -694,7 +727,8 @@ def _workerProcess(
         usb.util.release_interface(coreDevice, 0)
     except Exception as e:
         logger.warning(
-            "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)",
+            "Unable to release the USB interface (Did we never acquire it in "
+            "the first place? Permissions issue?)",
         )
         logger.warning(e)
 
@@ -703,7 +737,8 @@ def _workerProcess(
         coreDevice.attach_kernel_driver(0)
     except Exception as e:
         logger.warning(
-            "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)",
+            "Unable to reattach the kernel driver (Did we never acquire it in "
+            "the first place? Permissions issue?)",
         )
         logger.warning(e)
 
@@ -712,6 +747,7 @@ def _workerProcess(
         coreDevice.reset()
     except Exception as e:
         logger.warning(
-            "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)",
+            "Unable to reset the USB interface (Did we never acquire it in the "
+            "first place? Permissions issue?)",
         )
         logger.warning(e)

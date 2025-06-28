@@ -96,7 +96,8 @@ def getInterruptAddress(device):
         device (usb.core.Device): The device that we want to emulate
 
     Raises:
-        ValueError: Raised if the provided device is not an of type usb.core.device
+        ValueError: Raised if the provided device is not an of
+        type usb.core.device
         RuntimeError: Raised if the provided device does not have an endpoint
 
     Returns:

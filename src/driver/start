@@ -35,7 +35,8 @@ args = parser.parse_args()
 
 
 def main():
-    """Creates the driver, sets up signal kill listeners and starts the driver"""
+    """Creates the driver, sets up signal kill listeners and starts the
+    driver"""
 
     ##
     # - Create the drvier

@@ -136,7 +136,8 @@ def getCoreDeviceInfo(endpoint):
     """
     logger = DEFAULT_LOGGER
     logger.debug(
-        f"looking for core device with an interrupt endpoint address of {endpoint}"
+        "looking for core device with an interrupt endpoint address of "
+        f"{endpoint}"
     )
     results = [
         device
