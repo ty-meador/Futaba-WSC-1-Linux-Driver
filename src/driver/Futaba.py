@@ -598,7 +598,7 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
                 channelData.append(valueMap[rawValue])
             channelData.reverse()
             # Queue one event for each channel
-            for data, event in zip(channelData, channelEventsMap, strict=False):
+            for data, event in zip(channelData, channelEventsMap):
                 # Queue one event for each channel
                 emit(event, data, syn=False)
             # fire all queued events
