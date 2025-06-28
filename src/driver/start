@@ -43,7 +43,7 @@ def main():
     # - start the driver (blocks indefinitely)
     ##
     try:
-        driver = Futaba.FutabaDeviceDriver(bus=args.bus, port=args.port, name=args.name)
+        driver = Futaba.FutabaDeviceDriver(endpoint=135, name=args.name)
 
         # Set up sigkill listeners so we can exit gracefully
         signal.signal(signal.SIGINT, lambda _, __: driver.stop())

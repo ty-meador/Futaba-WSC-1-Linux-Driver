@@ -61,7 +61,7 @@ for parent in Path(__file__).resolve().parents:
         os.makedirs(LOG_PATH, exist_ok=True)
         break
 
-LOGLEVEL = logging.WARNING
+LOGLEVEL = logging.DEBUG
 DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
     os.path.join(LOG_PATH, "driver.txt"),
     maxBytes=5 * 1024 * 1024,  # 5 megabytes

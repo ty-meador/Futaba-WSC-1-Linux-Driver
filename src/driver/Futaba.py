@@ -222,7 +222,7 @@ class FutabaDeviceDriver:
             for eventName, calibration in zip(
                 self.config["channel_events"],
                 self._loadCalibration(self.product),
-                strict=False,
+                strict=True,
             )
         ]
         atexit.register(self.stop)
@@ -454,13 +454,11 @@ class ChannelCalibration:
 
         """
         # Guarantee that we are working with ints
-        inputRange[0] = int(inputRange[0])
-        inputRange[1] = int(inputRange[1])
-        outputRange[0] = int(outputRange[0])
-        outputRange[1] = int(outputRange[1])
+        inputRange = tuple(map(int, inputRange))
+        outputRange = tuple(map(int, outputRange))
 
         lowerInput = inputRange[0]
-        upperInput = inputRange[1]
+        upperInput = inputRange[2]
         lowerOutput = outputRange[0]
 
         # Create a value map such that the index of the array represents
@@ -481,6 +479,8 @@ class ChannelCalibration:
                     inputValues,
                     inputRange,
                     outputRange,
+                    left=outputRange[0],
+                    right=outputRange[1],
                 ),
                 0,  # No decimals
             ).astype(int),
@@ -578,8 +578,9 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
             # - - Long timeout length = less timeouts
             # - - Less timeouts = fewer exceptions raised
             # - - Fewer exceptions raised = less overhead
-            rawData = readDevice(interruptEndpoint, frameSize, timeout=1000)
+            rawData = readDevice(interruptEndpoint, frameSize, timeout=250)
             channelData = []
+            # rawValues = []
             for i in range(0, len(rawData), 2):
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
@@ -595,12 +596,15 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
                 elif rawValue < 0:
                     rawValue = 0
                 # Extract calibrated value from map
+                # rawValues.append(rawValue)
                 channelData.append(valueMap[rawValue])
             channelData.reverse()
+            # logger.critical(rawValues)
             # Queue one event for each channel
             for data, event in zip(channelData, channelEventsMap):
                 # Queue one event for each channel
                 emit(event, data, syn=False)
+
             # fire all queued events
             synchronize()
         except usb.core.USBTimeoutError:

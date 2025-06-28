@@ -13,6 +13,12 @@ parser.add_argument(
     help="Enable debug log level",
 )
 
+parser.add_argument(
+    "--calibrate",
+    action="store_true",
+    help="Used for calibration",
+)
+
 if __name__ == "__main__":
     args = parser.parse_args()
     DriverUI().run()
