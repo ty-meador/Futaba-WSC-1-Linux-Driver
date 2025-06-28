@@ -14,7 +14,9 @@ import driver
 
 
 class FutabaDeviceManager:
-    """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
+    """Provides a class-based interface for starting and stopping Futaba USB
+    device drivers.
+    """
 
     def __init__(self):
         """Create an object that manages Futaba drivers.
@@ -36,19 +38,17 @@ class FutabaDeviceManager:
         if len(self.futabaDevices) == 0:
             raise RuntimeError("No Futaba USB device detected!")
 
-    def listDevices(self):
-        """Get an ordered list of available devices.
-
-        Returns:
-            tuple of string: Ordered list of available devices
-
-        """
-        return tuple(
-            [
-                {"name": device.getName(), "state": device.getState(), "key": i}
-                for i, device in enumerate(self.futabaDevices)
-            ]
-        )
+    @classmethod
+    def findDevice(
+        cls,
+        endpoint=None,
+        # model=None,
+        # bus=None,
+        # port=None
+    ):
+        if endpoint is not None:
+            return cls._findDeviceByEndpoint(endpoint)
+        return None
 
     def getDeviceStatus(self, deviceIndex):
         """Get the status of the device at the given index.
@@ -66,6 +66,25 @@ class FutabaDeviceManager:
             self.logger.warning(e)
             return False
 
+    def listDevices(self):
+        """Get an ordered list of available devices.
+
+        Returns:
+            tuple of string: Ordered list of available devices
+
+        """
+        return tuple(
+            [
+                {
+                    "endpoint": device.getEndpoint(),
+                    "key": i,
+                    "name": device.getName(),
+                    "state": device.getState(),
+                }
+                for i, device in enumerate(self.futabaDevices)
+            ]
+        )
+
     def start(self, deviceIndex):
         """Start the devices at the given indexes.
 
@@ -73,22 +92,30 @@ class FutabaDeviceManager:
             deviceIndex (int or list of int, optional): The devices you want to start. Defaults to [].
 
         """
-        self.logger.debug(f"Attempting to start device at index[s] {deviceIndex}")
+        self.logger.debug(
+            f"Attempting to start device at index[s] {deviceIndex}"
+        )
         if isinstance(deviceIndex, int):
             result = self.futabaDevices[deviceIndex].start()
 
             if result:
-                self.logger.debug(f"-> {self.futabaDevices[deviceIndex]} started")
+                self.logger.debug(
+                    f"-> {self.futabaDevices[deviceIndex]} started"
+                )
             else:
                 raise RuntimeError(
                     f"Start requested failed for item at index {deviceIndex}",
                 )
         elif hasattr("__iter__", deviceIndex):
-            self.logger.debug("-> Iterable detected, attempting to start multiple...")
+            self.logger.debug(
+                "-> Iterable detected, attempting to start multiple..."
+            )
             for idx in deviceIndex:
                 result = self.futabaDevices[idx].start()
                 if result:
-                    self.logger.debug(f"--> {self.futabaDevices[deviceIndex]} started")
+                    self.logger.debug(
+                        f"--> {self.futabaDevices[deviceIndex]} started"
+                    )
                 else:
                     raise RuntimeError(
                         f"Start requested failed for item at index {idx}",
@@ -135,9 +162,86 @@ class FutabaDeviceManager:
         """
         return futabaDeviceDriver.getState() == "RUNNING"
 
+    def _findDeviceByEndpoint(self, endpoint):
+        """Find which device has the given endpoint
+
+        Args:
+            endpoint (int): The endpoint of the device to find
+
+        Returns:
+            _type_: _description_
+        """
+        for device in self.listDevices():
+            if device.getEndpoint() == endpoint:
+                return device
+        return None
+
 
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device."""
+
+    def __init__(self, device):
+        """Create an object that drives a single device on it's own process.
+
+        Args:
+            device (usb.core.Device): The device you want to spawn a driver for
+
+        Raises:
+            TypeError: If device is not of type usb.core.Device
+
+        """
+        self.state = "INITIALIZING"
+
+        self.endpoint = driver.findInterruptEndpoint(device)
+        deviceInfo = driver.getCoreDeviceInfo(self.endpoint)
+        if self.endpoint is None:
+            raise TypeError("Unable to find interrupt endpoint for device")
+        self.name = f"Futaba {deviceInfo['product']}({self.endpoint})"
+
+        self.logger = driver.newLogger(f"{deviceInfo['product']}_driver")
+        self.productID = deviceInfo["productID"]
+        self.serialNumber = deviceInfo["serialNumber"]
+        self.product = deviceInfo["product"]
+        self.manufacturer = deviceInfo["manufacturer"]
+        self.speed = deviceInfo["speed"]
+        self.interruptEndpoint = deviceInfo["interruptEndpoint"]
+        self.subProc = None
+        self.killswitch = multiprocessing.Event()
+        self.config = self._loadConfig(self.product)
+        self.deviceChannels = [
+            InputChannel(eventName, calibration, False)
+            for eventName, calibration in zip(
+                self.config["channel_events"],
+                self._loadCalibration(self.product),
+                strict=True,  # 1 config and 1 calibration per channel
+            )
+        ]
+        atexit.register(self.stop)
+
+    def __str__(self):
+        """Generate a string representation of this driver."""
+        return f"{self.name} Driver"
+
+    def __eq__(self, other):
+        return self.endpoint == other.endpoint
+
+    def __lt__(self, other):
+        return NotImplemented
+
+    def __gt__(self, other):
+        return NotImplemented
+
+    def __repr__(self):
+        """Generate a machine-readable representation of this driver."""
+        return str(self.toDict())
+
+    def getEndpoint(self):
+        """Get the interrupt endpoint for this device
+
+        Returns:
+            int: The interrupt endpoint for this device
+        """
+        return self.endpoint
 
     def getName(self):
         """Get the name of the device this driver was initialized for."""
@@ -188,52 +292,6 @@ class FutabaDeviceDriver:
             "endpointAddress": self.interruptEndpoint,
             "name": self.name,
         }
-
-    def __init__(self, device):
-        """Create an object that drives a single device on it's own process.
-
-        Args:
-            device (usb.core.Device): The device you want to spawn a driver for
-
-        Raises:
-            TypeError: If device is not of type usb.core.Device
-
-        """
-        self.state = "INITIALIZING"
-
-        self.endpoint = driver.findInterruptEndpoint(device)
-        deviceInfo = driver.getCoreDeviceInfo(self.endpoint)
-        if self.endpoint is None:
-            raise TypeError("Unable to find interrupt endpoint for device")
-        self.name = f"Futaba {deviceInfo['product']}({self.endpoint})"
-
-        self.logger = driver.newLogger(f"{deviceInfo['product']}_driver")
-        self.productID = deviceInfo["productID"]
-        self.serialNumber = deviceInfo["serialNumber"]
-        self.product = deviceInfo["product"]
-        self.manufacturer = deviceInfo["manufacturer"]
-        self.speed = deviceInfo["speed"]
-        self.interruptEndpoint = deviceInfo["interruptEndpoint"]
-        self.subProc = None
-        self.killswitch = multiprocessing.Event()
-        self.config = self._loadConfig(self.product)
-        self.deviceChannels = [
-            InputChannel(eventName, calibration, False)
-            for eventName, calibration in zip(
-                self.config["channel_events"],
-                self._loadCalibration(self.product),
-                strict=True,
-            )
-        ]
-        atexit.register(self.stop)
-
-    def __str__(self):
-        """Generate a string representation of this driver."""
-        return f"{self.name} Driver"
-
-    def __repr__(self):
-        """Generate a machine-readable representation of this driver."""
-        return str(self.toDict())
 
     @staticmethod
     def deviceIsSupported(coreDevice):
@@ -420,14 +478,19 @@ class ChannelCalibration:
 
         """
         if inputRange is None:
-            inputRange = [driver.DEFAULT_DEVICE_MIN_VAL, driver.DEFAULT_DEVICE_MAX_VAL]
+            inputRange = [
+                driver.DEFAULT_DEVICE_MIN_VAL,
+                driver.DEFAULT_DEVICE_MAX_VAL,
+            ]
         if outputRange is None:
             outputRange = [driver.EVENT_MIN_VAL, driver.EVENT_MAX_VAL]
 
         self.reverse = reverse
         self.inputRange = inputRange
         self.outputRange = outputRange
-        self.valueMap = self._generateValueMap(inputRange, outputRange, self.reverse)
+        self.valueMap = self._generateValueMap(
+            inputRange, outputRange, self.reverse
+        )
 
     def __str__(self):
         """Create a string representation of this calibration object."""
@@ -488,13 +551,17 @@ class ChannelCalibration:
 
 
 ##
-# Disabled mccabe linting as this function is specifically meant to be the target of a separate process. As such the function is
-# more complex and contains more statments that would otherwise be tolerated
+# Disabled mccabe linting as this function is specifically meant to be the
+# target of a separate process. As such the function is more complex and
+# contains more statments that would otherwise be tolerated
 ##
-def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa: C901, PLR0915, PLR0912
+def _workerProcess(
+    killswitch, frameSize, deviceChannels, name, interruptEndpoint
+):  # noqa: C901, PLR0915, PLR0912
     """Start a worker for the given device with the given settings.
 
-    This is meant to be run in a seperate process via `multiprocessing.Process(target=_workerProcess,...)`
+    This is meant to be run in a seperate process via
+    `multiprocessing.Process(target=_workerProcess,...)`
 
     Args:
         killswitch (multiprocessing.Event): This worker will run an infinite loop until this event is set
@@ -521,8 +588,10 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
             for _interface in _config:
                 for _endpoint in _interface:
                     if (
-                        usb.util.endpoint_direction(_endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
-                        and _endpoint.bmAttributes == driver.INTERRUPT_ENDPOINT_ATTRIBUTE
+                        usb.util.endpoint_direction(_endpoint.bEndpointAddress)
+                        == usb.util.ENDPOINT_IN
+                        and _endpoint.bmAttributes
+                        == driver.INTERRUPT_ENDPOINT_ATTRIBUTE
                         and _endpoint.bEndpointAddress == interruptEndpoint
                     ):
                         interruptEndpoint = _endpoint.bEndpointAddress
@@ -549,7 +618,12 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
 
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
-        tuple([event + (0, driver.EVENT_MAX_VAL, 0, 0) for event in channelEventsMap]),
+        tuple(
+            [
+                event + (0, driver.EVENT_MAX_VAL, 0, 0)
+                for event in channelEventsMap
+            ]
+        ),
         name,
         vendor=driver.FUTABA_VENDOR_ID,
     )
@@ -585,7 +659,9 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
 
-                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
+                rawValue = int(
+                    fromBytes(rawData[i : i + 2], byteorder="little")
+                )
                 # Avoid overflows and underflows
                 # account for off-by-one
                 maxInputVal = len(valueMap) - 1
@@ -601,7 +677,7 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
             channelData.reverse()
             # logger.critical(rawValues)
             # Queue one event for each channel
-            for data, event in zip(channelData, channelEventsMap):
+            for data, event in zip(channelData, channelEventsMap, strict=False):
                 # Queue one event for each channel
                 emit(event, data, syn=False)
 

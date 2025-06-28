@@ -49,7 +49,8 @@ def main():
         signal.signal(signal.SIGINT, lambda _, __: driver.stop())
         signal.signal(signal.SIGTERM, lambda _, __: driver.stop())
 
-        # Blocks the main thread - That's OK because this should be run as a subprocess anyway
+        # Blocks the main thread - That's OK because this should be run as
+        # asubprocess anyway
         driver.start()
     except Exception as e:
         if driver is not None:

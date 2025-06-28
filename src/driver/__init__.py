@@ -32,8 +32,13 @@ EVENT_MIN_VAL = 0
 DEFAULT_DEVICE_MIN_VAL = 704
 DEFAULT_DEVICE_MAX_VAL = 3392
 DEFAULT_CALIBRATION = [
-    [[DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL], [EVENT_MIN_VAL, EVENT_MAX_VAL]]
-    * len(DEFAULT_CONFIG["channel_events"])  # one calibration mapping per channel
+    [
+        [DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL],
+        [EVENT_MIN_VAL, EVENT_MAX_VAL],
+    ]
+    * len(
+        DEFAULT_CONFIG["channel_events"]
+    )  # one calibration mapping per channel
 ]
 FUTABA_VENDOR_ID = 4104  # 0x1008
 PRODUCTS = {
@@ -67,12 +72,15 @@ DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
 )
-DEFAULT_LOG_HANDLER.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
+DEFAULT_LOG_HANDLER.setFormatter(
+    logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
+)
 DEFAULT_LOGGER = logging.getLogger("driver")
 DEFAULT_LOGGER.setLevel(LOGLEVEL)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
 
-# These being the same value is a coincidence, they need to be sperate variables in case this chanes or is expanded upon
+# These being the same value is a coincidence, they need to be sperate variables
+# in case this chanes or is expanded upon
 INTERRUPT_ENDPOINT_ATTRIBUTE = 0x3
 HID_INTERFACE = 0x3
 
@@ -108,7 +116,8 @@ def findInterruptEndpoint(coreDevice):
     hidInterface = findHIDInterface(coreDevice)
     for endpoint in hidInterface:
         if (
-            usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
+            usb.util.endpoint_direction(endpoint.bEndpointAddress)
+            == usb.util.ENDPOINT_IN
             and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
         ):
             return endpoint.bEndpointAddress
@@ -126,11 +135,14 @@ def getCoreDeviceInfo(endpoint):
 
     """
     logger = DEFAULT_LOGGER
-    logger.debug(f"looking for core device with an interrupt endpoint address of {endpoint}")
+    logger.debug(
+        f"looking for core device with an interrupt endpoint address of {endpoint}"
+    )
     results = [
         device
         for device in usb.core.find(find_all=True)
-        if device.idVendor == FUTABA_VENDOR_ID and findInterruptEndpoint(device) == endpoint
+        if device.idVendor == FUTABA_VENDOR_ID
+        and findInterruptEndpoint(device) == endpoint
     ]
 
     if len(results) != 1:
@@ -157,9 +169,11 @@ def newLogger(
     """Generate a logger.
 
     Args:
-        name (str): The label to insert after the timestamp on each line in the logs
+        name (str): The label to insert after the timestamp on each line in the
+        logs
         fileName (str): The name of the log file the logger will log to
-        level (loglevel, optional): The level the logger should output. Defaults to logging.WARNING.
+        level (loglevel, optional): The level the logger should output. Defaults
+        to logging.WARNING.
 
     Returns:
         logger: The generated logger
@@ -173,7 +187,9 @@ def newLogger(
         maxBytes=5 * 1024 * 1024,  # 5 megabytes
         backupCount=5,
     )
-    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
+    )
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
@@ -195,7 +211,7 @@ def loadJsonFile(filePath):
 
     try:
         logger.debug(f"> Looking for {filePath}")
-        with open(filePath, "r", encoding="utf-8") as jsonFile:
+        with open(filePath, encoding="utf-8") as jsonFile:
             parsedJson = json.load(jsonFile)
         logger.debug("--> loaded!")
     except FileNotFoundError:
