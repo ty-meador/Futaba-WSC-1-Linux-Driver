@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """The main program - run with `sudo python3 main.py`"""
 
+import time
 from argparse import ArgumentParser
 
 import driver
@@ -29,6 +30,9 @@ parser.add_argument(
 )
 
 
+parser.add_argument("--ui", help="Launch the terminal based UI")
+
+
 def cliMode(args):
     """Run the driver in cli-mode
 
@@ -50,17 +54,33 @@ def cliMode(args):
         and args.port is not None
     ):
         device = manager.findDevice(bus=args.bus, port=args.port)
+    else:
+        for device in enumerate(manager.listDevices()):
+            print(f"[ {device['key']} ] : {device['name']}")
+
     if device is None:
-        # TO-DO - Show menu and allow user to choose which device to start
         raise RuntimeError(
             "Could not find a Futaba device at the specified endpoint"
         )
+
+    manager.start(device["key"])
+    print(f"Started {device['name']}")
+    print("CTRL + C to stop driver")
+
+    try:
+        while True:
+            # Block indefinitely so that background process stays alive
+            time.sleep(100)
+    except KeyboardInterrupt:
+        pass
+
+    print("Goodbye!")
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    if args.endpoint is not None:
-        cliMode(args)
-    else:
+    if args.ui:
         DriverUI(args).run()
+    else:
+        cliMode(args)

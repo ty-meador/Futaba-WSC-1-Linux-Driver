@@ -289,17 +289,14 @@ class FutabaDeviceManager:
             tuple of string: Ordered list of available devices
 
         """
-        return tuple(
-            [
-                {
-                    "endpoint": device.getEndpoint(),
-                    "key": i,
-                    "name": device.getName(),
-                    "state": device.getState(),
-                }
-                for i, device in enumerate(self.futabaDevices)
-            ]
-        )
+        deviceList = []
+        for i, device in enumerate(self.futabaDevices):
+            _dict = device.toDict()
+            deviceDict = {"key": i}
+            for key in _dict:
+                deviceDict[key] = _dict[key]
+            deviceList.append(deviceDict)
+        return deviceList
 
     def start(self, deviceIndex):
         """Start the devices at the given indexes.
@@ -387,10 +384,12 @@ class FutabaDeviceManager:
             endpoint (int): The endpoint of the device to find
 
         Returns:
-            _type_: _description_
+            dict: A dictionary representation of the device with the given
+            endpoint
         """
+        endpoint = int(endpoint)
         for device in self.listDevices():
-            if device["endpoint"] == endpoint:
+            if device["interruptEndpoint"] == endpoint:
                 return device
         return None
 
@@ -422,7 +421,7 @@ class FutabaDeviceDriver:
         self.product = deviceInfo["product"]
         self.manufacturer = deviceInfo["manufacturer"]
         self.speed = deviceInfo["speed"]
-        self.interruptEndpoint = deviceInfo["interruptEndpoint"]
+        self.interruptEndpoint = int(deviceInfo["interruptEndpoint"])
         self.subProc = None
         self.killswitch = multiprocessing.Event()
         self.config = self._loadConfig(self.product)
@@ -448,10 +447,6 @@ class FutabaDeviceDriver:
 
     def __gt__(self, other):
         return NotImplemented
-
-    def __repr__(self):
-        """Generate a machine-readable representation of this"""
-        return str(self.toDict())
 
     def getEndpoint(self):
         """Get the interrupt endpoint for this device
@@ -501,20 +496,22 @@ class FutabaDeviceDriver:
         self.state = "IDLE"
 
     def toDict(self):
-        """Create a dictionary representation of this"""
-        return {
-            "config": self.config,
-            "deviceChannels": tuple(
-                [channel.toDict() for channel in self.deviceChannels],
-            ),
-            "interruptEndpoint": self.interruptEndpoint,
-            "product": self.product,
-            "productID": self.productID,
-            "manufacturer": self.manufacturer,
-            "name": self.name,
-            "speed": self.speed,
-            "serialNumber": self.serialNumber,
-        }
+        """Create a dictionary representation of this driver"""
+        return dict(
+            {
+                "config": self.config,
+                "deviceChannels": tuple(
+                    [channel.toDict() for channel in self.deviceChannels],
+                ),
+                "interruptEndpoint": self.interruptEndpoint,
+                "product": self.product,
+                "productID": self.productID,
+                "manufacturer": self.manufacturer,
+                "name": self.name,
+                "serialNumber": self.serialNumber,
+                "speed": self.speed,
+            }
+        )
 
     @staticmethod
     def deviceIsSupported(coreDevice):
@@ -933,6 +930,8 @@ def _workerProcess(
             # fire all queued events
             synchronize()
         except usb.core.USBTimeoutError:
+            pass
+        except KeyboardInterrupt:
             pass
         except Exception as e:
             logger.critical(e)
