@@ -55,8 +55,13 @@ def cliMode(args):
     ):
         device = manager.findDevice(bus=args.bus, port=args.port)
     else:
-        for device in enumerate(manager.listDevices()):
+        selection = None
+        deviceList = manager.listDevices()
+        print("Which device would you like to start?")
+        for device in deviceList:
             print(f"[ {device['key']} ] : {device['name']}")
+        selection = int(input())
+        device = deviceList[selection]
 
     if device is None:
         raise RuntimeError(
