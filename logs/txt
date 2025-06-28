@@ -1,0 +1,322 @@
+2025-06-28 15:42:11,992 - DEBUG	: looking for core device with an interrupt endpoint address of 135
+2025-06-28 15:42:12,007 - DEBUG	: -> Found DEVICE ID 1008:000a on Bus 001 Address 002 =================
+ bLength                :   0x12 (18 bytes)
+ bDescriptorType        :    0x1 Device
+ bcdUSB                 :  0x200 USB 2.0
+ bDeviceClass           :    0x0 Specified at interface
+ bDeviceSubClass        :    0x0
+ bDeviceProtocol        :    0x0
+ bMaxPacketSize0        :   0x40 (64 bytes)
+ idVendor               : 0x1008
+ idProduct              : 0x000a
+ bcdDevice              :  0x200 Device 2.0
+ iManufacturer          :    0x1 Futaba
+ iProduct               :    0x2 WSC-1
+ iSerialNumber          :    0x3 000000000
+ bNumConfigurations     :    0x1
+  CONFIGURATION 1: 500 mA ==================================
+   bLength              :    0x9 (9 bytes)
+   bDescriptorType      :    0x2 Configuration
+   wTotalLength         :   0x22 (34 bytes)
+   bNumInterfaces       :    0x1
+   bConfigurationValue  :    0x1
+   iConfiguration       :    0x0 
+   bmAttributes         :   0x80 Bus Powered
+   bMaxPower            :   0xfa (500 mA)
+    INTERFACE 0: Human Interface Device ====================
+     bLength            :    0x9 (9 bytes)
+     bDescriptorType    :    0x4 Interface
+     bInterfaceNumber   :    0x0
+     bAlternateSetting  :    0x0
+     bNumEndpoints      :    0x1
+     bInterfaceClass    :    0x3 Human Interface Device
+     bInterfaceSubClass :    0x0
+     bInterfaceProtocol :    0x0
+     iInterface         :    0x0 
+      ENDPOINT 0x87: Interrupt IN ==========================
+       bLength          :    0x7 (7 bytes)
+       bDescriptorType  :    0x5 Endpoint
+       bEndpointAddress :   0x87 IN
+       bmAttributes     :    0x3 Interrupt
+       wMaxPacketSize   :   0x40 (64 bytes)
+       bInterval        :    0x1
+2025-06-28 15:42:12,020 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/configs/WSC-1.json
+2025-06-28 15:42:12,020 - DEBUG	: --> loaded!
+2025-06-28 15:42:12,020 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/calibrations/WSC-1.json
+2025-06-28 15:42:12,021 - DEBUG	: --> loaded!
+2025-06-28 15:43:45,092 - DEBUG	: looking for core device with an interrupt endpoint address of 135
+2025-06-28 15:43:45,107 - DEBUG	: -> Found DEVICE ID 1008:000a on Bus 001 Address 002 =================
+ bLength                :   0x12 (18 bytes)
+ bDescriptorType        :    0x1 Device
+ bcdUSB                 :  0x200 USB 2.0
+ bDeviceClass           :    0x0 Specified at interface
+ bDeviceSubClass        :    0x0
+ bDeviceProtocol        :    0x0
+ bMaxPacketSize0        :   0x40 (64 bytes)
+ idVendor               : 0x1008
+ idProduct              : 0x000a
+ bcdDevice              :  0x200 Device 2.0
+ iManufacturer          :    0x1 Futaba
+ iProduct               :    0x2 WSC-1
+ iSerialNumber          :    0x3 000000000
+ bNumConfigurations     :    0x1
+  CONFIGURATION 1: 500 mA ==================================
+   bLength              :    0x9 (9 bytes)
+   bDescriptorType      :    0x2 Configuration
+   wTotalLength         :   0x22 (34 bytes)
+   bNumInterfaces       :    0x1
+   bConfigurationValue  :    0x1
+   iConfiguration       :    0x0 
+   bmAttributes         :   0x80 Bus Powered
+   bMaxPower            :   0xfa (500 mA)
+    INTERFACE 0: Human Interface Device ====================
+     bLength            :    0x9 (9 bytes)
+     bDescriptorType    :    0x4 Interface
+     bInterfaceNumber   :    0x0
+     bAlternateSetting  :    0x0
+     bNumEndpoints      :    0x1
+     bInterfaceClass    :    0x3 Human Interface Device
+     bInterfaceSubClass :    0x0
+     bInterfaceProtocol :    0x0
+     iInterface         :    0x0 
+      ENDPOINT 0x87: Interrupt IN ==========================
+       bLength          :    0x7 (7 bytes)
+       bDescriptorType  :    0x5 Endpoint
+       bEndpointAddress :   0x87 IN
+       bmAttributes     :    0x3 Interrupt
+       wMaxPacketSize   :   0x40 (64 bytes)
+       bInterval        :    0x1
+2025-06-28 15:43:45,120 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/configs/WSC-1.json
+2025-06-28 15:43:45,120 - DEBUG	: --> loaded!
+2025-06-28 15:43:45,121 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/calibrations/WSC-1.json
+2025-06-28 15:43:45,121 - DEBUG	: --> loaded!
+2025-06-28 15:51:43,022 - DEBUG	: looking for core device with an interrupt endpoint address of 135
+2025-06-28 15:51:43,037 - DEBUG	: -> Found DEVICE ID 1008:000a on Bus 001 Address 002 =================
+ bLength                :   0x12 (18 bytes)
+ bDescriptorType        :    0x1 Device
+ bcdUSB                 :  0x200 USB 2.0
+ bDeviceClass           :    0x0 Specified at interface
+ bDeviceSubClass        :    0x0
+ bDeviceProtocol        :    0x0
+ bMaxPacketSize0        :   0x40 (64 bytes)
+ idVendor               : 0x1008
+ idProduct              : 0x000a
+ bcdDevice              :  0x200 Device 2.0
+ iManufacturer          :    0x1 Futaba
+ iProduct               :    0x2 WSC-1
+ iSerialNumber          :    0x3 000000000
+ bNumConfigurations     :    0x1
+  CONFIGURATION 1: 500 mA ==================================
+   bLength              :    0x9 (9 bytes)
+   bDescriptorType      :    0x2 Configuration
+   wTotalLength         :   0x22 (34 bytes)
+   bNumInterfaces       :    0x1
+   bConfigurationValue  :    0x1
+   iConfiguration       :    0x0 
+   bmAttributes         :   0x80 Bus Powered
+   bMaxPower            :   0xfa (500 mA)
+    INTERFACE 0: Human Interface Device ====================
+     bLength            :    0x9 (9 bytes)
+     bDescriptorType    :    0x4 Interface
+     bInterfaceNumber   :    0x0
+     bAlternateSetting  :    0x0
+     bNumEndpoints      :    0x1
+     bInterfaceClass    :    0x3 Human Interface Device
+     bInterfaceSubClass :    0x0
+     bInterfaceProtocol :    0x0
+     iInterface         :    0x0 
+      ENDPOINT 0x87: Interrupt IN ==========================
+       bLength          :    0x7 (7 bytes)
+       bDescriptorType  :    0x5 Endpoint
+       bEndpointAddress :   0x87 IN
+       bmAttributes     :    0x3 Interrupt
+       wMaxPacketSize   :   0x40 (64 bytes)
+       bInterval        :    0x1
+2025-06-28 15:51:43,050 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/configs/WSC-1.json
+2025-06-28 15:51:43,050 - DEBUG	: --> loaded!
+2025-06-28 15:51:43,050 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/calibrations/WSC-1.json
+2025-06-28 15:51:43,051 - DEBUG	: --> loaded!
+2025-06-28 15:52:14,389 - DEBUG	: looking for core device with an interrupt endpoint address of 135
+2025-06-28 15:52:14,405 - DEBUG	: -> Found DEVICE ID 1008:000a on Bus 001 Address 002 =================
+ bLength                :   0x12 (18 bytes)
+ bDescriptorType        :    0x1 Device
+ bcdUSB                 :  0x200 USB 2.0
+ bDeviceClass           :    0x0 Specified at interface
+ bDeviceSubClass        :    0x0
+ bDeviceProtocol        :    0x0
+ bMaxPacketSize0        :   0x40 (64 bytes)
+ idVendor               : 0x1008
+ idProduct              : 0x000a
+ bcdDevice              :  0x200 Device 2.0
+ iManufacturer          :    0x1 Futaba
+ iProduct               :    0x2 WSC-1
+ iSerialNumber          :    0x3 000000000
+ bNumConfigurations     :    0x1
+  CONFIGURATION 1: 500 mA ==================================
+   bLength              :    0x9 (9 bytes)
+   bDescriptorType      :    0x2 Configuration
+   wTotalLength         :   0x22 (34 bytes)
+   bNumInterfaces       :    0x1
+   bConfigurationValue  :    0x1
+   iConfiguration       :    0x0 
+   bmAttributes         :   0x80 Bus Powered
+   bMaxPower            :   0xfa (500 mA)
+    INTERFACE 0: Human Interface Device ====================
+     bLength            :    0x9 (9 bytes)
+     bDescriptorType    :    0x4 Interface
+     bInterfaceNumber   :    0x0
+     bAlternateSetting  :    0x0
+     bNumEndpoints      :    0x1
+     bInterfaceClass    :    0x3 Human Interface Device
+     bInterfaceSubClass :    0x0
+     bInterfaceProtocol :    0x0
+     iInterface         :    0x0 
+      ENDPOINT 0x87: Interrupt IN ==========================
+       bLength          :    0x7 (7 bytes)
+       bDescriptorType  :    0x5 Endpoint
+       bEndpointAddress :   0x87 IN
+       bmAttributes     :    0x3 Interrupt
+       wMaxPacketSize   :   0x40 (64 bytes)
+       bInterval        :    0x1
+2025-06-28 15:52:14,417 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/configs/WSC-1.json
+2025-06-28 15:52:14,418 - DEBUG	: --> loaded!
+2025-06-28 15:52:14,418 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/calibrations/WSC-1.json
+2025-06-28 15:52:14,418 - DEBUG	: --> loaded!
+2025-06-28 16:03:41,281 - DEBUG	: looking for core device with an interrupt endpoint address of 135
+2025-06-28 16:03:41,296 - DEBUG	: -> Found DEVICE ID 1008:000a on Bus 001 Address 002 =================
+ bLength                :   0x12 (18 bytes)
+ bDescriptorType        :    0x1 Device
+ bcdUSB                 :  0x200 USB 2.0
+ bDeviceClass           :    0x0 Specified at interface
+ bDeviceSubClass        :    0x0
+ bDeviceProtocol        :    0x0
+ bMaxPacketSize0        :   0x40 (64 bytes)
+ idVendor               : 0x1008
+ idProduct              : 0x000a
+ bcdDevice              :  0x200 Device 2.0
+ iManufacturer          :    0x1 Futaba
+ iProduct               :    0x2 WSC-1
+ iSerialNumber          :    0x3 000000000
+ bNumConfigurations     :    0x1
+  CONFIGURATION 1: 500 mA ==================================
+   bLength              :    0x9 (9 bytes)
+   bDescriptorType      :    0x2 Configuration
+   wTotalLength         :   0x22 (34 bytes)
+   bNumInterfaces       :    0x1
+   bConfigurationValue  :    0x1
+   iConfiguration       :    0x0 
+   bmAttributes         :   0x80 Bus Powered
+   bMaxPower            :   0xfa (500 mA)
+    INTERFACE 0: Human Interface Device ====================
+     bLength            :    0x9 (9 bytes)
+     bDescriptorType    :    0x4 Interface
+     bInterfaceNumber   :    0x0
+     bAlternateSetting  :    0x0
+     bNumEndpoints      :    0x1
+     bInterfaceClass    :    0x3 Human Interface Device
+     bInterfaceSubClass :    0x0
+     bInterfaceProtocol :    0x0
+     iInterface         :    0x0 
+      ENDPOINT 0x87: Interrupt IN ==========================
+       bLength          :    0x7 (7 bytes)
+       bDescriptorType  :    0x5 Endpoint
+       bEndpointAddress :   0x87 IN
+       bmAttributes     :    0x3 Interrupt
+       wMaxPacketSize   :   0x40 (64 bytes)
+       bInterval        :    0x1
+2025-06-28 16:03:41,309 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/configs/WSC-1.json
+2025-06-28 16:03:41,309 - DEBUG	: --> loaded!
+2025-06-28 16:03:41,309 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/calibrations/WSC-1.json
+2025-06-28 16:03:41,309 - DEBUG	: --> loaded!
+2025-06-28 16:04:43,175 - DEBUG	: looking for core device with an interrupt endpoint address of 135
+2025-06-28 16:04:43,190 - DEBUG	: -> Found DEVICE ID 1008:000a on Bus 001 Address 002 =================
+ bLength                :   0x12 (18 bytes)
+ bDescriptorType        :    0x1 Device
+ bcdUSB                 :  0x200 USB 2.0
+ bDeviceClass           :    0x0 Specified at interface
+ bDeviceSubClass        :    0x0
+ bDeviceProtocol        :    0x0
+ bMaxPacketSize0        :   0x40 (64 bytes)
+ idVendor               : 0x1008
+ idProduct              : 0x000a
+ bcdDevice              :  0x200 Device 2.0
+ iManufacturer          :    0x1 Futaba
+ iProduct               :    0x2 WSC-1
+ iSerialNumber          :    0x3 000000000
+ bNumConfigurations     :    0x1
+  CONFIGURATION 1: 500 mA ==================================
+   bLength              :    0x9 (9 bytes)
+   bDescriptorType      :    0x2 Configuration
+   wTotalLength         :   0x22 (34 bytes)
+   bNumInterfaces       :    0x1
+   bConfigurationValue  :    0x1
+   iConfiguration       :    0x0 
+   bmAttributes         :   0x80 Bus Powered
+   bMaxPower            :   0xfa (500 mA)
+    INTERFACE 0: Human Interface Device ====================
+     bLength            :    0x9 (9 bytes)
+     bDescriptorType    :    0x4 Interface
+     bInterfaceNumber   :    0x0
+     bAlternateSetting  :    0x0
+     bNumEndpoints      :    0x1
+     bInterfaceClass    :    0x3 Human Interface Device
+     bInterfaceSubClass :    0x0
+     bInterfaceProtocol :    0x0
+     iInterface         :    0x0 
+      ENDPOINT 0x87: Interrupt IN ==========================
+       bLength          :    0x7 (7 bytes)
+       bDescriptorType  :    0x5 Endpoint
+       bEndpointAddress :   0x87 IN
+       bmAttributes     :    0x3 Interrupt
+       wMaxPacketSize   :   0x40 (64 bytes)
+       bInterval        :    0x1
+2025-06-28 16:04:43,203 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/configs/WSC-1.json
+2025-06-28 16:04:43,203 - DEBUG	: --> loaded!
+2025-06-28 16:04:43,203 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/calibrations/WSC-1.json
+2025-06-28 16:04:43,203 - DEBUG	: --> loaded!
+2025-06-28 16:05:08,456 - DEBUG	: looking for core device with an interrupt endpoint address of 135
+2025-06-28 16:05:08,471 - DEBUG	: -> Found DEVICE ID 1008:000a on Bus 001 Address 002 =================
+ bLength                :   0x12 (18 bytes)
+ bDescriptorType        :    0x1 Device
+ bcdUSB                 :  0x200 USB 2.0
+ bDeviceClass           :    0x0 Specified at interface
+ bDeviceSubClass        :    0x0
+ bDeviceProtocol        :    0x0
+ bMaxPacketSize0        :   0x40 (64 bytes)
+ idVendor               : 0x1008
+ idProduct              : 0x000a
+ bcdDevice              :  0x200 Device 2.0
+ iManufacturer          :    0x1 Futaba
+ iProduct               :    0x2 WSC-1
+ iSerialNumber          :    0x3 000000000
+ bNumConfigurations     :    0x1
+  CONFIGURATION 1: 500 mA ==================================
+   bLength              :    0x9 (9 bytes)
+   bDescriptorType      :    0x2 Configuration
+   wTotalLength         :   0x22 (34 bytes)
+   bNumInterfaces       :    0x1
+   bConfigurationValue  :    0x1
+   iConfiguration       :    0x0 
+   bmAttributes         :   0x80 Bus Powered
+   bMaxPower            :   0xfa (500 mA)
+    INTERFACE 0: Human Interface Device ====================
+     bLength            :    0x9 (9 bytes)
+     bDescriptorType    :    0x4 Interface
+     bInterfaceNumber   :    0x0
+     bAlternateSetting  :    0x0
+     bNumEndpoints      :    0x1
+     bInterfaceClass    :    0x3 Human Interface Device
+     bInterfaceSubClass :    0x0
+     bInterfaceProtocol :    0x0
+     iInterface         :    0x0 
+      ENDPOINT 0x87: Interrupt IN ==========================
+       bLength          :    0x7 (7 bytes)
+       bDescriptorType  :    0x5 Endpoint
+       bEndpointAddress :   0x87 IN
+       bmAttributes     :    0x3 Interrupt
+       wMaxPacketSize   :   0x40 (64 bytes)
+       bInterval        :    0x1
+2025-06-28 16:05:08,484 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/configs/WSC-1.json
+2025-06-28 16:05:08,484 - DEBUG	: --> loaded!
+2025-06-28 16:05:08,484 - DEBUG	: > Looking for /home/ty/projects/Futaba_USB_Linux_Driver/src/driver/calibrations/WSC-1.json
+2025-06-28 16:05:08,484 - DEBUG	: --> loaded!

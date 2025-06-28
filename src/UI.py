@@ -7,7 +7,6 @@ from textual.events import Mount
 from textual.widgets import Button, Footer, Header, Pretty
 
 import driver
-from driver.Futaba import FutabaDeviceManager
 
 driverCmds = []
 
@@ -24,7 +23,7 @@ class DriverUI(App):
     def __init__(self, debug=False):
         super().__init__()
 
-        self.fdm = FutabaDeviceManager()
+        self.fdm = driver.FutabaDeviceManager()
 
         atexit.register(self.fdm.stopAll)
         futabaDevices = self.fdm.listDevices()
