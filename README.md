@@ -54,9 +54,9 @@ sudo ./run.sh --text-ui
   - This prevents the entire driver from crashing if a single device crashes
 - **Leave the terminal running while you game**
 ```shell               
-                        ┌─ Running Drivers ───────────────────────────────────────────────┐                   
-  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │[{'name': 'Futaba WSC-1(1,1)', 'state': 'RUNNING', 'key': 0}]    │                   
-  Futaba WSC-1(1,1) ⏹   └─────────────────────────────────────────────────────────────────┘                   
+                        ┌─ Running Drivers ───────────────────────────────────────────────┐
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │[{'name': 'Futaba WSC-1(1,1)', 'state': 'RUNNING', 'key': 0}]    │
+  Futaba WSC-1(1,1) ⏹   └─────────────────────────────────────────────────────────────────┘
   ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
 ```
 - If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
@@ -72,6 +72,7 @@ If you encounter any issues or would like to contribute:
 | --------------------------------------------- | ------------------------------------------------------------- | --------- |
 | [WSC-1](https://futabausa.com/product/wsc-1/) | [VRC-Pro](https://store.steampowered.com/app/335070/VRC_PRO/) |  ✓  |
 | [INTERLINK Plus](https://fccid.io/AZPFS0005H/User-Manual/Manual-232847) | [Real Flight Generation 2](https://forums.realflight.com/index.php?forums/realflight-g2.18/) | SAMPLES NEEDED | 
+| [T16IZ](https://futabausa.com/product/transmitter-16iz/) | NEEDS TESTING | NEEDS TESTING
 
 
 # Driver Limitations
