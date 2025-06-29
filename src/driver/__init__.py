@@ -900,7 +900,8 @@ def _workerProcess(
             # - - Fewer exceptions raised = less overhead
             rawData = readDevice(interruptEndpoint, frameSize, timeout=250)
             channelData = []
-            # rawValues = []
+            rawValues = []
+
             for i in range(0, len(rawData), 2):
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
@@ -918,7 +919,7 @@ def _workerProcess(
                 elif rawValue < 0:
                     rawValue = 0
                 # Extract calibrated value from map
-                # rawValues.append(rawValue)
+                rawValues.append(rawValue)
                 channelData.append(valueMap[rawValue])
             channelData.reverse()
             # logger.critical(rawValues)
