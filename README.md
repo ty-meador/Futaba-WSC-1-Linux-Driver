@@ -8,10 +8,9 @@ Python script that will remap the native hardware inputs to a virtual joystick d
 ## Credits
 This project was inspired by the [Futaba_T16IZ_Linux](https://github.com/shaozu/Futaba_T16IZ_Linux) repo which was inspired by [dji-mini-controller-linux-driver](https://github.com/catrielmuller/dji-mini-controller-linux-driver).
 
-## Installation
 
-### Commands
 
+## Quickstart
 ```shell
 # NOTE: The driver requires root level access which means you must be a sudoer!
 
@@ -21,29 +20,43 @@ git clone https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver.git
 cd futaba-usb-rc-linux-driver
 # install dependencies
 sudo pip3 install -r requirements.txt
+sudo ./run.sh --text-ui
 ```
-
-## Use
+# Use
+## Single Device
 ```shell
 # Make sure you are in the projects folder
-cd /path/to/futaba-usb-rc-linux-driver
+# cd /path/to/futaba-usb-rc-linux-driver
+sudo ./run.sh
+```
+- You will be shown a list of connected Futaba USB devices
+```shell
+Which device would you like to start?
+[ 0 ] : Futaba WSC-1(135)
+0
+Started Futaba WSC-1(135)
+CTRL + C to stop driver
+```
+- Type the number corresponding to the device you want to use
+- **Leave the terminal running while you game**
+
+## Multiple Devices
+```shell
+# Make sure you are in the projects folder
+# cd /path/to/futaba-usb-rc-linux-driver
 # Start the UI
 sudo ./run.sh --text-ui
 ```
-
-- This will start a text-based UI
 - The UI will show a list of available Futaba USB devices
   - Click the button for the device you want to start
 - Each device that you start will run in a **separate process**
   - This ensures that each device gets the maximum bandwidth possible
   - This prevents the entire driver from crashing if a single device crashes
 - **Leave the terminal running while you game**
-
-
 ```shell               
-                        ┌─ Running Drivers ───────────────────────────────────────────────┐                   
-  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │[{'name': 'Futaba WSC-1(1,1)', 'state': 'RUNNING', 'key': 0}]    │                   
-  Futaba WSC-1(1,1) ⏹   └─────────────────────────────────────────────────────────────────┘                   
+                        ┌─ Running Drivers ───────────────────────────────────────────────┐
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │[{'name': 'Futaba WSC-1(1,1)', 'state': 'RUNNING', 'key': 0}]    │
+  Futaba WSC-1(1,1) ⏹   └─────────────────────────────────────────────────────────────────┘
   ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
 ```
 - If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
@@ -54,10 +67,14 @@ If you encounter any issues or would like to contribute:
 - [please create an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
 - I will respond as soon as I am able
 
-## Known Compatability Chart
+## Compatability Chart
 | Futaba Device                                 | Game                                                          | Supported | 
 | --------------------------------------------- | ------------------------------------------------------------- | --------- |
-| [WSC-1](https://futabausa.com/product/wsc-1/) | [VRC-Pro](https://store.steampowered.com/app/335070/VRC_PRO/) |  &check;  |
+| [WSC-1](https://futabausa.com/product/wsc-1/) | [VRC-Pro](https://store.steampowered.com/app/335070/VRC_PRO/) |  ✓  |
+| [INTERLINK Plus](https://fccid.io/AZPFS0005H/User-Manual/Manual-232847) | [Real Flight Generation 2](https://forums.realflight.com/index.php?forums/realflight-g2.18/) | SAMPLES NEEDED | 
+| [T16IZ](https://futabausa.com/product/transmitter-16iz/) | NEEDS TESTING | NEEDS TESTING
 
-## Known issues
- - If you start (or restart) the driver while VRC-Pro is running, you MUST go into the settings and select the Futaba adapter as your input device
+
+# Driver Limitations
+ - The nature of the device is that of a user space virtual joystick. This has a vew inherent limitations
+   - If you start (or restart) the driver while VRC-Pro is running, you MUST go into the settings and select the Futaba adapter as your input device

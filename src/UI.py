@@ -16,7 +16,7 @@ STOP_ICON = "⏹"
 
 
 class DriverUI(App):
-    """UI for managing the drivers built with textualize"""
+    """UI for managing the drivers built with textualize."""
 
     CSS_PATH = "styles/main.tcss"
 
@@ -36,9 +36,11 @@ class DriverUI(App):
         yield Header()
         with Horizontal():
             for i, device in enumerate(self.fdm.listDevices()):
+                icon = PLAY_ICON
+                if device["state"] == "RUNNING":
+                    icon = STOP_ICON
                 yield Button(
-                    label=f"{device['name']} "
-                    f"{PLAY_ICON if device['state'] == 'IDLE' else STOP_ICON}",
+                    label=f"{device['name']} {icon}",
                     variant="primary",
                     name=str(i),
                     id=f"BTN_{i}",
@@ -47,7 +49,7 @@ class DriverUI(App):
         yield Footer()
 
     def on_mount(self):  # noqa: C0103
-        """on mount event callback"""
+        """On mount event callback."""
         # self.query_one(SelectionList).border_title = "Futaba Driver Manager"
         self.query_one(Pretty).border_title = "Running Drivers"
 
@@ -72,21 +74,12 @@ class DriverUI(App):
         f"{PLAY_ICON if device['state'] == 'RUNNING' else STOP_ICON}"
 
         self.query_one(Pretty).update(
-            list(
-                filter(
-                    lambda d: d["state"] == "RUNNING", self.fdm.listDevices()
-                )
-            )
+            list(filter(lambda d: d["state"] == "RUNNING", self.fdm.listDevices()))
         )
 
     @on(Mount)
     def update_selected_view(self):  # noqa: C0103
-        """callback"""
-
+        """Callback"""
         self.query_one(Pretty).update(
-            list(
-                filter(
-                    lambda d: d["state"] == "RUNNING", self.fdm.listDevices()
-                )
-            )
+            list(filter(lambda d: d["state"] == "RUNNING", self.fdm.listDevices()))
         )
