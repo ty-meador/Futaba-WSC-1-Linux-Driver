@@ -15,8 +15,6 @@ import numpy as np
 import uinput
 import usb
 
-import driver
-
 ##
 # Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
 # for this great starting point!
@@ -44,9 +42,7 @@ DEFAULT_CALIBRATION = [
         [DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL],
         [EVENT_MIN_VAL, EVENT_MAX_VAL],
     ]
-    * len(
-        DEFAULT_CONFIG["channel_events"]
-    )  # one calibration mapping per channel
+    * len(DEFAULT_CONFIG["channel_events"])  # one calibration mapping per channel
 ]
 FUTABA_VENDOR_ID = 4104  # 0x1008
 PRODUCTS = {
@@ -80,9 +76,7 @@ DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
 )
-DEFAULT_LOG_HANDLER.setFormatter(
-    logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
-)
+DEFAULT_LOG_HANDLER.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
 DEFAULT_LOGGER = logging.getLogger("driver")
 DEFAULT_LOGGER.setLevel(LOGLEVEL)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
@@ -124,8 +118,7 @@ def findInterruptEndpoint(coreDevice):
     hidInterface = findHIDInterface(coreDevice)
     for endpoint in hidInterface:
         if (
-            usb.util.endpoint_direction(endpoint.bEndpointAddress)
-            == usb.util.ENDPOINT_IN
+            usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
             and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
         ):
             return endpoint.bEndpointAddress
@@ -143,15 +136,11 @@ def getCoreDeviceInfo(endpoint):
 
     """
     logger = DEFAULT_LOGGER
-    logger.debug(
-        "looking for core device with an interrupt endpoint address of "
-        f"{endpoint}"
-    )
+    logger.debug(f"looking for core device with an interrupt endpoint address of {endpoint}")
     results = [
         device
         for device in usb.core.find(find_all=True)
-        if device.idVendor == FUTABA_VENDOR_ID
-        and findInterruptEndpoint(device) == endpoint
+        if device.idVendor == FUTABA_VENDOR_ID and findInterruptEndpoint(device) == endpoint
     ]
 
     if len(results) != 1:
@@ -196,9 +185,7 @@ def newLogger(
         maxBytes=5 * 1024 * 1024,  # 5 megabytes
         backupCount=5,
     )
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
-    )
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
@@ -306,30 +293,22 @@ class FutabaDeviceManager:
             start. Defaults to [].
 
         """
-        self.logger.debug(
-            f"Attempting to start device at index[s] {deviceIndex}"
-        )
+        self.logger.debug(f"Attempting to start device at index[s] {deviceIndex}")
         if isinstance(deviceIndex, int):
             result = self.futabaDevices[deviceIndex].start()
 
             if result:
-                self.logger.debug(
-                    f"-> {self.futabaDevices[deviceIndex]} started"
-                )
+                self.logger.debug(f"-> {self.futabaDevices[deviceIndex]} started")
             else:
                 raise RuntimeError(
                     f"Start requested failed for item at index {deviceIndex}",
                 )
         elif hasattr("__iter__", deviceIndex):
-            self.logger.debug(
-                "-> Iterable detected, attempting to start multiple..."
-            )
+            self.logger.debug("-> Iterable detected, attempting to start multiple...")
             for idx in deviceIndex:
                 result = self.futabaDevices[idx].start()
                 if result:
-                    self.logger.debug(
-                        f"--> {self.futabaDevices[deviceIndex]} started"
-                    )
+                    self.logger.debug(f"--> {self.futabaDevices[deviceIndex]} started")
                 else:
                     raise RuntimeError(
                         f"Start requested failed for item at index {idx}",
@@ -637,11 +616,11 @@ class InputChannel:
             outputRange=calibration[1],
             reverse=self.isReversed,
         )
-        self.valueMap = self.calibration.getCalibratedValueMap()
+        self.valueMap = self.calibration.valueMap
 
     def __str__(self):
         """Create a string representation of this IputChannel."""
-        return str(self.toDict())
+        return self.eventName
 
 
 class ChannelCalibration:
@@ -683,18 +662,6 @@ class ChannelCalibration:
         cost of 16kb of memory on an 8 channel device.
     """
 
-    def getCalibratedValueMap(self):
-        """Get an array where each index of the array represents a possible
-        device input and the value stored at that index is the calibrated output
-        value.
-
-        Returns:
-            array.array of int: The integer array that maps a given index to the
-            corresponding calibrated outpute valued stored at that index
-
-        """
-        return self.valueMap
-
     def __init__(
         self,
         inputRange=None,
@@ -725,21 +692,18 @@ class ChannelCalibration:
         self.reverse = reverse
         self.inputRange = inputRange
         self.outputRange = outputRange
-        self.valueMap = self._generateValueMap(
-            inputRange, outputRange, self.reverse
-        )
+        self.valueMap = self._generateValueMap(inputRange, outputRange, self.reverse)
 
-    def __str__(self):
-        """Create a string representation of this calibration object."""
-        return str(
-            {
-                "reverse": self.reverse,
-                "inputRange": self.inputRange,
-                "outputRange": self.outputRange,
-                "valueMap": f"Generated {len(self.valueMap)} values consuming"
-                f"{sys.getsizeof(self.valueMap)} bytes of memory",
-            },
-        )
+        def __str__(self):
+            """Create a string representation of this calibration object."""
+            return str(
+                {
+                    "reverse": self.reverse,
+                    "inputRange": self.inputRange,
+                    "outputRange": self.outputRange,
+                    "valueMap": f"Generated {len(self.valueMap)} values consuming{sys.getsizeof(self.valueMap)} bytes of memory",
+                },
+            )
 
     @staticmethod
     def _generateValueMap(inputRange, outputRange, reverse=False):
@@ -798,9 +762,7 @@ class ChannelCalibration:
 # target of a separate process. As such the function is more complex and
 # contains more statments that would otherwise be tolerated
 ##
-def _workerProcess(
-    killswitch, frameSize, deviceChannels, name, interruptEndpoint
-):  # noqa: C901, PLR0915, PLR0912
+def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa: C901, PLR0915, PLR0912
     """Start a worker for the given device with the given settings.
 
     This is meant to be run in a seperate process via
@@ -837,17 +799,14 @@ def _workerProcess(
                     continue
                 for _endpoint in _interface:
                     if (
-                        usb.util.endpoint_direction(_endpoint.bEndpointAddress)
-                        == usb.util.ENDPOINT_IN
-                        and _endpoint.bmAttributes
-                        == INTERRUPT_ENDPOINT_ATTRIBUTE
+                        _endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
+                        and usb.util.endpoint_direction(_endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
                         and _endpoint.bEndpointAddress == interruptEndpoint
                     ):
                         interruptEndpoint = _endpoint.bEndpointAddress
                         coreDevice = _device
                         logger.debug(
-                            f"Device at endpoint {interruptEndpoint}: "
-                            f"{coreDevice}",
+                            f"Device at endpoint {interruptEndpoint}: {coreDevice}",
                         )
                         break
 
@@ -906,9 +865,7 @@ def _workerProcess(
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
 
-                rawValue = int(
-                    fromBytes(rawData[i : i + 2], byteorder="little")
-                )
+                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
                 # Avoid overflows and underflows
                 # account for off-by-one
                 maxInputVal = len(valueMap) - 1
@@ -943,8 +900,7 @@ def _workerProcess(
         usb.util.release_interface(coreDevice, 0)
     except Exception as e:
         logger.warning(
-            "Unable to release the USB interface (Did we never acquire it in "
-            "the first place? Permissions issue?)",
+            "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)",
         )
         logger.warning(e)
 
@@ -953,8 +909,7 @@ def _workerProcess(
         coreDevice.attach_kernel_driver(0)
     except Exception as e:
         logger.warning(
-            "Unable to reattach the kernel driver (Did we never acquire it in "
-            "the first place? Permissions issue?)",
+            "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)",
         )
         logger.warning(e)
 
@@ -963,7 +918,6 @@ def _workerProcess(
         coreDevice.reset()
     except Exception as e:
         logger.warning(
-            "Unable to reset the USB interface (Did we never acquire it in the "
-            "first place? Permissions issue?)",
+            "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)",
         )
         logger.warning(e)
