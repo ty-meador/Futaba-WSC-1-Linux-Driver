@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""The main program - run with `sudo python3 main.py`"""
+"""The main program - run with `sudo python3 main.py`."""
 
 import time
 from argparse import ArgumentParser
@@ -10,37 +10,48 @@ from UI import DriverUI
 parser = ArgumentParser()
 
 parser.add_argument(
-    "--bus", help="The bus of the device you want to start a driver for"
+    "--bus",
+    help="The bus of the device you want to start a driver for",
 )
 
 parser.add_argument(
-    "--calibrate", action="store_true", help="Used for calibration"
+    "--calibrate",
+    action="store_true",
+    help="Used for calibration",
 )
 
 parser.add_argument(
-    "--debug", action="store_true", help="Enable debug log level"
+    "--debug",
+    action="store_true",
+    help="Enable debug log level",
 )
 
 parser.add_argument(
-    "--endpoint", help="Start a driver on the device at this endpoint"
+    "--endpoint",
+    help="Start a driver on the device at this endpoint",
 )
 
 parser.add_argument(
-    "--port", help="The port of the device you want start a driver for"
+    "--port",
+    help="The port of the device you want start a driver for",
 )
 
 
-parser.add_argument("--ui", help="Launch the terminal based UI")
+parser.add_argument(
+    "--ui",
+    help="Launch the terminal based UI",
+)
 
 
 def cliMode(args):
-    """Run the driver in cli-mode
+    """Run the driver in cli-mode.
 
     Args:
         args (argparse.ArgumentParser.arg): Arguments passed to the cli
 
     Raises:
         RuntimeError: Raised if the specified device cannot be found
+
     """
     manager = driver.FutabaDeviceManager()
 
@@ -64,9 +75,7 @@ def cliMode(args):
         device = deviceList[selection]
 
     if device is None:
-        raise RuntimeError(
-            "Could not find a Futaba device at the specified endpoint"
-        )
+        raise RuntimeError("Could not find a Futaba device at the specified endpoint")
 
     manager.start(device["key"])
     print(f"Started {device['name']}")

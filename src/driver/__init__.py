@@ -15,6 +15,37 @@ import numpy as np
 import uinput
 import usb
 
+ROOT_DIR = None
+# Start from THIS file's directory
+currentFile = Path(__file__).resolve()  # Using resolve to get an absolute path.
+for parent in currentFile.parents:  # Iterate over every parent.
+    if (parent / "LICENSE").exists():  # We expect the LICENSE file to be in the root of the project
+        ROOT_DIR = os.path.abspath(parent)
+        break
+
+if ROOT_DIR is None:
+    raise RuntimeError(
+        "Unable to locate a file named 'LICENSE', therefore cannot determine the "
+        "projects root directory"
+    )
+
+SRC_PATH = os.path.join(ROOT_DIR, "src")
+LOG_PATH = os.path.join(ROOT_DIR, "logs")
+os.makedirs(LOG_PATH, exist_ok=True)
+
+DRIVER_PATH = os.path.join(SRC_PATH, "driver")
+CONFIG_PATH = os.path.join(DRIVER_PATH, "configs")
+CALIBRATION_PATH = os.path.join(DRIVER_PATH, "calibrations")
+DEFAULT_DEVICE_MIN_VAL = 704
+DEFAULT_DEVICE_MID_VAL = 2048
+DEFAULT_DEVICE_MAX_VAL = 3392
+EVENT_MIN_VAL = 0
+EVENT_MID_VAL = 16384
+EVENT_MAX_VAL = 32768
+FUTABA_VENDOR_ID = 4104  # 0x1008
+INTERRUPT_ENDPOINT_ATTRIBUTE = 0x3  # conincidence
+HID_INTERFACE = 0x3  # conincidence
+
 ##
 # Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
 # for this great starting point!
@@ -33,18 +64,15 @@ DEFAULT_CONFIG = {
     ],
 }
 
-EVENT_MAX_VAL = 32768
-EVENT_MIN_VAL = 0
-DEFAULT_DEVICE_MIN_VAL = 704
-DEFAULT_DEVICE_MAX_VAL = 3392
+
 DEFAULT_CALIBRATION = [
     [
-        [DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MAX_VAL],
-        [EVENT_MIN_VAL, EVENT_MAX_VAL],
+        [DEFAULT_DEVICE_MIN_VAL, DEFAULT_DEVICE_MID_VAL, DEFAULT_DEVICE_MAX_VAL],
+        [EVENT_MIN_VAL, EVENT_MID_VAL, EVENT_MAX_VAL],
     ]
     * len(DEFAULT_CONFIG["channel_events"])  # one calibration mapping per channel
 ]
-FUTABA_VENDOR_ID = 4104  # 0x1008
+
 PRODUCTS = {
     "default": 999,
     "WSC-1": 10,
@@ -54,21 +82,13 @@ PRODUCTS = {
     999: "default",
 }
 
-CALIBRATION_PATH = None
-CONFIG_PATH = None
-LOG_PATH = None
-SRC_PATH = None
 
-for parent in Path(__file__).resolve().parents:
-    if (parent / ".pylintrc").exists():
-        PARENT = os.path.abspath(parent)
-        SRC_PATH = os.path.join(PARENT, "src")
-        LOG_PATH = os.path.join(PARENT, "logs")
-        DRIVER_PATH = os.path.join(SRC_PATH, "driver")
-        CONFIG_PATH = os.path.join(DRIVER_PATH, "configs")
-        CALIBRATION_PATH = os.path.join(DRIVER_PATH, "calibrations")
-        os.makedirs(LOG_PATH, exist_ok=True)
-        break
+HANDLER = handlers.RotatingFileHandler(
+    "logs.txt",
+    maxBytes=5 * 1024 * 1024,  # 5 megabytes
+    backupCount=5,
+)
+
 
 LOGLEVEL = logging.DEBUG
 DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
@@ -81,146 +101,9 @@ DEFAULT_LOGGER = logging.getLogger("driver")
 DEFAULT_LOGGER.setLevel(LOGLEVEL)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
 
-# These being the same value is a coincidence, they need to be sperate variables
-# in case this chanes or is expanded upon
-INTERRUPT_ENDPOINT_ATTRIBUTE = 0x3
-HID_INTERFACE = 0x3
-
-
-def findHIDInterface(coreDevice):
-    """Find the HID interface for the given device.
-
-    Args:
-        coreDevice (usb.core.Device): The device to search
-
-    Returns:
-        usb.core.Device.interface: The HID interface if one exists, none if
-        none exist
-
-    """
-    for config in coreDevice:
-        for interface in config:
-            if interface.bInterfaceClass == HID_INTERFACE:
-                return interface
-    return None
-
-
-def findInterruptEndpoint(coreDevice):
-    """Find the USB interrupt endpoint for the given HID interface.
-
-    Args:
-        hidInterface (usb.core.Device.intercface): The HID interface to search
-
-    Returns:
-        int: The address of the endpoint if one exists, None if none exist
-
-    """
-    hidInterface = findHIDInterface(coreDevice)
-    for endpoint in hidInterface:
-        if (
-            usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
-            and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
-        ):
-            return endpoint.bEndpointAddress
-    return None
-
-
-def getCoreDeviceInfo(endpoint):
-    """Find the core device on the given bus and port.
-
-    Args:
-        endpoint (int): The endpoint address of the device you want info for
-
-    Returns:
-        usb.core.Device: The core device at the provided bus and port0
-
-    """
-    logger = DEFAULT_LOGGER
-    logger.debug(f"looking for core device with an interrupt endpoint address of {endpoint}")
-    results = [
-        device
-        for device in usb.core.find(find_all=True)
-        if device.idVendor == FUTABA_VENDOR_ID and findInterruptEndpoint(device) == endpoint
-    ]
-
-    if len(results) != 1:
-        logger.debug(f"Expected to find exactly 1 result, found {len(results)}")
-        return False
-
-    device = results[0]
-    logger.debug(f"-> Found {results[0]}")
-    return {
-        "productID": device.idProduct,
-        "serialNumber": device.serial_number,
-        "product": device.product,
-        "manufacturer": device.manufacturer,
-        "speed": device.speed,
-        "interruptEndpoint": findInterruptEndpoint(device),
-    }
-
-
-def newLogger(
-    name="logs",
-    fileName=None,
-    level=LOGLEVEL,
-):
-    """Generate a logger.
-
-    Args:
-        name (str): The label to insert after the timestamp on each line in the
-        logs
-        fileName (str): The name of the log file the logger will log to
-        level (loglevel, optional): The level the logger should output. Defaults
-        to logging.WARNING.
-
-    Returns:
-        logger: The generated logger
-
-    """
-    if fileName is None:
-        fileName = re.sub(r"\W", "_", name) + ".txt"
-
-    handler = handlers.RotatingFileHandler(
-        os.path.join(LOG_PATH, fileName),
-        maxBytes=5 * 1024 * 1024,  # 5 megabytes
-        backupCount=5,
-    )
-    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    logger.addHandler(handler)
-    return logger
-
-
-def loadJsonFile(filePath):
-    """Load a json file into a dictionary.
-
-    Args:
-        filePath (str): The path to the json file you want to load
-
-    Returns:
-        dict: The parsed json
-
-    """
-    logger = DEFAULT_LOGGER
-    parsedJson = None
-
-    try:
-        logger.debug(f"> Looking for {filePath}")
-        with open(filePath, encoding="utf-8") as jsonFile:
-            parsedJson = json.load(jsonFile)
-        logger.debug("--> loaded!")
-    except FileNotFoundError:
-        # parsedJson defaults to None
-        logger.debug("--> not found, returning >None<")
-
-    return parsedJson
-
 
 class FutabaDeviceManager:
-    """Provides a class-based interface for starting and stopping Futaba USB
-    device drivers.
-    """
+    """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
 
     def __init__(self):
         """Create an object that manages Futaba drivers.
@@ -249,6 +132,17 @@ class FutabaDeviceManager:
         # bus=None,
         # port=None
     ):
+        """Find the Futaba device that has the provided endpoint.
+
+        Args:
+            endpoint (int, optional): The endpoint of the device you are looking for. Defaults to
+            None.
+
+        Returns:
+            usb.core.Device or None: Returns None if a device was not found. Otherwise returns the
+            core device handle.
+
+        """
         if endpoint is not None:
             return self._findDeviceByEndpoint(endpoint)
         return None
@@ -357,14 +251,15 @@ class FutabaDeviceManager:
         return futabaDeviceDriver.getState() == "RUNNING"
 
     def _findDeviceByEndpoint(self, endpoint):
-        """Find which device has the given endpoint
+        """Find which device has the given endpoint.
 
         Args:
-            endpoint (int): The endpoint of the device to find
+            endpoint (int): The endpoint of the device to find.
 
         Returns:
             dict: A dictionary representation of the device with the given
-            endpoint
+            endpoint.
+
         """
         endpoint = int(endpoint)
         for device in self.listDevices():
@@ -414,24 +309,37 @@ class FutabaDeviceDriver:
         ]
         atexit.register(self.stop)
 
-    def __str__(self):
-        """Generate a string representation of this"""
-        return f"{self.name} Driver"
-
     def __eq__(self, other):
-        return self.endpoint == other.endpoint
+        """Compare one drivers interrupt endpoint address with the other.
 
-    def __lt__(self, other):
-        return NotImplemented
-
-    def __gt__(self, other):
-        return NotImplemented
-
-    def getEndpoint(self):
-        """Get the interrupt endpoint for this device
+        Args:
+            other (FutabaDeviceDriver): The device to compare to
 
         Returns:
-            int: The interrupt endpoint for this device
+            bool: True if the devices have the same interrupt endpoint address
+
+        """
+        return self.endpoint == other.endpoint
+
+    def __hash__(self):
+        """Generate a has for this object.
+
+        Returns:
+            hash: The hash.
+
+        """
+        return hash(self.toDict())
+
+    def __str__(self):
+        """Generate a string representation of this device driver."""
+        return f"{self.name} Driver"
+
+    def getEndpoint(self):
+        """Get the interrupt endpoint for this device.
+
+        Returns:
+            int: The interrupt endpoint for this device.
+
         """
         return self.endpoint
 
@@ -440,10 +348,10 @@ class FutabaDeviceDriver:
         return self.name
 
     def getState(self):
-        """Get the current state of the
+        """Get the current state of the driver.
 
         Returns:
-            string: The current state of the driver
+            string: The current state of the driver.
 
         """
         if self.subProc is not None and self.subProc.is_alive():
@@ -467,7 +375,7 @@ class FutabaDeviceDriver:
         return self.getState()
 
     def stop(self):
-        """Stop the"""
+        """Stop the driver."""
         if not self.killswitch.is_set():
             self.killswitch.set()
         if self.subProc is not None and self.subProc.is_alive():
@@ -475,7 +383,7 @@ class FutabaDeviceDriver:
         self.state = "IDLE"
 
     def toDict(self):
-        """Create a dictionary representation of this driver"""
+        """Create a dictionary representation of this driver."""
         return dict(
             {
                 "config": self.config,
@@ -494,9 +402,9 @@ class FutabaDeviceDriver:
 
     @staticmethod
     def deviceIsSupported(coreDevice):
-        """Determine if the following conditions are true for the provided
-        device.
+        """Determine if the device is compatable with this driver class.
 
+        Determine if the following conditions are true for the provided device:
         - Provided device is a Futaba device
         - Device has a HID interface
         - HID interface has a suitable interrupt endpoint
@@ -520,8 +428,9 @@ class FutabaDeviceDriver:
         return endpoint is not None
 
     def _loadConfig(self, productName):
-        """Load the settings for this particular device and falls back to the
-        default config file if one doesn't exist.
+        """Load the device config.
+
+        Load the device config and fall back to the default config file if one doesn't exist.
 
         Returns:
             dict: A dictionary containing the driver settings
@@ -680,6 +589,7 @@ class ChannelCalibration:
             reverse (bool, optional): If reverse the calibrated values will be
             inserted into the resulting array backwards. This will reverse the
             direction of the input. Defaults to False.
+
         """
         if inputRange is None:
             inputRange = [
@@ -701,14 +611,14 @@ class ChannelCalibration:
                     "reverse": self.reverse,
                     "inputRange": self.inputRange,
                     "outputRange": self.outputRange,
-                    "valueMap": f"Generated {len(self.valueMap)} values consuming{sys.getsizeof(self.valueMap)} bytes of memory",
+                    "valueMap": f"Generated {len(self.valueMap)} values "
+                    f"consuming{sys.getsizeof(self.valueMap)} bytes of memory",
                 },
             )
 
     @staticmethod
     def _generateValueMap(inputRange, outputRange, reverse=False):
-        """Generate a list of values that maps the input range to the output
-        range.
+        """Generate a list of values that maps the input range to the output range.
 
         Args:
             inputRange (list, optional): This determines the size of the map.
@@ -757,6 +667,177 @@ class ChannelCalibration:
         )
 
 
+def findHIDInterface(coreDevice):
+    """Find the HID interface for the given device.
+
+    Args:
+        coreDevice (usb.core.Device): The device to search
+
+    Returns:
+        usb.core.Device.interface: The HID interface if one exists, none if
+        none exist
+
+    """
+    for config in coreDevice:
+        for interface in config:
+            if interface.bInterfaceClass == HID_INTERFACE:
+                return interface
+    return None
+
+
+def findInterruptEndpoint(coreDevice):
+    """Find the USB interrupt endpoint for the given HID interface.
+
+    Args:
+        coreDevice (usb.core.Device): The core device to find the interrupt endpoint of.
+
+    Returns:
+        int: The address of the endpoint if one exists, None if none exist.
+
+    """
+    hidInterface = findHIDInterface(coreDevice)
+    for endpoint in hidInterface:
+        if (
+            usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
+            and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
+        ):
+            return endpoint.bEndpointAddress
+    return None
+
+
+def getCoreDevice(endpoint):
+    """Get the core USB device handle that has the provided enpoint.
+
+    Args:
+        endpoint (int): The interrupt endpoint address as an integer.
+
+    Returns:
+        usb.core.Device: The core device handle that has the provided endpoint.
+
+    """
+    results = [
+        device
+        for device in usb.core.find(find_all=True)
+        if device.idVendor == FUTABA_VENDOR_ID and findInterruptEndpoint(device) == endpoint
+    ]
+
+    if len(results) != 1:
+        DEFAULT_LOGGER.critical(f"Expected to find exactly 1 result, found {len(results)}")
+        return False
+
+    DEFAULT_LOGGER.debug(f"-> Found {results[0]}")
+    return results[0]
+
+
+def getCoreDeviceInfo(endpoint):
+    """Find the core device on the given bus and port.
+
+    Args:
+        endpoint (int): The endpoint address of the device you want info for
+
+    Returns:
+        usb.core.Device: The core device at the provided bus and port0
+
+    """
+    logger = DEFAULT_LOGGER
+    logger.debug(f"looking for core device with an interrupt endpoint address of {endpoint}")
+    device = getCoreDevice(endpoint)
+    return {
+        "productID": device.idProduct,
+        "serialNumber": device.serial_number,
+        "product": device.product,
+        "manufacturer": device.manufacturer,
+        "speed": device.speed,
+        "interruptEndpoint": findInterruptEndpoint(device),
+    }
+
+
+def getInterruptAddress(device):
+    """Take in a device and returns is interrupt enpoint address.
+
+    Args:
+        device (usb.core.Device): The device that we want to emulate
+
+    Raises:
+        ValueError: Raised if the provided device is not an of type usb.core.device
+        RuntimeError: Raised if the provided device does not have an endpoint
+
+    Returns:
+        int: The endpoint object used to capture frames from the physical device
+
+    """
+    if not isinstance(device, usb.core.Device):
+        raise ValueError("Expected first param to be of type usb.core.Device")
+    for config in device:
+        for interface in config:
+            for endpoint in interface:
+                if (
+                    usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
+                    # 0x3 indicates interrupt endpoint
+                    and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
+                ):
+                    return endpoint.bEndpointAddress
+    raise RuntimeError("No interrupt endpoint found!")
+
+
+def loadJsonFile(filePath):
+    """Load a JSON file into a dictionary.
+
+    Args:
+        filePath (str): The path to the json file you want to load
+
+    Returns:
+        dict: The parsed json
+
+    """
+    logger = newLogger(f"loadJsonFile({filePath})")
+    parsedJson = None
+
+    try:
+        logger.debug(f"> Looking for {filePath}")
+        with open(filePath, encoding="utf-8") as jsonFile:
+            parsedJson = json.load(jsonFile)
+        logger.debug("--> loaded!")
+    except FileNotFoundError:
+        # parsedJson defaults to None
+        logger.debug("--> not found, returning >None<")
+    return parsedJson
+
+
+def newLogger(
+    name="logs",
+    fileName=None,
+    level=LOGLEVEL,
+):
+    """Generate a logger.
+
+    Args:
+        name (str, optional): The label to insert after the timestamp on each line in the logs.
+        Defaults to "logs"
+        fileName (str, optional): The name of the log file the logger will log to. Defaults to
+        None
+        level (loglevel, optional): The level the logger should output. Defaults to
+        logging.WARNING.
+
+    Returns:
+        logger: The generated logger
+
+    """
+    if fileName is None:
+        fileName = re.sub(r"\W", "_", name) + ".txt"
+
+    handler = handlers.RotatingFileHandler(
+        os.path.join(LOG_PATH, fileName),
+        maxBytes=5 * 1024 * 1024,  # 5 megabytes
+        backupCount=5,
+    )
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+    return logger
+
+
 ##
 # Disabled mccabe linting as this function is specifically meant to be the
 # target of a separate process. As such the function is more complex and
@@ -769,19 +850,18 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
     `multiprocessing.Process(target=_workerProcess,...)`
 
     Args:
-        killswitch (multiprocessing.Event): This worker will run an infinite
-        loop until this event is set
-        frameSize (int): The number of bytes to request from the usb device at
-        one time
-        deviceChannels (tuple of dict): a tuple where each value contained is a
-        calibrated value map for its corresponding channel
+        killswitch (multiprocessing.Event): This worker will run an infinite loop until this event
+        is set
+        frameSize (int): The number of bytes to request from the usb device at one time
+        deviceChannels (tuple of dict): a tuple where each value contained is a calibrated value map
+        for its corresponding channel
         name (str): The name the device will show up as
-        interruptEndpoint (int): The usb interrupt endpoint of the device that
-        you want to start a driver for
+        interruptEndpoint (int): The usb interrupt endpoint of the device that you want to start a
+        driver for
 
     NOTE main event loop optimization:
-        we initialize a local version of everything that will be used inside
-        the main event loop. By doing this, the interpreter:
+        we initialize a local version of everything that will be used inside the main event loop.
+        By doing this, the interpreter:
         - Does not have to re-create variables each iteration
         - Does not have to interpret dots, subscripts, etc
 
@@ -800,7 +880,8 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
                 for _endpoint in _interface:
                     if (
                         _endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
-                        and usb.util.endpoint_direction(_endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
+                        and usb.util.endpoint_direction(_endpoint.bEndpointAddress)
+                        == usb.util.ENDPOINT_IN
                         and _endpoint.bEndpointAddress == interruptEndpoint
                     ):
                         interruptEndpoint = _endpoint.bEndpointAddress
@@ -879,7 +960,7 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
                 rawValues.append(rawValue)
                 channelData.append(valueMap[rawValue])
             channelData.reverse()
-            # logger.critical(rawValues)
+
             # Queue one event for each channel
             for data, event in zip(channelData, channelEventsMap, strict=False):
                 # Queue one event for each channel
@@ -899,25 +980,16 @@ def _workerProcess(killswitch, frameSize, deviceChannels, name, interruptEndpoin
     try:
         usb.util.release_interface(coreDevice, 0)
     except Exception as e:
-        logger.warning(
-            "Unable to release the USB interface (Did we never acquire it in the first place? Permissions issue?)",
-        )
-        logger.warning(e)
+        logger.warning(f"Unable to release the USB interface, {e}")
 
     logger.debug("Reattaching the kernel ..")
     try:
         coreDevice.attach_kernel_driver(0)
     except Exception as e:
-        logger.warning(
-            "Unable to reattach the kernel driver (Did we never acquire it in the first place? Permissions issue?)",
-        )
-        logger.warning(e)
+        logger.warning(f"Unable to reattach the kernel driver, {e}")
 
     logger.debug("Resetting device...")
     try:
         coreDevice.reset()
     except Exception as e:
-        logger.warning(
-            "Unable to reset the USB interface (Did we never acquire it in the first place? Permissions issue?)",
-        )
-        logger.warning(e)
+        logger.warning(f"Unable to reset the USB interface, {e}")
