@@ -15,6 +15,8 @@ import numpy as np
 import uinput
 import usb
 
+from . import worker
+
 ROOT_DIR = None
 # Start from THIS file's directory
 currentFile = Path(__file__).resolve()  # Using resolve to get an absolute path.
@@ -363,7 +365,7 @@ class FutabaDeviceDriver:
                 self.logger.debug("-> Killswitch cleared")
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
-                target=_workerProcess,
+                target=worker.run,
                 args=self._toSubprocTuple(),
             )
             self.subProc.start()
