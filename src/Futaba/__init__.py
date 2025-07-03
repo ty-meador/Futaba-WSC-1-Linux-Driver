@@ -789,7 +789,7 @@ def loadJsonFile(filePath):
         dict: The parsed json
 
     """
-    logger = newLogger(f"loadJsonFile({filePath})")
+    logger = newLogger("loadJsonFile")
     parsedJson = None
 
     try:
