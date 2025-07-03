@@ -285,7 +285,7 @@ class FutabaDeviceDriver:
         if self.endpoint is None:
             raise TypeError("Unable to find interrupt endpoint for device")
         self.name = f"Futaba {deviceInfo['product']}({self.endpoint})"
-
+        self.front_pipe, self.back_pipe = multiprocessing.Pipe()
         self.logger = newLogger(f"{deviceInfo['product']}_driver")
         self.productID = deviceInfo["productID"]
         self.serialNumber = deviceInfo["serialNumber"]
@@ -806,7 +806,7 @@ def loadJsonFile(filePath):
 def newLogger(
     name="logs",
     fileName=None,
-    level=LOGLEVEL,
+    level=None,
 ):
     """Generate a logger.
 
@@ -822,6 +822,8 @@ def newLogger(
         logger: The generated logger
 
     """
+    if level is None:
+        level = LOGLEVEL
     if fileName is None:
         fileName = re.sub(r"\W", "_", name) + ".txt"
 

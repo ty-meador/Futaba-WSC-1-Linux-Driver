@@ -2,15 +2,21 @@
 
 Contains the atomic function that runs as a separate process for each FutabaDeviceDriver.
 """
-# ruff: noqa: PLC0415
-
-
 ##
 # Disabled mccabe linting as this function is specifically meant to be the
 # target of a separate process. As such the function is more complex and
 # contains more statments that would otherwise be tolerated
 ##
-def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa: C901, PLR0915, PLR0912
+# ruff: noqa: PLC0415, C901, PLR0915, PLR0912
+
+
+def run(
+    frameSize,
+    deviceChannels,
+    name,
+    interruptEndpoint,
+    pipe=None,
+):
     """Start a worker for the given device with the given settings.
 
     This is meant to be run in a seperate process via
@@ -25,6 +31,7 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa
         name (str): The name the device will show up as
         interruptEndpoint (int): The usb interrupt endpoint of the device that you want to start a
         driver for
+        pipe (multiprocessing.Pipe): The pipe to use to communicate with the main process. defaults to None.
 
     NOTE main event loop optimization:
         we initialize a local version of everything that will be used inside the main event loop.
@@ -101,6 +108,7 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa
     maxInputVal = None
     rawData = None
     readDevice = coreDevice.read
+    runFlag = True
     synchronize = virtualDevice.syn
 
     if coreDevice.is_kernel_driver_active(0):
@@ -108,8 +116,9 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa
     coreDevice.set_configuration()
 
     logger.info(f"Driver started: {interruptEndpoint} -> {name}")
+
     # -- MAIN LOOP --
-    while not killswitch.is_set():
+    while runFlag:
         try:
             # - The transmitter may not send a new frame if the inputs remain
             # static
@@ -139,7 +148,8 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):  # noqa
                 rawValues.append(rawValue)
                 channelData.append(valueMap[rawValue])
             channelData.reverse()
-
+            if pipe is not None:
+                pipe.put(channelData, False)
             # Queue one event for each channel
             for data, event in zip(channelData, channelEventsMap, strict=False):
                 # Queue one event for each channel
