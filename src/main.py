@@ -4,7 +4,7 @@
 import time
 from argparse import ArgumentParser
 
-import driver
+import Futaba
 from UI import DriverUI
 
 parser = ArgumentParser()
@@ -20,11 +20,6 @@ parser.add_argument(
     help="Used for calibration",
 )
 
-parser.add_argument(
-    "--debug",
-    action="store_true",
-    help="Enable debug log level",
-)
 
 parser.add_argument(
     "--endpoint",
@@ -53,7 +48,7 @@ def cliMode(args):
         RuntimeError: Raised if the specified device cannot be found
 
     """
-    manager = driver.FutabaDeviceManager()
+    manager = Futaba.FutabaDeviceManager()
 
     device = None
     if args.endpoint is not None:

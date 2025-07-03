@@ -6,7 +6,7 @@ from textual.containers import Horizontal
 from textual.events import Mount
 from textual.widgets import Button, Footer, Header, Pretty
 
-import driver
+import Futaba
 
 driverCmds = []
 
@@ -23,11 +23,11 @@ class DriverUI(App):
     def __init__(self, debug=False):
         super().__init__()
 
-        self.fdm = driver.FutabaDeviceManager()
+        self.fdm = Futaba.FutabaDeviceManager()
 
         atexit.register(self.fdm.stopAll)
         futabaDevices = self.fdm.listDevices()
-        self.logger = driver.newLogger("text-ui")
+        self.logger = Futaba.newLogger("text-ui")
 
         if len(futabaDevices) == 0:
             raise Exception("No Futaba USB device detected!")
