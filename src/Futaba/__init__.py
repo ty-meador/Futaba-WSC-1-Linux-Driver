@@ -15,8 +15,6 @@ import numpy as np
 import uinput
 import usb
 
-from . import worker
-
 ROOT_DIR = None
 # Start from THIS file's directory
 currentFile = Path(__file__).resolve()  # Using resolve to get an absolute path.
@@ -47,7 +45,6 @@ EVENT_MAX_VAL = 32768
 FUTABA_VENDOR_ID = 4104  # 0x1008
 INTERRUPT_ENDPOINT_ATTRIBUTE = 0x3  # conincidence
 HID_INTERFACE = 0x3  # conincidence
-print(LOG_PATH)
 ##
 # Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
 # for this great starting point!
@@ -297,7 +294,7 @@ class FutabaDeviceDriver:
         self.killswitch = multiprocessing.Event()
         self.config = self._loadConfig(self.product)
         self.deviceChannels = [
-            InputChannel(eventName, calibration, False)
+            InputChannel(self.logger, eventName, calibration, False)
             for eventName, calibration in zip(
                 self.config["channel_events"],
                 self._loadCalibration(self.product),
@@ -365,7 +362,7 @@ class FutabaDeviceDriver:
                 self.logger.debug("-> Killswitch cleared")
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
-                target=worker.run,
+                target=_workerProcess,
                 args=self._toSubprocTuple(),
             )
             self.subProc.start()
@@ -506,10 +503,11 @@ class InputChannel:
         """Generate a dictionary representation of this input channel."""
         return {"eventName": self.eventName, "valueMap": self.valueMap}
 
-    def __init__(self, eventName, calibration, reverseInputs=False):
+    def __init__(self, logger, eventName, calibration, reverseInputs=False):
         """Create an InputChannel object.
 
         Args:
+            logger (logging.Logger): The logger for the class to use
             eventName (str): Any valid uinput event
             calibration (ChannelCalibration): A calibration object used to
             calibrate this input channel
@@ -517,14 +515,21 @@ class InputChannel:
             generated in reverse to reverse the inputs. Defaults to False.
 
         """
+        self.logger = logger
         self.eventName = eventName
         self.isReversed = reverseInputs
         self.calibration = ChannelCalibration(
+            logger,
             inputRange=calibration[0],
             outputRange=calibration[1],
             reverse=self.isReversed,
         )
         self.valueMap = self.calibration.valueMap
+        self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
+        self.logger.debug(f"    isReversed: {self.isReversed}")
+        self.logger.debug(
+            f"    calibration memory footprint: {sys.getsizeof(self.calibration)} bytes"
+        )
 
     def __str__(self):
         """Create a string representation of this IputChannel."""
@@ -572,6 +577,7 @@ class ChannelCalibration:
 
     def __init__(
         self,
+        logger,
         inputRange=None,
         outputRange=None,
         reverse=False,
@@ -579,6 +585,7 @@ class ChannelCalibration:
         """Create a ChannelCalibration object.
 
         Args:
+            logger (logging.Logger): The logger you want this class to use
             inputRange (iterable of length 2, optional): A list, tuple, or array
             where the first value is the lowest possible input value and the
             second value is the highest possible input value. Defaults to None.
@@ -597,11 +604,26 @@ class ChannelCalibration:
             ]
         if outputRange is None:
             outputRange = [EVENT_MIN_VAL, EVENT_MAX_VAL]
-
+        self.logger = logger
         self.reverse = reverse
         self.inputRange = inputRange
         self.outputRange = outputRange
         self.valueMap = self._generateValueMap(inputRange, outputRange, self.reverse)
+
+        self.logger.debug(f"-= Channel Calibration({inputRange}, {outputRange}) created! =-")
+        self.logger.debug("    valueMap:")
+        self.logger.debug(f"        elements: {len(self.valueMap)}")
+        self.logger.debug(f"        unique values: {len(set(self.valueMap))}")
+        self.logger.debug(f"        mem footprint: {sys.getsizeof(self.valueMap)} bytes")
+        self.logger.debug(f"    isReversed: {self.reverse}")
+        self.logger.debug(f"    inputRange: {inputRange[2] - inputRange[0]} total elements")
+        self.logger.debug(f"        high: {inputRange[2]}")
+        self.logger.debug(f"        med: {inputRange[1]}")
+        self.logger.debug(f"        low: {inputRange[0]}")
+        self.logger.debug(f"    outputRange: {outputRange[2] - outputRange[0]} total elements")
+        self.logger.debug(f"        high: {outputRange[2]}")
+        self.logger.debug(f"        med: {outputRange[1]}")
+        self.logger.debug(f"        low: {outputRange[0]}")
 
         def __str__(self):
             """Create a string representation of this calibration object."""
