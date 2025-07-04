@@ -19,39 +19,18 @@ git clone https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver.git
 # Change working directory to the repo you just cloned
 cd futaba-usb-rc-linux-driver
 # install dependencies
-sudo pip3 install -r requirements.txt
-sudo ./run.sh --text-ui
-```
-# Use
-## Single Device
-```shell
-# Make sure you are in the projects folder
-# cd /path/to/futaba-usb-rc-linux-driver
+sudo ./install.sh
+...
 sudo ./run.sh
-```
-- You will be shown a list of connected Futaba USB devices
-```shell
 Which device would you like to start?
 [ 0 ] : Futaba WSC-1(135)
 0
 Started Futaba WSC-1(135)
 CTRL + C to stop driver
 ```
+
 - Type the number corresponding to the device you want to use
 - **Leave the terminal running while you game**
-
-## Multiple Devices
-```shell
-# Make sure you are in the projects folder
-# cd /path/to/futaba-usb-rc-linux-driver
-# Start the UI
-sudo ./run.sh
-Which device would you like to start?
-[ 0 ] : Futaba WSC-1(135)
-0
-Started Futaba WSC-1(135)
-CTRL + C to stop driver
-```
 
 - If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
 
