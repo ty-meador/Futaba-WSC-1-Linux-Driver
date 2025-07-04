@@ -1,4 +1,4 @@
-![Image of VRC-Pro RC simulator with the chosen input device being "Virtual Futaba WSC-1 on the right, and a UI on the left; The left of which is displaying a list of available Futaba USB devices, and the right of which is displaying a list of currently running devices"](screenshots/banner.png "VRC-Pro with WSC-1")
+![Image of VRC-Pro RC simulator with the chosen input device being "Virtual Futaba WSC-1 on the right, and a UI on the left; The left of which is displaying a list of available Futaba USB devices, and the right of which is displaying a list of currently running devices"](screenshots/example.gif "VRC-Pro with WSC-1")
 
 
 # Futaba USB RC Linux Driver 
@@ -45,20 +45,14 @@ CTRL + C to stop driver
 # Make sure you are in the projects folder
 # cd /path/to/futaba-usb-rc-linux-driver
 # Start the UI
-sudo ./run.sh --text-ui
+sudo ./run.sh
+Which device would you like to start?
+[ 0 ] : Futaba WSC-1(135)
+0
+Started Futaba WSC-1(135)
+CTRL + C to stop driver
 ```
-- The UI will show a list of available Futaba USB devices
-  - Click the button for the device you want to start
-- Each device that you start will run in a **separate process**
-  - This ensures that each device gets the maximum bandwidth possible
-  - This prevents the entire driver from crashing if a single device crashes
-- **Leave the terminal running while you game**
-```shell               
-                        ┌─ Running Drivers ───────────────────────────────────────────────┐
-  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │[{'name': 'Futaba WSC-1(1,1)', 'state': 'RUNNING', 'key': 0}]    │
-  Futaba WSC-1(1,1) ⏹   └─────────────────────────────────────────────────────────────────┘
-  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
-```
+
 - If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
 
 
