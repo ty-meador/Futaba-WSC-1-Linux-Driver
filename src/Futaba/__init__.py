@@ -444,7 +444,7 @@ class InputChannel:
 
 
 class ChannelCalibration:
-    """Provides a class based representation of a channel calibration.
+    """Provides a class based representation of a single channels calibration.
 
     Why:
         - The range of values that is output on a given channel is different for
