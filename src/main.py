@@ -5,7 +5,6 @@ import time
 from argparse import ArgumentParser
 
 import Futaba
-from UI import DriverUI
 
 parser = ArgumentParser()
 
@@ -89,7 +88,9 @@ def cliMode(args):
 if __name__ == "__main__":
     args = parser.parse_args()
 
+    # TO-DO Textualize-UI
     if args.ui:
-        DriverUI(args).run()
+        raise RuntimeError("Not yet Impelmented")
+        # DriverUI(args).run()
     else:
         cliMode(args)
