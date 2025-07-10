@@ -1,6 +1,7 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # ruff: noqa: PLC0415, C901, PLR0915, PLR0912
 
+
 ##
 # Disabled mccabe linting as this function is specifically meant to be the
 # target of a separate process. As such the function is more complex and
