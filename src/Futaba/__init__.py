@@ -1,15 +1,26 @@
 """Driver and manager for Futaba RC to USB adapters."""
 
 import array
+import asyncio
 import atexit
 import multiprocessing
 import os
 import sys
 
+import Enum
 import numpy as np
 import usb
 
 from . import utils, worker
+from .errors import DeviceNotFoundError
+
+
+class DeviceState(Enum):
+    """Stores the state of a single device."""
+
+    RUNNING = "RUNNING"
+    STOPPED = "STOPPED"
+    INITIALIZING = "INITIALIZING"
 
 
 class FutabaDeviceManager:
@@ -22,8 +33,6 @@ class FutabaDeviceManager:
             RuntimeError: Raised if no Futaba USB devices are detected
 
         """
-        atexit.register(self.stopAll)
-        self.logger = utils.newLogger("FutabaDeviceManager")
         self.futabaDevices = tuple(
             [
                 FutabaDeviceDriver(device)
@@ -33,7 +42,11 @@ class FutabaDeviceManager:
         )
 
         if len(self.futabaDevices) == 0:
-            raise RuntimeError("No Futaba USB device detected!")
+            raise DeviceNotFoundError
+
+        self.eventLoop = asyncio.get_event_loop()
+        self.logger = utils.newLogger("FutabaDeviceManager")
+        atexit.register(self.stopAll)
 
     def findDevice(
         self,
@@ -158,7 +171,7 @@ class FutabaDeviceManager:
             bool: True if the device has a subprocess
 
         """
-        return futabaDeviceDriver.getState() == "RUNNING"
+        return futabaDeviceDriver.getState() == DeviceState.RUNNING
 
     def _findDeviceByEndpoint(self, endpoint):
         """Find which device has the given endpoint.
@@ -191,7 +204,7 @@ class FutabaDeviceDriver:
             TypeError: If device is not of type usb.core.Device
 
         """
-        self.state = "INITIALIZING"
+        self.state = DeviceState.INITIALIZING
         self.endpoint = utils.getInterruptAddress(device)
         deviceInfo = utils.getCoreDeviceInfo(self.endpoint)
 
@@ -248,6 +261,10 @@ class FutabaDeviceDriver:
         """Generate a string representation of this device driver."""
         return f"{self.name} Driver"
 
+    def __del__(self):
+        """Destructor."""
+        self.stop()
+
     def getState(self):
         """Get the current state of the driver.
 
@@ -256,14 +273,14 @@ class FutabaDeviceDriver:
 
         """
         if self.subProc is not None and self.subProc.is_alive():
-            self.state = "RUNNING"
+            self.state = DeviceState.RUNNING
         else:
-            self.state = "IDLE"
+            self.state = DeviceState.RUNNING
         return self.state
 
     def start(self):
         """Start the driver if it is not running."""
-        if self.getState() != "RUNNING":
+        if self.getState() != DeviceState.RUNNING:
             if self.killswitch.is_set():
                 self.killswitch.clear()
                 self.logger.debug("-> Killswitch cleared")
@@ -281,7 +298,7 @@ class FutabaDeviceDriver:
             self.killswitch.set()
         if self.subProc is not None and self.subProc.is_alive():
             self.subProc.join()
-        self.state = "IDLE"
+        self.state = DeviceState.IDLE
 
     def toDict(self):
         """Create a dictionary representation of this driver."""
@@ -429,10 +446,15 @@ class InputChannel:
         )
         self.valueMap = self.calibration.valueMap
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
-        self.logger.debug(f"    isReversed: {self.isReversed}")
-        self.logger.debug(
-            f"    calibration memory footprint: {sys.getsizeof(self.calibration)} bytes"
-        )
+        self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
+
+    def __eq__(self, other):
+        """Determine if the input channels are equal."""
+        return self.eventName == other.eventName
+
+    def __hash__(self):
+        """Determine the objects hash."""
+        return hash(self.toDict())
 
     def __str__(self):
         """Create a string representation of this IputChannel."""
@@ -551,14 +573,14 @@ class ChannelCalibration:
         Args:
             inputRange (list, optional): This determines the size of the map.
             Defaults to [600, 3500].
-            outputRange (list, optional): This determines what values are
-            generated in the map. Defaults to [0, 32768].
-            reverse (bool, optional): If set to true the map will be generated
-            backwards. This will reverse the direction of the input
+            outputRange (list, optional): This determines what values are generated in the map.
+            Defaults to [0, 32768].
+            reverse (bool, optional): If set to true the map will be generated backwards. This will
+            reverse the direction of the input
 
         Returns:
-            list: A list of all possible output values given the range of input
-            values
+            array: An array of all possible output values which can be interpolated from the range
+            of input values
 
         """
         # Guarantee that we are working with ints

@@ -25,53 +25,41 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
 
     NOTE main event loop optimization:
         we initialize a local version of everything that will be used inside the main event loop.
-        By doing this, the interpreter:
-        - Does not have to re-create variables each iteration
-        - Does not have to interpret dots, subscripts, etc
+        The optimization works because:
+
+        - Attribute lookups (like obj.method) generate LOAD_ATTR bytecode instructions that are
+        slower than LOAD_FAST instructions used for local variables
+        - By storing method references in local variables before the loop, the interpreter uses
+        faster local variable access instead of attribute resolution
+        - This reduces the number of bytecode instructions and eliminates repeated attribute
+        traversal
 
     """
     import uinput
     import usb
 
-    from .. import utils
+    from .. import errors, utils
 
-    channel = None
     coreDevice = None
     logger = utils.newLogger(f"{name}_subproc")
     logger.debug("Subprocess started")
-    for _device in usb.core.find(find_all=True):
-        if _device.idVendor != utils.FUTABA_VENDOR_ID:
-            continue
-        for _config in _device:
-            for _interface in _config:
-                if _interface.bInterfaceClass != utils.HID_INTERFACE:
-                    continue
-                for _endpoint in _interface:
-                    if (
-                        _endpoint.bmAttributes == utils.INTERRUPT_ENDPOINT_ATTRIBUTE
-                        and usb.util.endpoint_direction(_endpoint.bEndpointAddress)
-                        == usb.util.ENDPOINT_IN
-                        and _endpoint.bEndpointAddress == interruptEndpoint
-                    ):
-                        interruptEndpoint = _endpoint.bEndpointAddress
-                        coreDevice = _device
-                        logger.debug(
-                            f"Device at endpoint {interruptEndpoint}: {coreDevice}",
-                        )
-                        break
+    coreDevice = utils.getCoreDevice(interruptEndpoint)
 
     if coreDevice is None:
-        raise TypeError(
-            f"No Futaba device found at interrupt endpoint {interruptEndpoint}",
-        )
+        raise errors.DeviceNotFoundError
 
-    channelEventsMap = []
-    channelValueMaps = []
-    for channel in deviceChannels:
-        channelEventsMap.append(getattr(uinput, channel["eventName"]))
-        channelValueMaps.append(channel["valueMap"])
-    channelEventsMap = tuple(channelEventsMap)
-    channelValueMaps = tuple(channelValueMaps)
+    # Extract event names and value maps from device channels in parallel
+    # zip(*[...]) unpacks the list of tuples and transposes them:
+    # - channelEventsMap gets all the uinput event attributes
+    # - channelValueMaps gets all the corresponding value mapping dictionaries
+    # strict=True force a 1:1 mapping between events and values
+    channelEventsMap, channelValueMaps = zip(
+        *[
+            (getattr(uinput, channel["eventName"]), channel["valueMap"])
+            for channel in deviceChannels
+        ],
+        strict=True,
+    )
 
     logger.debug("maps created")
 
@@ -84,12 +72,9 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
 
     logger.debug("virtual device set up")
 
-    # Create all variables outside the loop to avoid the overhead of
-    # recreating them each iteration
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
-    maxInputVal = None
-    rawData = None
+    killswitchIsSet = killswitch.is_set
     readDevice = coreDevice.read
     synchronize = virtualDevice.syn
 
@@ -99,14 +84,16 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
 
     logger.info(f"Driver started: {interruptEndpoint} -> {name}")
     # -- MAIN LOOP --
-    while not killswitch.is_set():
+    while not killswitchIsSet():
         try:
             # - The transmitter may not send a new frame if the inputs remain
-            # static
-            # - No reason to care about timeouts
-            # - - Long timeout length = less timeouts
-            # - - Less timeouts = fewer exceptions raised
-            # - - Fewer exceptions raised = less overhead
+            # static, causing read() to block until timeout
+            # - When frames are actively being sent, timeout length has no performance
+            # impact as read() returns immediately with data
+            # - During idle periods (static inputs), longer timeouts reduce the
+            # frequency of timeout exceptions, minimizing polling overhead
+            # - 250ms timeout reduces exception frequency during idle periods
+            # while remaining reasonable for process shutdown timing
             rawData = readDevice(interruptEndpoint, frameSize, timeout=250)
             channelData = []
             rawValues = []
@@ -131,8 +118,7 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
             channelData.reverse()
 
             # Queue one event for each channel
-            for data, event in zip(channelData, channelEventsMap, strict=False):
-                # Queue one event for each channel
+            for data, event in zip(channelData, channelEventsMap, strict=True):
                 emit(event, data, syn=False)
 
             # fire all queued events
