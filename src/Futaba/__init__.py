@@ -565,7 +565,7 @@ class ChannelCalibration:
             int: The number of kilobytes that the calibration map occupyes in memory
 
         """
-        return int(sys.getsizeof(self.valueMap) / 1024)  # kb
+        return sys.getsizeof(self.valueMap) // 1024  # kb
 
     @staticmethod
     def _generateValueMap(inputRange, outputRange, reverse=False):
