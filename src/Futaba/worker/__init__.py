@@ -40,6 +40,7 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
 
     from .. import errors, utils
 
+    print("HELLO WORLD")
     coreDevice = None
     logger = utils.newLogger(f"{name}_subproc")
     logger.debug("Subprocess started")

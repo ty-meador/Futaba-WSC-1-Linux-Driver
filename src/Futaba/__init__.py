@@ -1,13 +1,12 @@
 """Driver and manager for Futaba RC to USB adapters."""
 
 import array
-import asyncio
 import atexit
 import multiprocessing
 import os
 import sys
+from enum import Enum, auto
 
-import Enum
 import numpy as np
 import usb
 
@@ -18,9 +17,9 @@ from .errors import DeviceNotFoundError
 class DeviceState(Enum):
     """Stores the state of a single device."""
 
-    RUNNING = "RUNNING"
-    STOPPED = "STOPPED"
-    INITIALIZING = "INITIALIZING"
+    RUNNING = auto()
+    STOPPED = auto()
+    INITIALIZING = auto()
 
 
 class FutabaDeviceManager:
@@ -44,7 +43,6 @@ class FutabaDeviceManager:
         if len(self.futabaDevices) == 0:
             raise DeviceNotFoundError
 
-        self.eventLoop = asyncio.get_event_loop()
         self.logger = utils.newLogger("FutabaDeviceManager")
         atexit.register(self.stopAll)
 
@@ -93,14 +91,7 @@ class FutabaDeviceManager:
             tuple of string: Ordered list of available devices
 
         """
-        deviceList = []
-        for i, device in enumerate(self.futabaDevices):
-            _dict = device.toDict()
-            deviceDict = {"key": i}
-            for key in _dict:
-                deviceDict[key] = _dict[key]
-            deviceList.append(deviceDict)
-        return deviceList
+        return [{"key": i, **device.toDict()} for i, device in enumerate(self.futabaDevices)]
 
     def start(self, deviceIndex):
         """Start the devices at the given indexes.
@@ -275,7 +266,7 @@ class FutabaDeviceDriver:
         if self.subProc is not None and self.subProc.is_alive():
             self.state = DeviceState.RUNNING
         else:
-            self.state = DeviceState.RUNNING
+            self.state = DeviceState.STOPPED
         return self.state
 
     def start(self):
@@ -284,12 +275,14 @@ class FutabaDeviceDriver:
             if self.killswitch.is_set():
                 self.killswitch.clear()
                 self.logger.debug("-> Killswitch cleared")
+
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
                 target=worker.run,
                 args=self._toSubprocTuple(),
             )
             self.subProc.start()
+
         return self.getState()
 
     def stop(self):
@@ -298,16 +291,14 @@ class FutabaDeviceDriver:
             self.killswitch.set()
         if self.subProc is not None and self.subProc.is_alive():
             self.subProc.join()
-        self.state = DeviceState.IDLE
+        self.state = DeviceState.STOPPED
 
     def toDict(self):
         """Create a dictionary representation of this driver."""
         return dict(
             {
                 "config": self.config,
-                "deviceChannels": tuple(
-                    [channel.toDict() for channel in self.deviceChannels],
-                ),
+                "deviceChannels": len(self.deviceChannels),
                 "interruptEndpoint": self.interruptEndpoint,
                 "product": self.product,
                 "productID": self.productID,
@@ -543,7 +534,7 @@ class ChannelCalibration:
         self.logger.debug("    valueMap:")
         self.logger.debug(f"        elements: {len(self.valueMap)}")
         self.logger.debug(f"        unique values: {len(set(self.valueMap))}")
-        self.logger.debug(f"        mem footprint: {sys.getsizeof(self.valueMap)} bytes")
+        self.logger.debug(f"        mem footprint: {self.valueMap} bytes")
         self.logger.debug(f"    isReversed: {self.reverse}")
         self.logger.debug(f"    inputRange: {inputRange[2] - inputRange[0]} total elements")
         self.logger.debug(f"        high: {inputRange[2]}")
@@ -601,7 +592,7 @@ class ChannelCalibration:
             allPossibleInputValues[i] = i
 
         return array.array(
-            "I",  # int
+            "i",  # int
             np.round(
                 np.interp(
                     allPossibleInputValues,
