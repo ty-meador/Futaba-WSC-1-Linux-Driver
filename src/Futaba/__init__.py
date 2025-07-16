@@ -32,7 +32,16 @@ class FutabaDeviceManager:
             RuntimeError: Raised if no Futaba USB devices are detected
 
         """
-        self.futabaDevices = tuple(
+        if len(self.futabaDevices) == 0:
+            raise DeviceNotFoundError
+
+        self.logger = utils.newLogger("FutabaDeviceManager")
+        atexit.register(self.stopAll)
+
+    @property
+    def futabaDevices(self):
+        """A tuple of supported Futaba devices."""
+        return tuple(
             [
                 FutabaDeviceDriver(device)
                 for device in usb.core.find(find_all=True)
@@ -40,19 +49,7 @@ class FutabaDeviceManager:
             ]
         )
 
-        if len(self.futabaDevices) == 0:
-            raise DeviceNotFoundError
-
-        self.logger = utils.newLogger("FutabaDeviceManager")
-        atexit.register(self.stopAll)
-
-    def findDevice(
-        self,
-        endpoint=None,
-        # model=None,
-        # bus=None,
-        # port=None
-    ):
+    def findDevice(self, endpoint=None):
         """Find the Futaba device that has the provided endpoint.
 
         Args:
@@ -196,26 +193,20 @@ class FutabaDeviceDriver:
 
         """
         self.state = DeviceState.INITIALIZING
+
+        # Device metadata
         self.endpoint = utils.getInterruptAddress(device)
-        deviceInfo = utils.getCoreDeviceInfo(self.endpoint)
+        self.deviceInfo = utils.getCoreDeviceInfo(self.endpoint)
+        self.config = self._loadConfig(self.product)
 
         if self.endpoint is None:
             raise TypeError("Unable to find interrupt endpoint for device")
 
-        # Device metadata
-        self.name = f"Futaba {deviceInfo['product']}({self.endpoint})"
-        self.logger = utils.newLogger(f"{deviceInfo['product']}_driver")
-        self.productID = deviceInfo["productID"]
-        self.serialNumber = deviceInfo["serialNumber"]
-        self.product = deviceInfo["product"]
-        self.manufacturer = deviceInfo["manufacturer"]
-        self.speed = deviceInfo["speed"]
-        self.interruptEndpoint = int(deviceInfo["interruptEndpoint"])
+        self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
 
         # Class metadata
         self.subProc = None
         self.killswitch = multiprocessing.Event()
-        self.config = self._loadConfig(self.product)
         self.deviceChannels = [
             InputChannel(self.logger, eventName, calibration, False)
             for eventName, calibration in zip(
@@ -255,6 +246,78 @@ class FutabaDeviceDriver:
     def __del__(self):
         """Destructor."""
         self.stop()
+
+    @staticmethod
+    def deviceIsSupported(coreDevice):
+        """Determine if the device is compatable with this driver class.
+
+        Determine if the following conditions are true for the provided device:
+        - Provided device is a Futaba device
+        - Device has a HID interface
+        - HID interface has a suitable interrupt endpoint
+
+        Args:
+            coreDevice (usb.core.Device): The device to check
+
+        Returns:
+            bool: True if all conditions are met, false otherwise
+
+        """
+        if coreDevice.idVendor != utils.FUTABA_VENDOR_ID:
+            return False
+
+        hidInterface = utils.findHIDInterface(coreDevice)
+        if hidInterface is None:
+            return False
+
+        endpoint = utils.findInterruptEndpoint(coreDevice)
+
+        return endpoint is not None
+
+    @property
+    def frameSize(self):
+        """The frame size is the number of bytes read from the USB device per cycle."""
+        return self.config["frameSize"]
+
+    @property
+    def interruptEndpoint(self):
+        """The interrupt endpoint for the device."""
+        return int(self.deviceInfo["interruptEndpoint"])
+
+    @property
+    def manufacturer(self):
+        """The manufacturer of the device."""
+        return self.deviceInfo["manufacturer"]
+
+    @property
+    def model(self):
+        """The product name/model of the device."""
+        return self.name
+
+    @property
+    def name(self):
+        """The name that the virtual device will show up as to the operating system."""
+        return f"Futaba {self.deviceInfo['product']}({self.endpoint})"
+
+    @property
+    def productName(self):
+        """The product name/model of the device."""
+        return self.deviceInfo["product"]
+
+    @property
+    def productID(self):
+        """The product ID is a unique number assigned to vendors by the governing body."""
+        return self.deviceInfo["productID"]
+
+    @property
+    def serialNumber(self):
+        """The serial number of the device."""
+        return self.deviceInfo["serialNumber"]
+
+    @property
+    def speed(self):
+        """USB generation speed supported by the device."""
+        return self.deviceInfo["speed"]
 
     def getState(self):
         """Get the current state of the driver.
@@ -308,33 +371,6 @@ class FutabaDeviceDriver:
                 "speed": self.speed,
             }
         )
-
-    @staticmethod
-    def deviceIsSupported(coreDevice):
-        """Determine if the device is compatable with this driver class.
-
-        Determine if the following conditions are true for the provided device:
-        - Provided device is a Futaba device
-        - Device has a HID interface
-        - HID interface has a suitable interrupt endpoint
-
-        Args:
-            coreDevice (usb.core.Device): The device to check
-
-        Returns:
-            bool: True if all conditions are met, false otherwise
-
-        """
-        if coreDevice.idVendor != utils.FUTABA_VENDOR_ID:
-            return False
-
-        hidInterface = utils.findHIDInterface(coreDevice)
-        if hidInterface is None:
-            return False
-
-        endpoint = utils.findInterruptEndpoint(coreDevice)
-
-        return endpoint is not None
 
     def _loadConfig(self, productName):
         """Load the device config.
@@ -559,7 +595,7 @@ class ChannelCalibration:
 
     @property
     def memoryFootprint(self):
-        """Get the size in memory of the generated calibration map in Kilobytes.
+        """Get the size in Kilobytes of the calibration map.
 
         Returns:
             int: The number of kilobytes that the calibration map occupyes in memory
