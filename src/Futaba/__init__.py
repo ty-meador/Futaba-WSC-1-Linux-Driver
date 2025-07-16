@@ -534,7 +534,7 @@ class ChannelCalibration:
         self.logger.debug("    valueMap:")
         self.logger.debug(f"        elements: {len(self.valueMap)}")
         self.logger.debug(f"        unique values: {len(set(self.valueMap))}")
-        self.logger.debug(f"        mem footprint: {self.valueMap} bytes")
+        self.logger.debug(f"        mem footprint: {self.memFootprint} Kb")
         self.logger.debug(f"    isReversed: {self.reverse}")
         self.logger.debug(f"    inputRange: {inputRange[2] - inputRange[0]} total elements")
         self.logger.debug(f"        high: {inputRange[2]}")
@@ -553,9 +553,19 @@ class ChannelCalibration:
                     "inputRange": self.inputRange,
                     "outputRange": self.outputRange,
                     "valueMap": f"Generated {len(self.valueMap)} values "
-                    f"consuming{sys.getsizeof(self.valueMap)} bytes of memory",
+                    f"consuming{self.memFootprint} Kilobytes of memory",
                 },
             )
+
+    @property
+    def memoryFootprint(self):
+        """Get the size in memory of the generated calibration map in Kilobytes.
+
+        Returns:
+            int: The number of kilobytes that the calibration map occupyes in memory
+
+        """
+        return int(sys.getsizeof(self.valueMap) / 1024)  # kb
 
     @staticmethod
     def _generateValueMap(inputRange, outputRange, reverse=False):
