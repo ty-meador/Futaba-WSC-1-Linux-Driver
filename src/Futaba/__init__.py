@@ -193,25 +193,22 @@ class FutabaDeviceDriver:
 
         """
         self.state = DeviceState.INITIALIZING
-
-        # Device metadata
         self.endpoint = utils.getInterruptAddress(device)
         self.deviceInfo = utils.getCoreDeviceInfo(self.endpoint)
-        self.config = self._loadConfig(self.product)
 
         if self.endpoint is None:
             raise TypeError("Unable to find interrupt endpoint for device")
 
         self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
-
-        # Class metadata
         self.subProc = None
         self.killswitch = multiprocessing.Event()
+
+        self.config = self._loadConfig(self.productName)
         self.deviceChannels = [
             InputChannel(self.logger, eventName, calibration, False)
             for eventName, calibration in zip(
                 self.config["channel_events"],
-                self._loadCalibration(self.product),
+                self._loadCalibration(self.productName),
                 strict=True,  # 1 event name and 1 calibration per channel
             )
         ]
@@ -363,7 +360,7 @@ class FutabaDeviceDriver:
                 "config": self.config,
                 "deviceChannels": len(self.deviceChannels),
                 "interruptEndpoint": self.interruptEndpoint,
-                "product": self.product,
+                "product": self.productName,
                 "productID": self.productID,
                 "manufacturer": self.manufacturer,
                 "name": self.name,
@@ -556,10 +553,15 @@ class ChannelCalibration:
         if inputRange is None:
             inputRange = [
                 utils.DEFAULT_DEVICE_MIN_VAL,
+                utils.DEFAULT_DEVICE_MID_VAL,
                 utils.DEFAULT_DEVICE_MAX_VAL,
             ]
         if outputRange is None:
-            outputRange = [utils.EVENT_MIN_VAL, utils.EVENT_MAX_VAL]
+            outputRange = [
+                utils.EVENT_MIN_VAL,
+                utils.EVENT_MID_VAL,
+                utils.EVENT_MAX_VAL,
+            ]
         self.logger = logger
         self.reverse = reverse
         self.inputRange = inputRange
@@ -570,7 +572,7 @@ class ChannelCalibration:
         self.logger.debug("    valueMap:")
         self.logger.debug(f"        elements: {len(self.valueMap)}")
         self.logger.debug(f"        unique values: {len(set(self.valueMap))}")
-        self.logger.debug(f"        mem footprint: {self.memFootprint} Kb")
+        self.logger.debug(f"        mem footprint: {self.memoryFootprint} Kb")
         self.logger.debug(f"    isReversed: {self.reverse}")
         self.logger.debug(f"    inputRange: {inputRange[2] - inputRange[0]} total elements")
         self.logger.debug(f"        high: {inputRange[2]}")
@@ -589,7 +591,7 @@ class ChannelCalibration:
                     "inputRange": self.inputRange,
                     "outputRange": self.outputRange,
                     "valueMap": f"Generated {len(self.valueMap)} values "
-                    f"consuming{self.memFootprint} Kilobytes of memory",
+                    f"consuming{self.memoryFootprint} Kilobytes of memory",
                 },
             )
 

@@ -62,7 +62,6 @@ def cliMode(args):
     else:
         selection = None
         deviceList = manager.listDevices()
-        print(deviceList)
         print("Which device would you like to start?")
         for device in deviceList:
             print(f"[ {device['key']} ] : {device['name']}")
