@@ -468,7 +468,7 @@ class InputChannel:
             outputRange=calibration[1],
             reverse=self.isReversed,
         )
-        self.valueMap = self.calibration.valueMap
+        self._valueMap = self.calibration.valueMap
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
         self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
 
@@ -486,7 +486,7 @@ class InputChannel:
 
     def toDict(self):
         """Generate a dictionary representation of this input channel."""
-        return {"eventName": self.eventName, "valueMap": self.valueMap}
+        return {"eventName": self.eventName, "valueMap": self._valueMap}
 
 
 class ChannelCalibration:
@@ -563,17 +563,17 @@ class ChannelCalibration:
                 utils.EVENT_MAX_VAL,
             ]
         self.logger = logger
-        self.reverse = reverse
-        self.inputRange = inputRange
-        self.outputRange = outputRange
-        self.valueMap = self._generateValueMap(inputRange, outputRange, self.reverse)
+        self._reverse = reverse
+        self._inputRange = inputRange
+        self._outputRange = outputRange
+        self._valueMap = self._generateValueMap(inputRange, outputRange, self._reverse)
 
         self.logger.debug(f"-= Channel Calibration({inputRange}, {outputRange}) created! =-")
         self.logger.debug("    valueMap:")
-        self.logger.debug(f"        elements: {len(self.valueMap)}")
-        self.logger.debug(f"        unique values: {len(set(self.valueMap))}")
+        self.logger.debug(f"        elements: {len(self._valueMap)}")
+        self.logger.debug(f"        unique values: {len(set(self._valueMap))}")
         self.logger.debug(f"        mem footprint: {self.memoryFootprint} Kb")
-        self.logger.debug(f"    isReversed: {self.reverse}")
+        self.logger.debug(f"    isReversed: {self._reverse}")
         self.logger.debug(f"    inputRange: {inputRange[2] - inputRange[0]} total elements")
         self.logger.debug(f"        high: {inputRange[2]}")
         self.logger.debug(f"        med: {inputRange[1]}")
@@ -587,13 +587,18 @@ class ChannelCalibration:
             """Create a string representation of this calibration object."""
             return str(
                 {
-                    "reverse": self.reverse,
-                    "inputRange": self.inputRange,
-                    "outputRange": self.outputRange,
-                    "valueMap": f"Generated {len(self.valueMap)} values "
+                    "reverse": self._reverse,
+                    "inputRange": self._inputRange,
+                    "outputRange": self._outputRange,
+                    "valueMap": f"Generated {len(self._valueMap)} values "
                     f"consuming{self.memoryFootprint} Kilobytes of memory",
                 },
             )
+
+    @property
+    def inputRange(self):
+        """Get the input range of this calibration."""
+        return self._inputRange
 
     @property
     def memoryFootprint(self):
@@ -603,7 +608,22 @@ class ChannelCalibration:
             int: The number of kilobytes that the calibration map occupyes in memory
 
         """
-        return sys.getsizeof(self.valueMap) // 1024  # kb
+        return sys.getsizeof(self._valueMap) // 1024  # kb
+
+    @property
+    def outputRange(self):
+        """Get the output range of this calibration."""
+        return self._outputRange
+
+    @property
+    def reverse(self):
+        """Determine whether or not the calibration array should be generate backwards."""
+        return self._reverse
+
+    @property
+    def valueMap(self):
+        """The calibrated value map."""
+        return self._valueMap
 
     @staticmethod
     def _generateValueMap(inputRange, outputRange, reverse=False):
