@@ -35,6 +35,8 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
         traversal
 
     """
+    import os
+
     import uinput
     import usb
 
@@ -47,6 +49,18 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
 
     if coreDevice is None:
         raise errors.DeviceNotFoundError
+
+    # Set realtime priority at the start of the process
+    try:
+        # SCHED_FIFO with priority 99 (highest realtime priority)
+        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(99))
+    except PermissionError:
+        print("Warning: Need CAP_SYS_NICE capability or root for realtime scheduling")
+        try:
+            # Fallback to highest nice priority
+            os.nice(-20)
+        except PermissionError:
+            print("Warning: Cannot set process priority")
 
     # Extract event names and value maps from device channels in parallel
     # zip(*[...]) unpacks the list of tuples and transposes them:
@@ -71,7 +85,9 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
     )
 
     logger.debug("virtual device set up")
-
+    channelEventsMap = tuple(reversed(channelEventsMap))
+    channelData = [0] * len(deviceChannels)
+    rawValues = [0] * len(deviceChannels)
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
     killswitchIsSet = killswitch.is_set
@@ -95,13 +111,10 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
             # - 250ms timeout reduces exception frequency during idle periods
             # while remaining reasonable for process shutdown timing
             rawData = readDevice(interruptEndpoint, frameSize, timeout=250)
-            channelData = []
-            rawValues = []
 
             for i in range(0, len(rawData), 2):
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
-
                 rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
                 # Avoid overflows and underflows
                 # account for off-by-one
@@ -113,11 +126,11 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
                 elif rawValue < 0:
                     rawValue = 0
                 # Extract calibrated value from map
-                rawValues.append(rawValue)
-                channelData.append(valueMap[rawValue])
-            channelData.reverse()
+                rawValues[channel] = rawValue
+                channelData[channel] = valueMap[rawValue]
+            # channelData.reverse()
 
-            # Queue one event for each channel
+            # # Queue one event for each channel
             for data, event in zip(channelData, channelEventsMap, strict=True):
                 emit(event, data, syn=False)
 
@@ -128,6 +141,9 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
         except KeyboardInterrupt:
             pass
         except Exception as e:
+            # We want to capture everything and log it to a file and then re-raise it.
+            # This is because this will be running in a seperate process and such such
+            # print statements don't do much good.
             logger.critical(e)
             raise e
 

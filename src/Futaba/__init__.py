@@ -550,13 +550,13 @@ class ChannelCalibration:
             direction of the input. Defaults to False.
 
         """
-        if inputRange is None:
+        if inputRange is None or len(inputRange) != 3:
             inputRange = [
                 utils.DEFAULT_DEVICE_MIN_VAL,
                 utils.DEFAULT_DEVICE_MID_VAL,
                 utils.DEFAULT_DEVICE_MAX_VAL,
             ]
-        if outputRange is None:
+        if outputRange is None or len(outputRange) != 3:
             outputRange = [
                 utils.EVENT_MIN_VAL,
                 utils.EVENT_MID_VAL,
