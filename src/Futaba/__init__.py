@@ -5,11 +5,21 @@ import atexit
 import multiprocessing
 import os
 import sys
+from enum import Enum, auto
 
 import numpy as np
 import usb
 
 from . import utils, worker
+from .errors import DeviceNotFoundError
+
+
+class DeviceState(Enum):
+    """Stores the state of a single device."""
+
+    RUNNING = auto()
+    STOPPED = auto()
+    INITIALIZING = auto()
 
 
 class FutabaDeviceManager:
@@ -22,9 +32,16 @@ class FutabaDeviceManager:
             RuntimeError: Raised if no Futaba USB devices are detected
 
         """
-        atexit.register(self.stopAll)
+        if len(self.futabaDevices) == 0:
+            raise DeviceNotFoundError
+
         self.logger = utils.newLogger("FutabaDeviceManager")
-        self.futabaDevices = tuple(
+        atexit.register(self.stopAll)
+
+    @property
+    def futabaDevices(self):
+        """A tuple of supported Futaba devices."""
+        return tuple(
             [
                 FutabaDeviceDriver(device)
                 for device in usb.core.find(find_all=True)
@@ -32,16 +49,7 @@ class FutabaDeviceManager:
             ]
         )
 
-        if len(self.futabaDevices) == 0:
-            raise RuntimeError("No Futaba USB device detected!")
-
-    def findDevice(
-        self,
-        endpoint=None,
-        # model=None,
-        # bus=None,
-        # port=None
-    ):
+    def findDevice(self, endpoint=None):
         """Find the Futaba device that has the provided endpoint.
 
         Args:
@@ -80,14 +88,7 @@ class FutabaDeviceManager:
             tuple of string: Ordered list of available devices
 
         """
-        deviceList = []
-        for i, device in enumerate(self.futabaDevices):
-            _dict = device.toDict()
-            deviceDict = {"key": i}
-            for key in _dict:
-                deviceDict[key] = _dict[key]
-            deviceList.append(deviceDict)
-        return deviceList
+        return [{"key": i, **device.toDict()} for i, device in enumerate(self.futabaDevices)]
 
     def start(self, deviceIndex):
         """Start the devices at the given indexes.
@@ -158,7 +159,7 @@ class FutabaDeviceManager:
             bool: True if the device has a subprocess
 
         """
-        return futabaDeviceDriver.getState() == "RUNNING"
+        return futabaDeviceDriver.getState() == DeviceState.RUNNING
 
     def _findDeviceByEndpoint(self, endpoint):
         """Find which device has the given endpoint.
@@ -191,32 +192,23 @@ class FutabaDeviceDriver:
             TypeError: If device is not of type usb.core.Device
 
         """
-        self.state = "INITIALIZING"
+        self.state = DeviceState.INITIALIZING
         self.endpoint = utils.getInterruptAddress(device)
-        deviceInfo = utils.getCoreDeviceInfo(self.endpoint)
+        self.deviceInfo = utils.getCoreDeviceInfo(self.endpoint)
 
         if self.endpoint is None:
             raise TypeError("Unable to find interrupt endpoint for device")
 
-        # Device metadata
-        self.name = f"Futaba {deviceInfo['product']}({self.endpoint})"
-        self.logger = utils.newLogger(f"{deviceInfo['product']}_driver")
-        self.productID = deviceInfo["productID"]
-        self.serialNumber = deviceInfo["serialNumber"]
-        self.product = deviceInfo["product"]
-        self.manufacturer = deviceInfo["manufacturer"]
-        self.speed = deviceInfo["speed"]
-        self.interruptEndpoint = int(deviceInfo["interruptEndpoint"])
-
-        # Class metadata
+        self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
         self.subProc = None
         self.killswitch = multiprocessing.Event()
-        self.config = self._loadConfig(self.product)
+
+        self.config = self._loadConfig(self.productName)
         self.deviceChannels = [
             InputChannel(self.logger, eventName, calibration, False)
             for eventName, calibration in zip(
                 self.config["channel_events"],
-                self._loadCalibration(self.product),
+                self._loadCalibration(self.productName),
                 strict=True,  # 1 event name and 1 calibration per channel
             )
         ]
@@ -248,58 +240,9 @@ class FutabaDeviceDriver:
         """Generate a string representation of this device driver."""
         return f"{self.name} Driver"
 
-    def getState(self):
-        """Get the current state of the driver.
-
-        Returns:
-            string: The current state of the driver.
-
-        """
-        if self.subProc is not None and self.subProc.is_alive():
-            self.state = "RUNNING"
-        else:
-            self.state = "IDLE"
-        return self.state
-
-    def start(self):
-        """Start the driver if it is not running."""
-        if self.getState() != "RUNNING":
-            if self.killswitch.is_set():
-                self.killswitch.clear()
-                self.logger.debug("-> Killswitch cleared")
-            self.subProc = multiprocessing.Process(
-                name=f"{self.name} Driver",
-                target=worker.run,
-                args=self._toSubprocTuple(),
-            )
-            self.subProc.start()
-        return self.getState()
-
-    def stop(self):
-        """Stop the driver."""
-        if not self.killswitch.is_set():
-            self.killswitch.set()
-        if self.subProc is not None and self.subProc.is_alive():
-            self.subProc.join()
-        self.state = "IDLE"
-
-    def toDict(self):
-        """Create a dictionary representation of this driver."""
-        return dict(
-            {
-                "config": self.config,
-                "deviceChannels": tuple(
-                    [channel.toDict() for channel in self.deviceChannels],
-                ),
-                "interruptEndpoint": self.interruptEndpoint,
-                "product": self.product,
-                "productID": self.productID,
-                "manufacturer": self.manufacturer,
-                "name": self.name,
-                "serialNumber": self.serialNumber,
-                "speed": self.speed,
-            }
-        )
+    def __del__(self):
+        """Destructor."""
+        self.stop()
 
     @staticmethod
     def deviceIsSupported(coreDevice):
@@ -327,6 +270,104 @@ class FutabaDeviceDriver:
         endpoint = utils.findInterruptEndpoint(coreDevice)
 
         return endpoint is not None
+
+    @property
+    def frameSize(self):
+        """The frame size is the number of bytes read from the USB device per cycle."""
+        return self.config["frameSize"]
+
+    @property
+    def interruptEndpoint(self):
+        """The interrupt endpoint for the device."""
+        return int(self.deviceInfo["interruptEndpoint"])
+
+    @property
+    def manufacturer(self):
+        """The manufacturer of the device."""
+        return self.deviceInfo["manufacturer"]
+
+    @property
+    def model(self):
+        """The product name/model of the device."""
+        return self.name
+
+    @property
+    def name(self):
+        """The name that the virtual device will show up as to the operating system."""
+        return f"Futaba {self.deviceInfo['product']}({self.endpoint})"
+
+    @property
+    def productName(self):
+        """The product name/model of the device."""
+        return self.deviceInfo["product"]
+
+    @property
+    def productID(self):
+        """The product ID is a unique number assigned to vendors by the governing body."""
+        return self.deviceInfo["productID"]
+
+    @property
+    def serialNumber(self):
+        """The serial number of the device."""
+        return self.deviceInfo["serialNumber"]
+
+    @property
+    def speed(self):
+        """USB generation speed supported by the device."""
+        return self.deviceInfo["speed"]
+
+    def getState(self):
+        """Get the current state of the driver.
+
+        Returns:
+            string: The current state of the driver.
+
+        """
+        if self.subProc is not None and self.subProc.is_alive():
+            self.state = DeviceState.RUNNING
+        else:
+            self.state = DeviceState.STOPPED
+        return self.state
+
+    def start(self):
+        """Start the driver if it is not running."""
+        if self.getState() != DeviceState.RUNNING:
+            if self.killswitch.is_set():
+                self.killswitch.clear()
+                self.logger.debug("-> Killswitch cleared")
+
+            self.subProc = multiprocessing.Process(
+                name=f"{self.name} Driver",
+                target=worker.run,
+                args=self._toSubprocTuple(),
+            )
+            self.subProc.start()
+
+        return self.getState()
+
+    def stop(self):
+        """Stop the driver."""
+        if not self.killswitch.is_set():
+            self.killswitch.set()
+        if self.subProc is not None and self.subProc.is_alive():
+            self.subProc.join()
+        self.state = DeviceState.STOPPED
+
+    def toDict(self):
+        """Create a dictionary representation of this driver."""
+        return dict(
+            {
+                "config": self.config,
+                "deviceChannels": len(self.deviceChannels),
+                "interruptEndpoint": self.interruptEndpoint,
+                "product": self.productName,
+                "productID": self.productID,
+                "manufacturer": self.manufacturer,
+                "name": self.name,
+                "serialNumber": self.serialNumber,
+                "speed": self.speed,
+            }
+        )
 
     def _loadConfig(self, productName):
         """Load the device config.
@@ -427,12 +468,17 @@ class InputChannel:
             outputRange=calibration[1],
             reverse=self.isReversed,
         )
-        self.valueMap = self.calibration.valueMap
+        self._valueMap = self.calibration.valueMap
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
-        self.logger.debug(f"    isReversed: {self.isReversed}")
-        self.logger.debug(
-            f"    calibration memory footprint: {sys.getsizeof(self.calibration)} bytes"
-        )
+        self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
+
+    def __eq__(self, other):
+        """Determine if the input channels are equal."""
+        return self.eventName == other.eventName
+
+    def __hash__(self):
+        """Determine the objects hash."""
+        return hash(self.toDict())
 
     def __str__(self):
         """Create a string representation of this IputChannel."""
@@ -440,7 +486,7 @@ class InputChannel:
 
     def toDict(self):
         """Generate a dictionary representation of this input channel."""
-        return {"eventName": self.eventName, "valueMap": self.valueMap}
+        return {"eventName": self.eventName, "valueMap": self._valueMap}
 
 
 class ChannelCalibration:
@@ -504,25 +550,30 @@ class ChannelCalibration:
             direction of the input. Defaults to False.
 
         """
-        if inputRange is None:
+        if inputRange is None or len(inputRange) != 3:
             inputRange = [
                 utils.DEFAULT_DEVICE_MIN_VAL,
+                utils.DEFAULT_DEVICE_MID_VAL,
                 utils.DEFAULT_DEVICE_MAX_VAL,
             ]
-        if outputRange is None:
-            outputRange = [utils.EVENT_MIN_VAL, utils.EVENT_MAX_VAL]
+        if outputRange is None or len(outputRange) != 3:
+            outputRange = [
+                utils.EVENT_MIN_VAL,
+                utils.EVENT_MID_VAL,
+                utils.EVENT_MAX_VAL,
+            ]
         self.logger = logger
-        self.reverse = reverse
-        self.inputRange = inputRange
-        self.outputRange = outputRange
-        self.valueMap = self._generateValueMap(inputRange, outputRange, self.reverse)
+        self._reverse = reverse
+        self._inputRange = inputRange
+        self._outputRange = outputRange
+        self._valueMap = self._generateValueMap(inputRange, outputRange, self._reverse)
 
         self.logger.debug(f"-= Channel Calibration({inputRange}, {outputRange}) created! =-")
         self.logger.debug("    valueMap:")
-        self.logger.debug(f"        elements: {len(self.valueMap)}")
-        self.logger.debug(f"        unique values: {len(set(self.valueMap))}")
-        self.logger.debug(f"        mem footprint: {sys.getsizeof(self.valueMap)} bytes")
-        self.logger.debug(f"    isReversed: {self.reverse}")
+        self.logger.debug(f"        elements: {len(self._valueMap)}")
+        self.logger.debug(f"        unique values: {len(set(self._valueMap))}")
+        self.logger.debug(f"        mem footprint: {self.memoryFootprint} Kb")
+        self.logger.debug(f"    isReversed: {self._reverse}")
         self.logger.debug(f"    inputRange: {inputRange[2] - inputRange[0]} total elements")
         self.logger.debug(f"        high: {inputRange[2]}")
         self.logger.debug(f"        med: {inputRange[1]}")
@@ -536,13 +587,43 @@ class ChannelCalibration:
             """Create a string representation of this calibration object."""
             return str(
                 {
-                    "reverse": self.reverse,
-                    "inputRange": self.inputRange,
-                    "outputRange": self.outputRange,
-                    "valueMap": f"Generated {len(self.valueMap)} values "
-                    f"consuming{sys.getsizeof(self.valueMap)} bytes of memory",
+                    "reverse": self._reverse,
+                    "inputRange": self._inputRange,
+                    "outputRange": self._outputRange,
+                    "valueMap": f"Generated {len(self._valueMap)} values "
+                    f"consuming{self.memoryFootprint} Kilobytes of memory",
                 },
             )
+
+    @property
+    def inputRange(self):
+        """Get the input range of this calibration."""
+        return self._inputRange
+
+    @property
+    def memoryFootprint(self):
+        """Get the size in Kilobytes of the calibration map.
+
+        Returns:
+            int: The number of kilobytes that the calibration map occupyes in memory
+
+        """
+        return sys.getsizeof(self._valueMap) // 1024  # kb
+
+    @property
+    def outputRange(self):
+        """Get the output range of this calibration."""
+        return self._outputRange
+
+    @property
+    def reverse(self):
+        """Determine whether or not the calibration array should be generate backwards."""
+        return self._reverse
+
+    @property
+    def valueMap(self):
+        """The calibrated value map."""
+        return self._valueMap
 
     @staticmethod
     def _generateValueMap(inputRange, outputRange, reverse=False):
@@ -551,14 +632,14 @@ class ChannelCalibration:
         Args:
             inputRange (list, optional): This determines the size of the map.
             Defaults to [600, 3500].
-            outputRange (list, optional): This determines what values are
-            generated in the map. Defaults to [0, 32768].
-            reverse (bool, optional): If set to true the map will be generated
-            backwards. This will reverse the direction of the input
+            outputRange (list, optional): This determines what values are generated in the map.
+            Defaults to [0, 32768].
+            reverse (bool, optional): If set to true the map will be generated backwards. This will
+            reverse the direction of the input
 
         Returns:
-            list: A list of all possible output values given the range of input
-            values
+            array: An array of all possible output values which can be interpolated from the range
+            of input values
 
         """
         # Guarantee that we are working with ints
@@ -579,7 +660,7 @@ class ChannelCalibration:
             allPossibleInputValues[i] = i
 
         return array.array(
-            "I",  # int
+            "i",  # int
             np.round(
                 np.interp(
                     allPossibleInputValues,
