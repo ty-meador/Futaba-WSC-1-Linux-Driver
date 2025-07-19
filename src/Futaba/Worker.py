@@ -1,6 +1,16 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # ruff: noqa: PLC0415, C901, PLR0915, PLR0912
 
+from enum import Enum, auto
+
+
+class WorkerCommand(Enum):
+    """Stores various Subproc Command Signals."""
+
+    START = auto()
+    STOP = auto()
+    KILL = auto()
+
 
 ##
 # Disabled mccabe linting as this function is specifically meant to be the
@@ -40,7 +50,8 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
     import uinput
     import usb
 
-    from .. import errors, utils
+    from . import Util as utils
+    from .Error import DeviceNotFoundError
 
     coreDevice = None
     logger = utils.newLogger(f"{name}_subproc")
@@ -48,7 +59,7 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
     coreDevice = utils.getCoreDevice(interruptEndpoint)
 
     if coreDevice is None:
-        raise errors.DeviceNotFoundError
+        raise DeviceNotFoundError
 
     # Set realtime priority at the start of the process
     try:
@@ -87,7 +98,8 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
     logger.debug("virtual device set up")
     channelEventsMap = tuple(reversed(channelEventsMap))
     channelData = [0] * len(deviceChannels)
-    rawValues = [0] * len(deviceChannels)
+    # rawValues = [0] * len(deviceChannels)
+    rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
     killswitchIsSet = killswitch.is_set
@@ -126,7 +138,6 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
                 elif rawValue < 0:
                     rawValue = 0
                 # Extract calibrated value from map
-                rawValues[channel] = rawValue
                 channelData[channel] = valueMap[rawValue]
             # channelData.reverse()
 
