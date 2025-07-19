@@ -49,7 +49,7 @@ class FutabaDeviceDriver:
 
         self.config = self._loadConfig(self.productName)
         self.deviceChannels = [
-            InputChannel(self.logger, eventName, calibration, False)
+            InputChannel(eventName, calibration, False, logger=self.logger)
             for eventName, calibration in zip(
                 self.config["channel_events"],
                 self._loadCalibration(self.productName),
@@ -288,31 +288,30 @@ class FutabaDeviceDriver:
         )
 
 
+@dataclass(frozen=True)
 class InputChannel:
     """Provides a class based representation of a single input channel."""
 
-    def __init__(self, logger, eventName, calibration, reverseInputs=False):
-        """Create an InputChannel object.
+    eventName: str
+    calibrationRanges: object
+    isReversed: bool = False
+    logger: object = field(default_factory=lambda: utils.newLogger("InputChannel"))
+    valueMap: array.array = field(default_factory=lambda: [])
 
-        Args:
-            logger (logging.Logger): The logger for the class to use
-            eventName (str): Any valid uinput event
-            calibration (ChannelCalibration): A calibration object used to
-            calibrate this input channel
-            reverseInputs (bool, optional): If true the value map will be
-            generated in reverse to reverse the inputs. Defaults to False.
-
-        """
-        self.logger = logger
-        self.eventName = eventName
-        self.isReversed = reverseInputs
-        self.calibration = ChannelCalibration(
-            logger=logger,
-            inputRange=calibration[0],
-            outputRange=calibration[1],
-            reverse=self.isReversed,
+    def __post_init__(self):
+        """Instantiate our ChannelCalibration object."""
+        object.__setattr__(
+            self,
+            "calibration",
+            ChannelCalibration(
+                logger=self.logger,
+                inputRange=self.calibrationRanges[0],
+                outputRange=self.calibrationRanges[1],
+                reverse=self.isReversed,
+            ),
         )
-        self._valueMap = self.calibration.valueMap
+        object.__setattr__(self, "valueMap", self.calibration.valueMap)
+
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
         self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
 
@@ -324,13 +323,9 @@ class InputChannel:
         """Determine the objects hash."""
         return hash(self.toDict())
 
-    def __str__(self):
-        """Create a string representation of this IputChannel."""
-        return self.eventName
-
     def toDict(self):
         """Generate a dictionary representation of this input channel."""
-        return {"eventName": self.eventName, "valueMap": self._valueMap}
+        return {"eventName": self.eventName, "valueMap": self.valueMap}
 
 
 @dataclass(frozen=True)
@@ -408,7 +403,7 @@ class ChannelCalibration:
 
     logger: object = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
-    valueMap: object = field(init=False, repr=False)
+    valueMap: array.array = field(init=False, repr=False)
 
     def __post_init__(self):
         """Generate the calibration mapping array."""
@@ -425,14 +420,13 @@ class ChannelCalibration:
         object.__setattr__(self, "valueMap", valueMap)
         object.__setattr__(self, "inputRange", inputRange)
         object.__setattr__(self, "outputRange", outputRange)
-
-        memoryFootprint = sys.getsizeof(valueMap) // 1024  # kb
+        object.__setattr__(self, "valueMapSize", sys.getsizeof(valueMap) // 1024)  # kb
 
         logger.debug(f"-= Channel Calibration({inputRange}, {outputRange}) created! =-")
         logger.debug("    valueMap:")
         logger.debug(f"        elements: {len(valueMap)}")
         logger.debug(f"        unique values: {len(set(valueMap))}")
-        logger.debug(f"        mem footprint: {memoryFootprint} Kb")
+        logger.debug(f"        mem footprint: {self.valueMapSize} Kb")
         logger.debug(f"    isReversed: {reverse}")
         logger.debug(f"    inputRange: {inputRange[2] - inputRange[0]} total elements")
         logger.debug(f"        high: {inputRange[2]}")
