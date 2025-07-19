@@ -5,7 +5,7 @@ from enum import Enum, auto
 
 
 class WorkerCommand(Enum):
-    """Stores various Subproc Command Signals."""
+    """Stores various worker commmand signals"""
 
     START = auto()
     STOP = auto()
@@ -17,7 +17,7 @@ class WorkerCommand(Enum):
 # target of a separate process. As such the function is more complex and
 # contains more statments that would otherwise be tolerated
 ##
-def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
+def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
     """Start a worker for the given device with the given settings.
 
     This is meant to be run in a seperate process via
@@ -46,11 +46,13 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
 
     """
     import os
+    from time import sleep
 
     import uinput
     import usb
 
     from . import Util as utils
+    from .Driver import DriverState
     from .Error import DeviceNotFoundError
 
     coreDevice = None
@@ -86,8 +88,6 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
         strict=True,
     )
 
-    logger.debug("maps created")
-
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
         tuple([event + (0, utils.EVENT_MAX_VAL, 0, 0) for event in channelEventsMap]),
@@ -95,25 +95,51 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
         vendor=utils.FUTABA_VENDOR_ID,
     )
 
-    logger.debug("virtual device set up")
+    ##
+    # Cache all attribute lookups to maximize main loop performance.
+    # (See "Attributes Lookup" section in docstring above)
+    ##
     channelEventsMap = tuple(reversed(channelEventsMap))
-    channelData = [0] * len(deviceChannels)
-    # rawValues = [0] * len(deviceChannels)
+    rawValues = [0] * len(deviceChannels)
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
     killswitchIsSet = killswitch.is_set
+    poll = pipe.poll
     readDevice = coreDevice.read
-    synchronize = virtualDevice.syn
+    recv = pipe.recv
+    send = pipe.send
+    (
+        RUNNING,
+        STOPPED,
+        INITIALIZING,
+    ) = DriverState
 
     if coreDevice.is_kernel_driver_active(0):
         coreDevice.detach_kernel_driver(0)
     coreDevice.set_configuration()
 
+    state = RUNNING
     logger.info(f"Driver started: {interruptEndpoint} -> {name}")
+
     # -- MAIN LOOP --
     while not killswitchIsSet():
         try:
+            # Check for command/control messages before we do anythying else
+            if poll():
+                msg = recv()
+                if msg == WorkerCommand.START:
+                    state = RUNNING
+                elif msg == WorkerCommand.STOP:
+                    state = STOPPED
+
+            # Prevent busy waiting if we aren't actively running
+            if state != RUNNING:
+                sleep(0.01)
+                continue
+
+            ## RUNNING ##
+
             # - The transmitter may not send a new frame if the inputs remain
             # static, causing read() to block until timeout
             # - When frames are actively being sent, timeout length has no performance
@@ -138,15 +164,12 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint):
                 elif rawValue < 0:
                     rawValue = 0
                 # Extract calibrated value from map
-                channelData[channel] = valueMap[rawValue]
-            # channelData.reverse()
-
-            # # Queue one event for each channel
-            for data, event in zip(channelData, channelEventsMap, strict=True):
-                emit(event, data, syn=False)
-
-            # fire all queued events
-            synchronize()
+                rawValues[channel] = rawValue
+                emit(  # Pass our calibrated input to the virtual device
+                    channelEventsMap[channel],
+                    valueMap[rawValue],
+                    syn=True,
+                )
         except usb.core.USBTimeoutError:
             pass
         except KeyboardInterrupt:
