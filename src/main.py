@@ -47,7 +47,7 @@ def cliMode(args):
         RuntimeError: Raised if the specified device cannot be found
 
     """
-    manager = Futaba.FutabaDeviceManager()
+    manager = Futaba.DeviceManager()
 
     device = None
     if args.endpoint is not None:
