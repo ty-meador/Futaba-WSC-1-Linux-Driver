@@ -56,7 +56,7 @@ class FutabaDeviceDriver:
                 strict=True,  # 1 event name and 1 calibration per channel
             )
         ]
-        self.front_pipe, self.back_pipe = multiprocessing.Pipe()
+        self.frontPipe, self.backPipe = multiprocessing.Pipe()
         atexit.register(self.stop)
 
     def __eq__(self, other):
@@ -284,6 +284,7 @@ class FutabaDeviceDriver:
                 [channel.toDict() for channel in self.deviceChannels],
                 self.name,
                 self.interruptEndpoint,
+                self.backPipe,
             ]
         )
 
