@@ -100,7 +100,7 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
     # (See "Attributes Lookup" section in docstring above)
     ##
     channelEventsMap = tuple(reversed(channelEventsMap))
-    rawValues = [0] * len(deviceChannels)
+    # rawValues = [0] * len(deviceChannels) # For main process communication
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
@@ -119,10 +119,15 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
         coreDevice.detach_kernel_driver(0)
     coreDevice.set_configuration()
 
-    state = RUNNING
     logger.info(f"Driver started: {interruptEndpoint} -> {name}")
 
     # -- MAIN LOOP --
+    # - Runs until main process sets the killswitch event
+    # - If WorkerCommand.STOP is received on the provided duplex pipe, the USB inputs will
+    # NOT be processed
+    # - If WorkerCommand.START is received on the provided duplex pipe, the USB inputs WILL
+    # be processsed
+    state = RUNNING
     while not killswitchIsSet():
         try:
             # Check for command/control messages before we do anythying else
@@ -163,8 +168,6 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
                 # the minimum value from that
                 elif rawValue < 0:
                     rawValue = 0
-                # Extract calibrated value from map
-                rawValues[channel] = rawValue
                 emit(  # Pass our calibrated input to the virtual device
                     channelEventsMap[channel],
                     valueMap[rawValue],
