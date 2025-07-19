@@ -168,6 +168,10 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
                 # the minimum value from that
                 elif rawValue < 0:
                     rawValue = 0
+
+                # Send data back to main process for calibration process,
+                # monitoring, benchmarking,etc etc
+                # send(rawData, valueMap[rawValue])
                 emit(  # Pass our calibrated input to the virtual device
                     channelEventsMap[channel],
                     valueMap[rawValue],
