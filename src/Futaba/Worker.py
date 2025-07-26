@@ -90,7 +90,9 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
 
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
-        tuple([event + (0, utils.EVENT_MAX_VAL, 0, 0) for event in channelEventsMap]),
+        tuple(
+            [event + (utils.EVENT_MIN_VAL, utils.EVENT_MAX_VAL, 0, 0) for event in channelEventsMap]
+        ),
         name,
         vendor=utils.FUTABA_VENDOR_ID,
     )

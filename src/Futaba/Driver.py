@@ -289,15 +289,17 @@ class FutabaDeviceDriver:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InputChannel:
     """Provides a class based representation of a single input channel."""
 
     eventName: str
-    calibrationRanges: object
+    calibrationRange: object
+
     isReversed: bool = False
     logger: object = field(default_factory=lambda: utils.newLogger("InputChannel"))
     valueMap: array.array = field(default_factory=lambda: [])
+    calibration: "ChannelCalibration" = None
 
     def __post_init__(self):
         """Instantiate our ChannelCalibration object."""
@@ -306,8 +308,7 @@ class InputChannel:
             "calibration",
             ChannelCalibration(
                 logger=self.logger,
-                inputRange=self.calibrationRanges[0],
-                outputRange=self.calibrationRanges[1],
+                inputRange=self.calibrationRange,
                 reverse=self.isReversed,
             ),
         )
@@ -329,7 +330,7 @@ class InputChannel:
         return {"eventName": self.eventName, "valueMap": self.valueMap}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChannelCalibration:
     """Provides a class based representation of a single channels calibration.
 
@@ -383,7 +384,7 @@ class ChannelCalibration:
 
     """
 
-    # The exat number of steps we expect the input and ouput ranges to contain
+    # The exact number of steps we expect the input and ouput ranges to contain
     RANGE_STEP_COUNT = 3
 
     inputRange: typing.Iterable = field(
@@ -405,6 +406,7 @@ class ChannelCalibration:
     logger: object = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
     valueMap: array.array = field(init=False, repr=False)
+    valueMapSize: int = field(init=False, repr=False)
 
     def __post_init__(self):
         """Generate the calibration mapping array."""
