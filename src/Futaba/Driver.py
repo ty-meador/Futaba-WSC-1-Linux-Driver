@@ -443,9 +443,9 @@ class ChannelCalibration:
 
         Args:
             inputRange (list, optional): This determines the size of the map.
-            Defaults to [704, 2048, 3392].
+            Defaults to utils.DEFAULT_INPUT_RANGE.
             outputRange (list, optional): This determines what values are generated in the map.
-            Defaults to [-32767, 0, 32767].
+            Defaults to utils.DEFAULT_OUTPUT_RANGE.
             reverse (bool, optional): If set to true the map will be generated backwards. This will
             reverse the direction of the input
 
