@@ -20,6 +20,7 @@ class DriverState(Enum):
 
     RUNNING = auto()
     STOPPED = auto()
+    SUSPENDED = auto()
     INITIALIZING = auto()
 
 
@@ -46,6 +47,7 @@ class FutabaDeviceDriver:
         self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
         self.subProc = None
         self.killswitch = multiprocessing.Event()
+        self.runFlag = multiprocessing.Event()
 
         self.config = self._loadConfig(self.productName)
         self.deviceChannels = [
@@ -168,7 +170,10 @@ class FutabaDeviceDriver:
 
         """
         if self.subProc is not None and self.subProc.is_alive():
-            self.state = DriverState.RUNNING
+            if self.runFlag.is_set():
+                self.state = DriverState.RUNNING
+            else:
+                self.state = DriverState.SUSPENDED
         else:
             self.state = DriverState.STOPPED
         return self.state
@@ -179,6 +184,9 @@ class FutabaDeviceDriver:
             if self.killswitch.is_set():
                 self.killswitch.clear()
                 self.logger.debug("-> Killswitch cleared")
+            if not self.runFlag.is_set():
+                self.runFlag.set()
+                self.logger.debug("-> runFlag set")
 
             self.subProc = multiprocessing.Process(
                 name=f"{self.name} Driver",
@@ -190,12 +198,17 @@ class FutabaDeviceDriver:
         return self.getState()
 
     def stop(self):
-        """Stop the driver."""
+        """Stop the driver and kill the subprocess."""
         if not self.killswitch.is_set():
             self.killswitch.set()
         if self.subProc is not None and self.subProc.is_alive():
             self.subProc.join()
-        self.state = DriverState.STOPPED
+        self.subProc = None
+
+    def suspend(self):
+        """Suspend the driver without killing the subprocess."""
+        if self.runFlag.is_set():
+            self.runFlag.clear()
 
     def toDict(self):
         """Create a dictionary representation of this driver."""
@@ -280,11 +293,11 @@ class FutabaDeviceDriver:
         return tuple(
             [
                 self.killswitch,
+                self.runFlag,
                 self.config["frame_size"],
                 [channel.toDict() for channel in self.deviceChannels],
                 self.name,
                 self.interruptEndpoint,
-                self.backPipe,
             ]
         )
 
@@ -336,12 +349,12 @@ class ChannelCalibration:
 
     Args:
         logger (logging.Logger): The logger you want this class to use
-        inputRange (iterable of length 2, optional): A list, tuple, or array
-        where the first value is the lowest possible input value and the
-        second value is the highest possible input value. Defaults to None.
-        outputRange (_type_, optional): A list, tuple, or array where the
-        first value is the lowest possible output value and the second value
-        is the highest possible output value. Defaults to None.
+        inputRange (iterable, optional): An iterable of length 3 where each item represents the low,
+        middle, and high point respectively in increasing order.
+        defaults to utils.DEFAULT_INPUT_RANGE
+        outputRange (_type_, optional): An iterable of length 3 where each item represents the low,
+        middle, and high point respectively in increasing order.
+        defaults to utils.DEFAULT_OUTPUT_RANGE
         reverse (bool, optional): If reverse the calibrated values will be
         inserted into the resulting array backwards. This will reverse the
         direction of the input. Defaults to False.
@@ -384,24 +397,8 @@ class ChannelCalibration:
 
     """
 
-    # The exact number of steps we expect the input and ouput ranges to contain
-    RANGE_STEP_COUNT = 3
-
-    inputRange: typing.Iterable = field(
-        default_factory=lambda: [
-            utils.DEFAULT_DEVICE_MIN_VAL,
-            utils.DEFAULT_DEVICE_MID_VAL,
-            utils.DEFAULT_DEVICE_MAX_VAL,
-        ]
-    )
-
-    outputRange: typing.Iterable = field(
-        default_factory=lambda: [
-            utils.EVENT_MIN_VAL,
-            utils.EVENT_MID_VAL,
-            utils.EVENT_MAX_VAL,
-        ]
-    )
+    inputRange: typing.Iterable = field(default_factory=lambda: utils.DEFAULT_INPUT_RANGE)
+    outputRange: typing.Iterable = field(default_factory=lambda: utils.DEFAULT_OUTPUT_RANGE)
 
     logger: object = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
@@ -446,9 +443,9 @@ class ChannelCalibration:
 
         Args:
             inputRange (list, optional): This determines the size of the map.
-            Defaults to [600, 3500].
+            Defaults to [704, 2048, 3392].
             outputRange (list, optional): This determines what values are generated in the map.
-            Defaults to [0, 32768].
+            Defaults to [-32767, 0, 32767].
             reverse (bool, optional): If set to true the map will be generated backwards. This will
             reverse the direction of the input
 
