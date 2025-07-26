@@ -1,7 +1,8 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # ruff: noqa: PLC0415, C901, PLR0915, PLR0912
 
-from enum import Enum, auto, multiprocessing
+import multiprocessing
+from enum import Enum, auto
 
 
 class WorkerCommand(Enum):

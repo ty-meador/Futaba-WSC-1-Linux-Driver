@@ -411,7 +411,7 @@ class ChannelCalibration:
     inputRange: typing.Iterable = field(default_factory=lambda: utils.DEFAULT_INPUT_RANGE)
     outputRange: typing.Iterable = field(default_factory=lambda: utils.DEFAULT_OUTPUT_RANGE)
 
-    logger: logging.logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
+    logger: logging.Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
     valueMap: array.array = field(init=False, repr=False)
     valueMapSize: int = field(init=False, repr=False)
@@ -453,7 +453,7 @@ class ChannelCalibration:
         inputRange: typing.Iterable[int],
         outputRange: typing.Iterable[int],
         reverse: bool = False,
-    ) -> array.array[int]:
+    ) -> array.array:
         """Generate a list of values that maps the input range to the output range.
 
         Args:
