@@ -5,7 +5,7 @@ from enum import Enum, auto
 
 
 class WorkerCommand(Enum):
-    """Stores various worker commmand signals"""
+    """Stores various worker commmand signals."""
 
     START = auto()
     STOP = auto()
@@ -17,7 +17,7 @@ class WorkerCommand(Enum):
 # target of a separate process. As such the function is more complex and
 # contains more statments that would otherwise be tolerated
 ##
-def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
+def run(killswitch, runFlag, frameSize, deviceChannels, name, interruptEndpoint):
     """Start a worker for the given device with the given settings.
 
     This is meant to be run in a seperate process via
@@ -52,16 +52,16 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
     import usb
 
     from . import Util as utils
-    from .Driver import DriverState
     from .Error import DeviceNotFoundError
 
-    coreDevice = None
     logger = utils.newLogger(f"{name}_subproc")
-    logger.debug("Subprocess started")
-    coreDevice = utils.getCoreDevice(interruptEndpoint)
 
+    coreDevice = None
+    coreDevice = utils.getCoreDevice(interruptEndpoint)
     if coreDevice is None:
         raise DeviceNotFoundError
+
+    logger.debug("Subprocess started")
 
     # Set realtime priority at the start of the process
     try:
@@ -90,7 +90,18 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
 
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
-        tuple([event + (0, utils.EVENT_MAX_VAL, 0, 0) for event in channelEventsMap]),
+        tuple(
+            [
+                event
+                + (
+                    utils.EVENT_MIN_VAL,
+                    utils.EVENT_MAX_VAL,
+                    0,  # Deadzone - What do we look like, Spektrum?
+                    0,  # Fuzz (Noise tolerance) - Again, this is Futaba. WHAT NOSIE???
+                )
+                for event in channelEventsMap
+            ]
+        ),
         name,
         vendor=utils.FUTABA_VENDOR_ID,
     )
@@ -100,20 +111,11 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
     # (See "Attributes Lookup" section in docstring above)
     ##
     channelEventsMap = tuple(reversed(channelEventsMap))
-    # rawValues = [0] * len(deviceChannels) # For main process communication
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
     killswitchIsSet = killswitch.is_set
-    poll = pipe.poll
     readDevice = coreDevice.read
-    recv = pipe.recv
-    send = pipe.send
-    (
-        RUNNING,
-        STOPPED,
-        INITIALIZING,
-    ) = DriverState
 
     if coreDevice.is_kernel_driver_active(0):
         coreDevice.detach_kernel_driver(0)
@@ -123,28 +125,15 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
 
     # -- MAIN LOOP --
     # - Runs until main process sets the killswitch event
-    # - If WorkerCommand.STOP is received on the provided duplex pipe, the USB inputs will
-    # NOT be processed
-    # - If WorkerCommand.START is received on the provided duplex pipe, the USB inputs WILL
-    # be processsed
-    state = RUNNING
+    # - if runFlag is not set then inputs will not be processed
     while not killswitchIsSet():
         try:
-            # Check for command/control messages before we do anythying else
-            if poll():
-                msg = recv()
-                if msg == WorkerCommand.START:
-                    state = RUNNING
-                elif msg == WorkerCommand.STOP:
-                    state = STOPPED
-
             # Prevent busy waiting if we aren't actively running
-            if state != RUNNING:
+            if not runFlag.is_set():
                 sleep(0.01)
                 continue
 
             ## RUNNING ##
-
             # - The transmitter may not send a new frame if the inputs remain
             # static, causing read() to block until timeout
             # - When frames are actively being sent, timeout length has no performance
@@ -159,19 +148,14 @@ def run(killswitch, frameSize, deviceChannels, name, interruptEndpoint, pipe):
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
                 rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
-                # Avoid overflows and underflows
-                # account for off-by-one
-                maxInputVal = len(valueMap) - 1
+
+                # Avoid index OOB errors
+                maxInputVal = len(valueMap) - 1  # account for off-by-one
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
-                # calibration map will always have an index 0, so we pull
-                # the minimum value from that
                 elif rawValue < 0:
                     rawValue = 0
 
-                # Send data back to main process for calibration process,
-                # monitoring, benchmarking,etc etc
-                # send(rawData, valueMap[rawValue])
                 emit(  # Pass our calibrated input to the virtual device
                     channelEventsMap[channel],
                     valueMap[rawValue],
