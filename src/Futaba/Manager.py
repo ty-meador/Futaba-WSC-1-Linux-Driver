@@ -1,6 +1,7 @@
 """Module provides a simple interface to spawn and manage multiple Futaba RC to USB adapters."""
 
 import atexit
+import typing
 
 import usb
 
@@ -12,7 +13,7 @@ from .Error import DeviceNotFoundError
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
 
-    def __init__(self, debugMode=False):
+    def __init__(self, debugMode: bool = False) -> None:
         """Create an object that manages Futaba drivers.
 
         Raises:
@@ -26,7 +27,7 @@ class FutabaDeviceManager:
         atexit.register(self.stopAll)
 
     @property
-    def futabaDevices(self):
+    def futabaDevices(self) -> typing.Iterable[FutabaDeviceDriver]:
         """A tuple of supported Futaba devices."""
         return tuple(
             [
@@ -36,7 +37,7 @@ class FutabaDeviceManager:
             ]
         )
 
-    def findDevice(self, endpoint=None):
+    def findDevice(self, endpoint: int = None) -> int or None:
         """Find the Futaba device that has the provided endpoint.
 
         Args:
@@ -52,7 +53,7 @@ class FutabaDeviceManager:
             return self._findDeviceByEndpoint(endpoint)
         return None
 
-    def getDeviceStatus(self, deviceIndex):
+    def getDeviceStatus(self, deviceIndex: int) -> DriverState or False:
         """Get the status of the device at the given index.
 
         Args:
@@ -68,21 +69,24 @@ class FutabaDeviceManager:
             self.logger.warning(e)
             return False
 
-    def listDevices(self):
+    def listDevices(self) -> typing.Iterable(dict):
         """Get an ordered list of available devices.
 
         Returns:
-            tuple of string: Ordered list of available devices
+            deviceList typing.Iterable[dict]: A list of available devices.
 
         """
         return [{"key": i, **device.toDict()} for i, device in enumerate(self.futabaDevices)]
 
-    def start(self, deviceIndex):
+    def start(self, deviceIndex: int) -> typing.Iterable(dict):
         """Start the devices at the given indexes.
 
         Args:
             deviceIndex (int or list of int, optional): The devices you want to
             start. Defaults to [].
+
+        Returns:
+            deviceList typing.Iterable[dict]: A list of available devices.
 
         """
         self.logger.debug(f"Attempting to start device at index[s] {deviceIndex}")
@@ -108,12 +112,15 @@ class FutabaDeviceManager:
 
         return self.listDevices()
 
-    def stop(self, deviceIndex):
+    def stop(self, deviceIndex: int) -> typing.Iterable(dict):
         """Stop the devices at the given indexes.
 
         Args:
             deviceIndex (int or list of int, optional): The devices you want to
             stop. Defaults to [].
+
+        Returns:
+            deviceList typing.Iterable[dict]: A list of available devices.
 
         """
         try:
@@ -126,8 +133,13 @@ class FutabaDeviceManager:
             self.logger.warning(e)
         return self.listDevices()
 
-    def stopAll(self):
-        """Stop all running drivers."""
+    def stopAll(self) -> typing.Iterable(dict):
+        """Stop all running drivers.
+
+        Returns:
+            deviceList typing.Iterable[dict]: A list of available devices.
+
+        """
         try:
             for device in self.futabaDevices:
                 device.stop()
@@ -136,7 +148,7 @@ class FutabaDeviceManager:
         return self.listDevices()
 
     @staticmethod
-    def _deviceIsRunning(futabaDeviceDriver):
+    def _deviceIsRunning(futabaDeviceDriver: FutabaDeviceDriver) -> DriverState:
         """Determine if the provided driver is currently running or not.
 
         Args:
@@ -148,7 +160,7 @@ class FutabaDeviceManager:
         """
         return futabaDeviceDriver.getState() == DriverState.RUNNING
 
-    def _findDeviceByEndpoint(self, endpoint):
+    def _findDeviceByEndpoint(self, endpoint: int) -> usb.core.Device or None:
         """Find which device has the given endpoint.
 
         Args:
