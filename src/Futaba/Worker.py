@@ -25,7 +25,7 @@ def run(
     deviceChannels: dict,
     name: str,
     interruptEndpoint: int,
-):
+) -> None:
     """Start a worker for the given device with the given settings.
 
     This is meant to be run in a seperate process via
