@@ -1,5 +1,4 @@
 {
-    "frame_size": 16,
     "channel_events": [
         "ABS_X",
         "ABS_Y",
@@ -9,5 +8,8 @@
         "ABS_RUDDER",
         "ABS_TILT_X",
         "ABS_TILT_Y"
-    ]
+    ],
+    "dead_zone": 0,
+    "frame_size": 16,
+    "noise_filter": 0
 }

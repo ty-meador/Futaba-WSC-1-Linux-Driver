@@ -5,6 +5,7 @@ import multiprocessing
 from enum import Enum, auto
 
 from .InputChannel import ChannelDict
+from .Util import DeviceConfig
 
 
 class WorkerCommand(Enum):
@@ -23,7 +24,7 @@ class WorkerCommand(Enum):
 def run(
     killswitch: multiprocessing.Event,
     runFlag: multiprocessing.Event,
-    frameSize: int,
+    deviceConfig: DeviceConfig,
     deviceChannels: list[ChannelDict],
     name: str,
     interruptEndpoint: int,
@@ -36,7 +37,7 @@ def run(
     Args:
         killswitch (multiprocessing.Event): This worker will run an infinite loop until this event
         is set.
-        runFlag (multiprocessing.Event): This worker will process device inputs only if this is set.
+        runFlag (multiprocessing.Event): This worker will process device inputs if this is set.
         frameSize (int): The number of bytes to request from the usb device at one time.
         deviceChannels (list[ChannelDict]) a tuple where each value contained is a calibrated value
         map for its corresponding channel.
@@ -49,7 +50,7 @@ def run(
         The optimization works because:
 
         - Attribute lookups (like obj.method) generate LOAD_ATTR bytecode instructions that are
-        slower than LOAD_FAST instructions used for local variables
+        slower than the LOAD_FAST instructions that are used for local variables.
         - By storing method references in local variables before the loop, the interpreter uses
         faster local variable access instead of attribute resolution
         - This reduces the number of bytecode instructions and eliminates repeated attribute
@@ -98,7 +99,10 @@ def run(
         ],
         strict=True,
     )
-
+    noiseFilter = (
+        deviceConfig.noiseFilter if deviceConfig.noiseFilter else utils.DEFAULT_NOISE_FILTER
+    )
+    deadZone = deviceConfig.deadZone if deviceConfig.deadZone else utils.DEFAULT_DEADZONE
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
         tuple(
@@ -107,8 +111,8 @@ def run(
                 + (
                     utils.EVENT_MIN_VAL,
                     utils.EVENT_MAX_VAL,
-                    0,  # Deadzone - What do we look like, Spektrum?
-                    0,  # Fuzz (Noise tolerance) - Again, this is Futaba. WHAT NOSIE???
+                    deadZone,
+                    noiseFilter,
                 )
                 for event in channelEventsMap
             ]
@@ -121,6 +125,8 @@ def run(
     # Cache all attribute lookups to maximize main loop performance.
     # (See "Attributes Lookup" section in docstring above)
     ##
+    frameSize = deviceConfig.frameSize
+
     channelEventsMap = tuple(reversed(channelEventsMap))
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
