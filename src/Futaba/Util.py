@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+from dataclasses import dataclass
 from logging import handlers
 from pathlib import Path
 
@@ -14,6 +15,20 @@ DEFAULT_LOG_HANDLER: logging.handlers.RotatingFileHandler = handlers.RotatingFil
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
 )
+
+##
+# Futaba makes prescision electronics. However, if you have an aging device, these values may need
+# to be increased.
+##
+
+# You may want to increase this value if:
+# - You are experiencing "cross talk" between channels
+# - A channel is drifting/hovering around a static input
+DEFAULT_NOISE_FILTER: int = 0
+# You may want to increase this value if:
+# - Your inputs have any "joystick drift"
+# - Leaving the neutral position is too sensitive
+DEFAULT_DEADZONE: int = 0
 
 ##
 # Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
@@ -41,8 +56,8 @@ DEFAULT_OUTPUT_RANGE: tuple[int, int, int] = tuple(
 )
 
 FUTABA_VENDOR_ID: int = 4104  # 0x1008
-INTERRUPT_ENDPOINT_ATTRIBUTE: hex = 0x3  # conincidence
 HID_INTERFACE: hex = 0x3  # conincidence
+INTERRUPT_ENDPOINT_ATTRIBUTE: hex = 0x3  # conincidence
 
 
 DEFAULT_CONFIG: dict = {
@@ -276,3 +291,13 @@ def newLogger(
     logger.setLevel(level)
     logger.addHandler(handler)
     return logger
+
+
+@dataclass(frozen=True, slots=True)
+class DeviceConfig:
+    """Stores the configuration settings for a single device."""
+
+    channelEvents: list[str]
+    deadZone: int = DEFAULT_DEADZONE
+    frameSize: int = 16
+    noiseFilter: int = 0

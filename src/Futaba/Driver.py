@@ -25,6 +25,9 @@ class DriverState(Enum):
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device."""
 
+    ##
+    # Magic Methods
+    ##
     def __init__(self, device: usb.core.Device) -> None:
         """Create an object that drives a single device on it's own process.
 
@@ -88,6 +91,9 @@ class FutabaDeviceDriver:
         """Destructor."""
         self.stop()
 
+    ##
+    # Static Methods
+    ##
     @staticmethod
     def deviceIsSupported(coreDevice: usb.core.Device) -> bool:
         """Determine if the device is compatable with this driver class.
@@ -115,6 +121,18 @@ class FutabaDeviceDriver:
 
         return endpoint is not None
 
+    ##
+    # Class Properties
+    ##
+    @property
+    def deadZone(self) -> int:
+        """The size of the dead zone for the device.
+
+        Returns:
+            int: The size of the dead zone for the device
+        """
+        return self.config["dead_zone"]
+
     @property
     def frameSize(self) -> int:
         """The frame size is the number of bytes read from the USB device per cycle."""
@@ -141,6 +159,15 @@ class FutabaDeviceDriver:
         return f"Futaba {self.deviceInfo['product']}({self.endpoint})"
 
     @property
+    def noiseFilter(self) -> int:
+        """The minimum input change necessary trigger an output change.
+
+        Returns:
+            int: The noise filter value.
+        """
+        return self.config["noise_filter"]
+
+    @property
     def productName(self) -> str:
         """The product name/model of the device."""
         return self.deviceInfo["product"]
@@ -160,6 +187,9 @@ class FutabaDeviceDriver:
         """USB generation speed supported by the device."""
         return self.deviceInfo["speed"]
 
+    ##
+    # Instance Methods
+    ##
     def getState(self) -> DriverState:
         """Get the current state of the driver.
 
@@ -224,6 +254,9 @@ class FutabaDeviceDriver:
             }
         )
 
+    ##
+    # Private Methods
+    ##
     def _loadConfig(self, productName: str) -> dict[str, Any]:
         """Load the device config.
 
@@ -303,7 +336,12 @@ class FutabaDeviceDriver:
             [
                 self.killswitch,
                 self.runFlag,
-                self.frameSize,
+                utils.DeviceConfig(
+                    channelEvents=self.config["channel_events"],
+                    deadZone=self.config["dead_zone"],
+                    frameSize=self.config["frame_size"],
+                    noiseFilter=self.config["noise_filter"],
+                ),
                 tuple([channel.toDict() for channel in self.deviceChannels]),
                 self.name,
                 self.interruptEndpoint,
