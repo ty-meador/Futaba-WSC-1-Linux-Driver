@@ -9,12 +9,13 @@ import sys
 import typing
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from typing import Any
 
 import numpy as np
 import usb
 
+from . import FutabaDeviceDriver, Worker
 from . import Util as utils
-from . import Worker
 
 
 class DriverState(Enum):
@@ -63,7 +64,7 @@ class FutabaDeviceDriver:
         self.frontPipe, self.backPipe = multiprocessing.Pipe()
         atexit.register(self.stop)
 
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other: FutabaDeviceDriver) -> bool:
         """Compare one drivers interrupt endpoint address with the other.
 
         Args:
@@ -168,7 +169,7 @@ class FutabaDeviceDriver:
         """Get the current state of the driver.
 
         Returns:
-            string: The current state of the driver.
+            DriverState: The current state of the driver.
 
         """
         if self.subProc is not None and self.subProc.is_alive():
@@ -212,7 +213,7 @@ class FutabaDeviceDriver:
         if self.runFlag.is_set():
             self.runFlag.clear()
 
-    def toDict(self) -> dict:
+    def toDict(self) -> dict[str, Any]:
         """Create a dictionary representation of this driver."""
         return dict(
             {
@@ -228,10 +229,13 @@ class FutabaDeviceDriver:
             }
         )
 
-    def _loadConfig(self, productName: str) -> dict:
+    def _loadConfig(self, productName: str) -> dict[str, Any]:
         """Load the device config.
 
         Load the device config and fall back to the default config file if one doesn't exist.
+
+        Args:
+            productName (str): The name of the product to load the config for.
 
         Returns:
             dict: A dictionary containing the driver settings
@@ -255,16 +259,15 @@ class FutabaDeviceDriver:
         self.logger.debug(f"config={config}")
         return config
 
-    def _loadCalibration(self, productName: str) -> dict:
+    def _loadCalibration(self, productName: str) -> list[list[int]]:
         """Load the calibration file for the given product.
 
         Args:
-            productName (str, optional): The name of the product to load the
+            productName (str): The name of the product to load the
             calibration for. Defaults to None.
 
         Returns:
-            list of list: Each inner list will contain exactly 2 items, each of
-            which are lists.
+            list of list: Each inner list will contain calibration data for a channel.
 
         """
         filePath = os.path.join(utils.CALIBRATION_PATH, f"{productName}.json")
@@ -291,7 +294,7 @@ class FutabaDeviceDriver:
         multiprocessing.Event,  # Killswitch
         multiprocessing.Event,  # runFlag
         int,  # frameSize
-        list,  # device Channels
+        list[dict[str, Any]],  # device Channels
         str,  # name
         int,  # interrupt endpoint
     ]:
@@ -305,7 +308,7 @@ class FutabaDeviceDriver:
             [
                 self.killswitch,
                 self.runFlag,
-                self.config["frame_size"],
+                self.frameSize,
                 [channel.toDict() for channel in self.deviceChannels],
                 self.name,
                 self.interruptEndpoint,
@@ -323,7 +326,7 @@ class InputChannel:
     isReversed: bool = False
     logger: object = field(default_factory=lambda: utils.newLogger("InputChannel"))
     valueMap: array.array = field(default_factory=lambda: [])
-    calibration: "ChannelCalibration" = None
+    calibration: "ChannelCalibration" | None = None
 
     def __post_init__(self) -> None:
         """Instantiate our ChannelCalibration object."""
@@ -341,7 +344,7 @@ class InputChannel:
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
         self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
 
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other: "InputChannel") -> bool:
         """Determine if the input channels are equal."""
         return self.eventName == other.eventName
 
@@ -349,7 +352,7 @@ class InputChannel:
         """Determine the objects hash."""
         return hash(self.toDict())
 
-    def toDict(self) -> dict:
+    def toDict(self) -> dict[str, Any]:
         """Generate a dictionary representation of this input channel."""
         return {"eventName": self.eventName, "valueMap": self.valueMap}
 
@@ -360,10 +363,10 @@ class ChannelCalibration:
 
     Args:
         logger (logging.Logger): The logger you want this class to use
-        inputRange (iterable, optional): An iterable of length 3 where each item represents the low,
+        inputRange (typing.Iterable, optional): An iterable of length 3 where each item represents the low,
         middle, and high point respectively in increasing order.
         defaults to utils.DEFAULT_INPUT_RANGE
-        outputRange (_type_, optional): An iterable of length 3 where each item represents the low,
+        outputRange (typing.Iterable, optional): An iterable of length 3 where each item represents the low,
         middle, and high point respectively in increasing order.
         defaults to utils.DEFAULT_OUTPUT_RANGE
         reverse (bool, optional): If reverse the calibrated values will be
@@ -457,15 +460,15 @@ class ChannelCalibration:
         """Generate a list of values that maps the input range to the output range.
 
         Args:
-            inputRange (list, optional): This determines the size of the map.
+            inputRange (typing.Iterable[int]): This determines the size of the map.
             Defaults to utils.DEFAULT_INPUT_RANGE.
-            outputRange (list, optional): This determines what values are generated in the map.
-            Defaults to utils.DEFAULT_OUTPUT_RANGE.
+            outputRange (typing.Iterable[int]): This determines what values are generated in the
+            map. Defaults to utils.DEFAULT_OUTPUT_RANGE.
             reverse (bool, optional): If set to true the map will be generated backwards. This will
             reverse the direction of the input
 
         Returns:
-            array: An array of all possible output values which can be interpolated from the range
+            array.array: An array of all possible output values which can be interpolated from the range
             of input values
 
         """
