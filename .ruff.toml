@@ -46,6 +46,7 @@ select = [
     "PL",
     # pydoc
     "D",
+    "DOC",
     # pycodestyle
     "E",
     "W",
@@ -59,7 +60,7 @@ select = [
     "SIM",
     # isort
     "I",
-    
+
 ]
 ignore = []
 
@@ -69,6 +70,10 @@ unfixable = []
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.pydocstyle]
+# Use Google-style docstrings.
+convention = "google"
 
 [format]
 # Like Black, use double quotes for strings.

@@ -4,6 +4,8 @@
 import multiprocessing
 from enum import Enum, auto
 
+from .InputChannel import ChannelDict
+
 
 class WorkerCommand(Enum):
     """Stores various worker commmand signals."""
@@ -22,7 +24,7 @@ def run(
     killswitch: multiprocessing.Event,
     runFlag: multiprocessing.Event,
     frameSize: int,
-    deviceChannels: dict,
+    deviceChannels: list[ChannelDict],
     name: str,
     interruptEndpoint: int,
 ) -> None:
@@ -36,8 +38,8 @@ def run(
         is set.
         runFlag (multiprocessing.Event): This worker will process device inputs only if this is set.
         frameSize (int): The number of bytes to request from the usb device at one time.
-        deviceChannels (dict): a tuple where each value contained is a calibrated value map
-        for its corresponding channel.
+        deviceChannels (list[ChannelDict]) a tuple where each value contained is a calibrated value
+        map for its corresponding channel.
         name (str): The name the device will show up as.
         interruptEndpoint (int): The usb interrupt endpoint of the device that you want to start a
         driver for.
