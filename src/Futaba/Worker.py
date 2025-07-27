@@ -1,7 +1,10 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # ruff: noqa: PLC0415, C901, PLR0915, PLR0912
 
+import multiprocessing
 from enum import Enum, auto
+
+from .InputChannel import ChannelDict
 
 
 class WorkerCommand(Enum):
@@ -17,7 +20,14 @@ class WorkerCommand(Enum):
 # target of a separate process. As such the function is more complex and
 # contains more statments that would otherwise be tolerated
 ##
-def run(killswitch, runFlag, frameSize, deviceChannels, name, interruptEndpoint):
+def run(
+    killswitch: multiprocessing.Event,
+    runFlag: multiprocessing.Event,
+    frameSize: int,
+    deviceChannels: list[ChannelDict],
+    name: str,
+    interruptEndpoint: int,
+) -> None:
     """Start a worker for the given device with the given settings.
 
     This is meant to be run in a seperate process via
@@ -25,13 +35,14 @@ def run(killswitch, runFlag, frameSize, deviceChannels, name, interruptEndpoint)
 
     Args:
         killswitch (multiprocessing.Event): This worker will run an infinite loop until this event
-        is set
-        frameSize (int): The number of bytes to request from the usb device at one time
-        deviceChannels (tuple of dict): a tuple where each value contained is a calibrated value map
-        for its corresponding channel
-        name (str): The name the device will show up as
+        is set.
+        runFlag (multiprocessing.Event): This worker will process device inputs only if this is set.
+        frameSize (int): The number of bytes to request from the usb device at one time.
+        deviceChannels (list[ChannelDict]) a tuple where each value contained is a calibrated value
+        map for its corresponding channel.
+        name (str): The name the device will show up as.
         interruptEndpoint (int): The usb interrupt endpoint of the device that you want to start a
-        driver for
+        driver for.
 
     NOTE main event loop optimization:
         we initialize a local version of everything that will be used inside the main event loop.

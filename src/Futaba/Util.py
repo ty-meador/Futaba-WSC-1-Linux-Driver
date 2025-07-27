@@ -9,7 +9,7 @@ from pathlib import Path
 
 import usb
 
-DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
+DEFAULT_LOG_HANDLER: logging.handlers.RotatingFileHandler = handlers.RotatingFileHandler(
     "logs.txt",
     maxBytes=5 * 1024 * 1024,  # 5 megabytes
     backupCount=5,
@@ -19,20 +19,20 @@ DEFAULT_LOG_HANDLER = handlers.RotatingFileHandler(
 # Credit to https://github.com/shaozu/Futaba_T16IZ_Linux/blob/main/entry.py
 # for this great starting point!
 ##
-DEFAULT_DEVICE_MIN_VAL = 704
-DEFAULT_DEVICE_MID_VAL = 2048
-DEFAULT_DEVICE_MAX_VAL = 3392
-EVENT_MIN_VAL = -32768
-EVENT_MID_VAL = 0
-EVENT_MAX_VAL = 32767
-DEFAULT_INPUT_RANGE = tuple(
+DEFAULT_DEVICE_MIN_VAL: int = 704
+DEFAULT_DEVICE_MID_VAL: int = 2048
+DEFAULT_DEVICE_MAX_VAL: int = 3392
+EVENT_MIN_VAL: int = -32768
+EVENT_MID_VAL: int = 0
+EVENT_MAX_VAL: int = 32767
+DEFAULT_INPUT_RANGE: tuple[int, int, int] = tuple(
     [
         DEFAULT_DEVICE_MIN_VAL,
         DEFAULT_DEVICE_MID_VAL,
         DEFAULT_DEVICE_MAX_VAL,
     ]
 )
-DEFAULT_OUTPUT_RANGE = tuple(
+DEFAULT_OUTPUT_RANGE: tuple[int, int, int] = tuple(
     [
         EVENT_MIN_VAL,
         EVENT_MID_VAL,
@@ -40,12 +40,12 @@ DEFAULT_OUTPUT_RANGE = tuple(
     ]
 )
 
-FUTABA_VENDOR_ID = 4104  # 0x1008
-INTERRUPT_ENDPOINT_ATTRIBUTE = 0x3  # conincidence
-HID_INTERFACE = 0x3  # conincidence
+FUTABA_VENDOR_ID: int = 4104  # 0x1008
+INTERRUPT_ENDPOINT_ATTRIBUTE: hex = 0x3  # conincidence
+HID_INTERFACE: hex = 0x3  # conincidence
 
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: dict = {
     "frame_size": 16,
     "channel_events": [
         "ABS_X",
@@ -59,7 +59,7 @@ DEFAULT_CONFIG = {
     ],
 }
 
-DEFAULT_CALIBRATION = [
+DEFAULT_CALIBRATION: list = [
     DEFAULT_INPUT_RANGE,
     DEFAULT_INPUT_RANGE,
     DEFAULT_INPUT_RANGE,
@@ -70,7 +70,7 @@ DEFAULT_CALIBRATION = [
     DEFAULT_INPUT_RANGE,
 ]
 
-PRODUCTS = {
+PRODUCTS: dict = {
     "default": 999,
     "WSC-1": 10,
     "T16IZ": 11,
@@ -80,17 +80,14 @@ PRODUCTS = {
 }
 
 
-LOGLEVEL = logging.DEBUG
+LOGLEVEL: int = logging.DEBUG
 DEFAULT_LOG_HANDLER.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
-DEFAULT_LOGGER = logging.getLogger("driver")
+DEFAULT_LOGGER: logging.Logger = logging.getLogger("driver")
 DEFAULT_LOGGER.setLevel(LOGLEVEL)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
 
 
-FUTABA_VENDOR_ID = 4104  # 0x1008
-INTERRUPT_ENDPOINT_ATTRIBUTE = 0x3  # conincidence
-HID_INTERFACE = 0x3  # conincidence
-ROOT_DIR = None
+ROOT_DIR: str | None = None
 # Start from THIS file's directory
 currentFile = Path(__file__).resolve()  # Using resolve to get an absolute path.
 for parent in currentFile.parents:  # Iterate over every parent.
@@ -104,23 +101,26 @@ if ROOT_DIR is None:
         "projects root directory"
     )
 
-SRC_PATH = os.path.join(ROOT_DIR, "src")
-LOG_PATH = os.path.join(ROOT_DIR, "logs")
+SRC_PATH: str = os.path.join(ROOT_DIR, "src")
+LOG_PATH: str = os.path.join(ROOT_DIR, "logs")
 os.makedirs(LOG_PATH, exist_ok=True)
-DRIVER_PATH = os.path.join(SRC_PATH, "Futaba")
-CONFIG_PATH = os.path.join(DRIVER_PATH, "configs")
-CALIBRATION_PATH = os.path.join(DRIVER_PATH, "calibrations")
+DRIVER_PATH: str = os.path.join(SRC_PATH, "Futaba")
+CONFIG_PATH: str = os.path.join(DRIVER_PATH, "configs")
+CALIBRATION_PATH: str = os.path.join(DRIVER_PATH, "calibrations")
 
 
-def findHIDInterface(coreDevice):
+def findHIDInterface(coreDevice: usb.core.Device) -> usb.core.Interface | None:
     """Find the HID interface for the given device.
 
     Args:
         coreDevice (usb.core.Device): The device to search
 
     Returns:
-        usb.core.Device.interface: The HID interface if one exists, none if
-        none exist
+        usb.core.Device.interface: The HID interface if one exists
+        None: Returned when:
+            - No device found with matching vendor ID and endpoint
+            - Multiple devices found (ambiguous result)
+            - Device access fails
 
     """
     for config in coreDevice:
@@ -130,7 +130,7 @@ def findHIDInterface(coreDevice):
     return None
 
 
-def findInterruptEndpoint(coreDevice):
+def findInterruptEndpoint(coreDevice: usb.core.Device) -> int | None:
     """Find the USB interrupt endpoint for the given HID interface.
 
     Args:
@@ -141,16 +141,17 @@ def findInterruptEndpoint(coreDevice):
 
     """
     hidInterface = findHIDInterface(coreDevice)
-    for endpoint in hidInterface:
-        if (
-            usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
-            and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
-        ):
-            return endpoint.bEndpointAddress
+    if hidInterface:
+        for endpoint in hidInterface:
+            if (
+                usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
+                and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
+            ):
+                return endpoint.bEndpointAddress
     return None
 
 
-def getCoreDevice(endpoint):
+def getCoreDevice(endpoint: int) -> usb.core.Device | bool:
     """Get the core USB device handle that has the provided enpoint.
 
     Args:
@@ -158,6 +159,8 @@ def getCoreDevice(endpoint):
 
     Returns:
         usb.core.Device: The core device handle that has the provided endpoint.
+        False: Returned when:
+            - The number of devices found is not exactly 1
 
     """
     results = [
@@ -171,7 +174,7 @@ def getCoreDevice(endpoint):
     return results[0]
 
 
-def getCoreDeviceInfo(endpoint):
+def getCoreDeviceInfo(endpoint: int) -> dict | None:
     """Find the core device on the given bus and port.
 
     Args:
@@ -182,17 +185,21 @@ def getCoreDeviceInfo(endpoint):
 
     """
     device = getCoreDevice(endpoint)
-    return {
-        "productID": device.idProduct,
-        "serialNumber": device.serial_number,
-        "product": device.product,
-        "manufacturer": device.manufacturer,
-        "speed": device.speed,
-        "interruptEndpoint": findInterruptEndpoint(device),
-    }
+    return (
+        {
+            "productID": device.idProduct,
+            "serialNumber": device.serial_number,
+            "product": device.product,
+            "manufacturer": device.manufacturer,
+            "speed": device.speed,
+            "interruptEndpoint": findInterruptEndpoint(device),
+        }
+        if device
+        else None
+    )
 
 
-def getInterruptAddress(device):
+def getInterruptAddress(device: usb.core.Device) -> int:
     """Take in a device and returns is interrupt enpoint address.
 
     Args:
@@ -219,7 +226,7 @@ def getInterruptAddress(device):
     raise RuntimeError("No interrupt endpoint found!")
 
 
-def loadJsonFile(filePath):
+def loadJsonFile(filePath: Path | str) -> dict:
     """Load a JSON file into a dictionary.
 
     Args:
@@ -236,10 +243,10 @@ def loadJsonFile(filePath):
 
 
 def newLogger(
-    name,
-    fileName=None,
-    level=None,
-):
+    name: str,
+    fileName: str | None = None,
+    level: int | None = None,
+) -> logging.Logger:
     """Generate a logger.
 
     Args:
@@ -251,7 +258,7 @@ def newLogger(
         logging.WARNING.
 
     Returns:
-        logger: The generated logger
+        logger (logging.logger): The generated logger
 
     """
     if level is None:

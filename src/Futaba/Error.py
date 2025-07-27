@@ -12,9 +12,9 @@ class FutabaError(Exception):
 class DeviceNotFoundError(FutabaError):
     """Custom exception raised when a Futaba device is not found."""
 
-    message = "Futaba device not found. Please ensure a Futaba USB device is connected."
+    message: str = "Futaba device not found. Please ensure a Futaba USB device is connected."
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Cast this error to a string.
 
         Returns:
