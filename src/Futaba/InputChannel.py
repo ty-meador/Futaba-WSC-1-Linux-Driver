@@ -194,7 +194,7 @@ class InputChannel:
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
         self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
 
-    def __eq__(self, other: "object") -> bool:
+    def __eq__(self, other: object) -> bool:
         """Determine if the Input Channels are equal.
 
         Args:
