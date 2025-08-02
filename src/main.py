@@ -1,101 +1,153 @@
 #!/usr/bin/python3
-"""The main program - run with `sudo python3 main.py`."""
+"""RC USB Receiver Driver - Standalone Version."""
 
+import os
+import signal
+import sys
 import time
 from argparse import ArgumentParser
+from pathlib import Path
 
-import Futaba
+# Ensure we can import our modules regardless of execution context
+if getattr(sys, "frozen", False):
+    # Running as compiled executable
+    bundle_dir = Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else Path(sys.executable).parent
+else:
+    # Running as script
+    bundle_dir = Path(__file__).parent
 
-parser = ArgumentParser()
+# Add the bundle directory to Python path
+sys.path.insert(0, str(bundle_dir))
 
-parser.add_argument(
-    "--autostart",
-    action="store_true",
-    help="Start the first device found",
-)
-
-parser.add_argument(
-    "--bus",
-    help="The bus of the device you want to start a driver for",
-)
-
-parser.add_argument(
-    "--calibrate",
-    action="store_true",
-    help="Used for calibration",
-)
+try:
+    import Futaba
+except ImportError as e:
+    print(f"❌ Failed to import Futaba module: {e}")
+    print("Make sure all required modules are available.")
+    sys.exit(1)
 
 
-parser.add_argument(
-    "--endpoint",
-    help="Start a driver on the device at this endpoint",
-)
-
-parser.add_argument(
-    "--port",
-    help="The port of the device you want start a driver for",
-)
+def check_privileges():
+    """Ensure the driver is running with proper privileges."""
+    if os.geteuid() != 0:
+        print("❌ This driver requires root privileges to access USB devices.")
+        print("Please run with sudo:")
+        print(f"   sudo {sys.argv[0]} {' '.join(sys.argv[1:])}")
+        sys.exit(1)
 
 
-parser.add_argument(
-    "--ui",
-    help="Launch the terminal based UI",
-)
+def setup_signal_handlers():
+    """Setup graceful shutdown handlers."""
+
+    def signal_handler(signum, frame):
+        print("\n🛑 Shutdown signal received. Cleaning up...")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
 
-def cliMode(args):
-    """Run the driver in cli-mode.
+def create_parser():
+    """Create command line argument parser."""
+    parser = ArgumentParser(
+        description="RC USB Receiver Driver - Standalone Version",
+        epilog="Example: sudo ./rc-driver --autostart",
+    )
 
-    Args:
-        args (argparse.ArgumentParser.arg): Arguments passed to the cli
+    parser.add_argument(
+        "--autostart", action="store_true", help="Start the first device found automatically"
+    )
 
-    Raises:
-        RuntimeError: Raised if the specified device cannot be found
+    parser.add_argument("--bus", help="The bus of the device you want to start a driver for")
 
-    """
-    manager = Futaba.DeviceManager()
+    parser.add_argument("--calibrate", action="store_true", help="Used for calibration mode")
 
-    device = None
-    if args.endpoint is not None:
-        device = manager.findDevice(endpoint=args.endpoint)
-    else:
-        selection = None
-        deviceList = manager.listDevices()
-        deviceCount = len(deviceList)
+    parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
 
-        if deviceCount == 1 or args.autostart:
-            print(f"Found {deviceCount} Futaba devices, autostarting {deviceList[0]['name']}")
-            device = deviceList[0]
-        elif deviceCount > 1:
-            print("Which device would you like to start?")
-            for device in deviceList:
-                print(f"[ {device['key']} ] : {device['name']}")
-            selection = int(input())
-            device = deviceList[selection]
+    parser.add_argument("--port", help="The port of the device you want start a driver for")
 
-    if device is None:
-        raise RuntimeError("Could not find a Futaba device at the specified endpoint")
+    parser.add_argument(
+        "--ui", action="store_true", help="Launch the terminal based UI (not yet implemented)"
+    )
 
-    manager.start(device["key"])
-    print(f"Started {device['name']}")
-    print("CTRL + C to stop driver")
+    parser.add_argument("--version", action="version", version="RC Driver v1.0.0 (Standalone)")
+
+    return parser
+
+
+def cli_mode(args):
+    """Run the driver in CLI mode."""
+    print("🎮 RC USB Receiver Driver")
+    print("=" * 30)
 
     try:
-        while True:
-            # Block indefinitely so that background process stays alive
-            time.sleep(100)
-    except KeyboardInterrupt:
-        pass
+        manager = Futaba.DeviceManager()
+        device = None
 
-    print("Goodbye!")
+        if args.endpoint is not None:
+            device = manager.findDevice(endpoint=args.endpoint)
+        else:
+            device_list = manager.listDevices()
+            device_count = len(device_list)
+
+            if device_count == 0:
+                print("❌ No Futaba devices found.")
+                print("Make sure your device is connected and try again.")
+                return
+            elif device_count == 1 or args.autostart:
+                print(f"✅ Found {device_count} Futaba device(s)")
+                print(f"🚀 Auto-starting {device_list[0]['name']}")
+                device = device_list[0]
+            else:
+                print(f"📋 Found {device_count} devices. Please select:")
+                for i, dev in enumerate(device_list):
+                    print(f"  [{i}] {dev['name']}")
+
+                try:
+                    selection = int(input("Enter selection: "))
+                    device = device_list[selection]
+                except (ValueError, IndexError):
+                    print("❌ Invalid selection.")
+                    return
+
+        if device is None:
+            print("❌ Could not find or select a device.")
+            return
+
+        # Start the device
+        manager.start(device["key"])
+        print(f"✅ Started {device['name']}")
+        print("🎯 Driver is running. Press CTRL+C to stop.")
+
+        # Keep running
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
+
+    print("👋 Driver stopped. Goodbye!")
+
+
+def main():
+    """Main entry point."""
+    setup_signal_handlers()
+    check_privileges()
+
+    parser = create_parser()
+    args = parser.parse_args()
+
+    if args.ui:
+        print("❌ UI mode is not yet implemented.")
+        print("Use CLI mode instead (remove --ui flag).")
+        sys.exit(1)
+    else:
+        cli_mode(args)
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
-
-    # TO-DO
-    if args.ui:
-        raise RuntimeError("Not yet Impelmented")
-        # DriverUI(args).run()
-    else:
-        cliMode(args)
+    main()

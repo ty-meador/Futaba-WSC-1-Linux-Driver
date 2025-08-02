@@ -7,8 +7,6 @@ import typing
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
-
 from . import Util as utils
 
 
@@ -113,8 +111,9 @@ class ChannelCalibration:
         logger.debug(f"        med: {outputRange[1]}")
         logger.debug(f"        low: {outputRange[0]}")
 
-    @staticmethod
+    @classmethod
     def _generateValueMap(
+        cls,
         inputRange: typing.Iterable[int],
         outputRange: typing.Iterable[int],
         reverse: bool = False,
@@ -143,7 +142,7 @@ class ChannelCalibration:
 
         # Create a value map such that the index of the array represents
         # the input value, and the contents at that index is the output
-        allPossibleInputValues = np.array([outputMin] * inputMax, int)
+        allPossibleInputValues = array.array("i", [outputMin] * inputMax)
 
         arrayRange = range(inputMin, inputMax)
         if reverse:
@@ -152,18 +151,79 @@ class ChannelCalibration:
             allPossibleInputValues[i] = i
 
         return array.array(
-            "i",  # int
-            np.round(
-                np.interp(
-                    allPossibleInputValues,
-                    inputRange,
-                    outputRange,
-                    left=outputMin,
-                    right=outputMax,
-                ),
-                0,  # No decimals
-            ).astype(int),
+            "i",
+            cls.interpolate(
+                allPossibleInputValues,
+                inputRange,
+                outputRange,
+                left=outputMin,
+                right=outputMax,
+            ),
         )
+
+        # return array.array(
+        #     "i",  # int
+        #     np.round(
+        #         np.interp(
+        #             allPossibleInputValues,
+        #             inputRange,
+        #             outputRange,
+        #             left=outputMin,
+        #             right=outputMax,
+        #         ),
+        #         0,  # No decimals
+        #     ).astype(int),
+        # )
+
+    @classmethod
+    def interpolate(
+        cls,
+        xVals: typing.Iterable[int],
+        xPoints: typing.Iterable[int],
+        yPoints: typing.Iterable[int],
+        left: int | None = None,
+        right: int | None = None,
+    ) -> list[int]:
+        """Pure Python 1D linear interpolation to replace numpy.interp().
+
+        Args:
+            xVals: Values to interpolate at
+            xPoints: X coordinates of known points
+            yPoints: Y coordinates of known points
+            left: Value for x < xPoints[0]
+            right: Value for x > xPoints[-1]
+
+        Returns:
+            List of interpolated integer values
+        """
+        result = []
+
+        for x in xVals:
+            # Handle boundary conditions
+            if x <= xPoints[0]:
+                result.append(left if left is not None else yPoints[0])
+                continue
+            if x >= xPoints[-1]:
+                result.append(right if right is not None else yPoints[-1])
+                continue
+
+            # Find the right interval for interpolation
+            for i in range(len(xPoints) - 1):
+                if xPoints[i] <= x <= xPoints[i + 1]:
+                    # Linear interpolation formula: y = y1 + (y2-y1) * (x-x1)/(x2-x1)
+                    x1, x2 = xPoints[i], xPoints[i + 1]
+                    y1, y2 = yPoints[i], yPoints[i + 1]
+
+                    if x2 == x1:  # Avoid division by zero  # noqa: SIM108
+                        interpolated = y1
+                    else:
+                        # Use float division, then round to integer
+                        interpolated = y1 + (y2 - y1) * (x - x1) / (x2 - x1)
+
+                    result.append(int(round(interpolated)))
+                    break
+
+        return result
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,0 +1,19 @@
+# Nuitka package configuration
+build:
+  # Optimization settings
+  optimization: true
+  lto: true
+  
+  # Dependencies
+  include-packages:
+    - Futaba
+    - usb
+    - uinput
+  
+  # Linux specific
+  linux-onefile: true
+  assume-yes-for-downloads: true
+  
+  # Output
+  output-filename: rc-driver
+  remove-output: true

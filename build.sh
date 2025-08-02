@@ -12,7 +12,7 @@ fi
 
 # Install build dependencies
 echo "📦 Installing build dependencies..."
-pip3 install --user nuitka ordered-set zstandard
+pip3 install nuitka ordered-set zstandard
 
 # Run the build
 echo "🔨 Starting build process..."
