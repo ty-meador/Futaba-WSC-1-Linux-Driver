@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build script to create standalone executable."""
+"""Build script to create standalone executable for Futaba RC Driver."""
 
 import glob
 import os
@@ -8,8 +8,19 @@ import subprocess
 import sys
 
 
-def run_command(cmd, cwd=None, capture=True):
-    """Run a command and handle errors."""
+def runCommand(cmd: str | list[str], cwd: str | None = None, capture: bool = True) -> str | None:
+    """Run a command and handle errors.
+
+    Args:
+        cmd: Command to run (string or list of arguments)
+        cwd: Working directory for command execution
+        capture: Whether to capture and return output
+
+    Returns:
+        Command output if capture=True and successful, empty string if capture=False and successful,
+        None if command failed
+
+    """
     try:
         if isinstance(cmd, list):
             if capture:
@@ -40,19 +51,27 @@ def run_command(cmd, cwd=None, capture=True):
         return None
 
 
-def find_native_libraries():
-    """Find all native libraries that need to be included."""
+def findNativeLibraries() -> list[str]:
+    """Find all native libraries that need to be included in the build.
+
+    Searches for uinput and USB-related native libraries in the Python environment
+    and prepares Nuitka arguments for including them in the distribution.
+
+    Returns:
+        List of Nuitka arguments for including native libraries
+
+    """
     print("🔍 Locating native libraries...")
 
-    nuitka_args = []
+    nuitkaArgs = []
 
     try:
         # Find uinput library location
         import uinput
 
-        uinput_file = uinput.__file__
-        uinput_dir = os.path.dirname(uinput_file)
-        print(f"📍 uinput module at: {uinput_dir}")
+        uinputFile = uinput.__file__
+        uinputDir = os.path.dirname(uinputFile)
+        print(f"📍 uinput module at: {uinputDir}")
 
         # Search for all uinput-related native libraries in site-packages
         import sys
@@ -73,31 +92,29 @@ def find_native_libraries():
                         if os.path.isfile(match):
                             filename = os.path.basename(match)
                             # Include the file directly in the root of the distribution
-                            nuitka_args.append(f"--include-data-files={match}={filename}")
+                            nuitkaArgs.append(f"--include-data-files={match}={filename}")
                             print(f"📚 Found native library: {filename}")
 
         # Also include the entire uinput package data
-        nuitka_args.append("--include-package-data=uinput")
+        nuitkaArgs.append("--include-package-data=uinput")
 
         # Find USB libraries too
         try:
             import usb
 
-            usb_backend_path = None
-
             # Try to find libusb backend
             for path in sys.path:
                 if any(pkg in path for pkg in ["site-packages", "dist-packages"]):
-                    usb_patterns = [
+                    usbPatterns = [
                         os.path.join(path, "**", "*usb*.so"),
                         os.path.join(path, "**", "libusb*.so"),
                     ]
-                    for pattern in usb_patterns:
+                    for pattern in usbPatterns:
                         matches = glob.glob(pattern, recursive=True)
                         for match in matches:
                             if os.path.isfile(match):
                                 filename = os.path.basename(match)
-                                nuitka_args.append(f"--include-data-files={match}={filename}")
+                                nuitkaArgs.append(f"--include-data-files={match}={filename}")
                                 print(f"📚 Found USB library: {filename}")
         except ImportError:
             print("⚠️  USB module not found")
@@ -106,12 +123,20 @@ def find_native_libraries():
         print("❌ uinput not found in current environment")
         return []
 
-    return nuitka_args
+    return nuitkaArgs
 
 
-def build_executable():
-    """Build the standalone executable using Nuitka."""
-    print("🔨 Building RC Driver executable...")
+def buildExecutable() -> bool:
+    """Build the standalone executable using Nuitka.
+
+    Compiles the Python application into a standalone executable with all
+    dependencies included. Optimizes for real-time performance and minimal size.
+
+    Returns:
+        True if build completed successfully, False otherwise
+
+    """
+    print("🔨 Building Futaba RC Driver executable...")
 
     # Check if Nuitka is installed
     try:
@@ -121,17 +146,17 @@ def build_executable():
         sys.exit(1)
 
     # Check for C compiler
-    compiler_found = False
+    compilerFound = False
     for compiler in ["gcc", "clang", "cc"]:
         try:
             subprocess.run([compiler, "--version"], capture_output=True, check=True)
             print(f"✅ Found C compiler: {compiler}")
-            compiler_found = True
+            compilerFound = True
             break
         except (subprocess.CalledProcessError, FileNotFoundError):
             continue
 
-    if not compiler_found:
+    if not compilerFound:
         print("❌ No C compiler found! Install with:")
         print("   sudo apt install build-essential")
         print("   # or")
@@ -146,14 +171,20 @@ def build_executable():
         print("⚠️  ccache not found - install with 'sudo apt install ccache' for faster rebuilds")
 
     # Detect resources
-    cpu_count = os.cpu_count() or 4
-    jobs = min(cpu_count, 8)  # Cap at 8 to avoid memory issues
+    cpuCount = os.cpu_count() or 4
+    jobs = min(cpuCount, 8)  # Cap at 8 to avoid memory issues
     print(f"🚀 Using {jobs} CPU cores")
 
     # Clean previous builds
     print("🧹 Cleaning previous builds...")
-    dirs_to_clean = ["build", "main.dist", "rc-driver.dist", "main.build", "rc-driver.build"]
-    for d in dirs_to_clean:
+    dirsToClean = [
+        "build",
+        "main.dist",
+        "main.build",
+        "futaba-rc-driver.dist",
+        "futaba-rc-driver.build",
+    ]
+    for d in dirsToClean:
         if os.path.exists(d):
             print(f"  Removing {d}")
             shutil.rmtree(d)
@@ -162,17 +193,17 @@ def build_executable():
     if not os.path.exists("src/main.py"):
         print("❌ src/main.py not found!")
         print("📁 Current directory contents:")
-        run_command("ls -la", capture=False)
+        runCommand("ls -la", capture=False)
         if os.path.exists("src"):
             print("📁 src/ directory contents:")
-            run_command("ls -la src/", capture=False)
+            runCommand("ls -la src/", capture=False)
         sys.exit(1)
 
     # Find native libraries
-    native_lib_args = find_native_libraries()
+    nativeLibArgs = findNativeLibraries()
 
     # Optimized Nuitka build command for real-time performance
-    nuitka_cmd = [
+    nuitkaCmd = [
         "python3",
         "-m",
         "nuitka",
@@ -181,7 +212,7 @@ def build_executable():
         "--show-progress",
         "--show-memory",
         "--verbose",
-        "--output-filename=rc-driver",
+        "--output-filename=futaba-rc-driver",
         "--remove-output",
         f"--jobs={jobs}",
         # Performance optimizations
@@ -213,59 +244,65 @@ def build_executable():
     ]
 
     # Add native library inclusion arguments
-    nuitka_cmd.extend(native_lib_args)
+    nuitkaCmd.extend(nativeLibArgs)
 
     print("🎯 Running optimized Nuitka build:")
-    print(f"   Command: {' '.join(nuitka_cmd[:6])}... (truncated)")
+    print(f"   Command: {' '.join(nuitkaCmd[:6])}... (truncated)")
 
     # Run the build command
     try:
-        result = subprocess.run(nuitka_cmd, check=True)
-        build_success = True
+        result = subprocess.run(nuitkaCmd, check=True)
+        buildSuccess = True
     except subprocess.CalledProcessError as e:
         print(f"❌ Nuitka build failed with exit code {e.returncode}")
-        build_success = False
+        buildSuccess = False
 
-    # Find the output directory
-    possible_dirs = ["rc-driver.dist", "main.dist"]
-    output_dir = None
-    executable_path = None
+    # Find the output directory - Nuitka creates based on source filename, not output filename
+    possibleDirs = ["main.dist", "futaba-rc-driver.dist"]
+    outputDir = None
+    executablePath = None
 
-    for dir_name in possible_dirs:
-        if os.path.exists(dir_name):
-            output_dir = dir_name
-            exec_path = os.path.join(dir_name, "rc-driver")
-            if os.path.exists(exec_path):
-                executable_path = exec_path
+    for dirName in possibleDirs:
+        if os.path.exists(dirName):
+            outputDir = dirName
+            # Look for the executable with our specified name
+            execPath = os.path.join(dirName, "futaba-rc-driver")
+            if os.path.exists(execPath):
+                executablePath = execPath
                 break
-            exec_path = os.path.join(dir_name, "main")
-            if os.path.exists(exec_path):
-                executable_path = exec_path
+            # Also check for main executable (fallback)
+            execPath = os.path.join(dirName, "main")
+            if os.path.exists(execPath):
+                executablePath = execPath
                 break
 
-    if not output_dir:
+    if not outputDir:
         print("❌ No output directory found!")
+        print("📁 Available directories:")
+        for item in os.listdir("."):
+            if os.path.isdir(item) and (".dist" in item or ".build" in item):
+                print(f"  - {item}")
         return False
 
-    if not executable_path:
-        print(f"❌ No executable found in {output_dir}")
+    if not executablePath:
+        print(f"❌ No executable found in {outputDir}")
         return False
 
-    print(f"✅ Build completed: {executable_path}")
+    print(f"✅ Build completed: {executablePath}")
 
     # Make executable
-    run_command(f"chmod +x {executable_path}")
+    runCommand(f"chmod +x {executablePath}")
 
     # Verify native libraries are present
     print("\n🔍 Verifying native libraries...")
-    so_files = glob.glob(os.path.join(output_dir, "*.so"))
+    soFiles = glob.glob(os.path.join(outputDir, "*.so"))
 
-    if so_files:
+    if soFiles:
         print("✅ Native libraries found:")
-        for so_file in so_files:
-            filename = os.path.basename(so_file)
-            file_size = os.path.getsize(so_file)
-            print(f"  📚 {filename} ({file_size:,} bytes)")
+        for soFile in soFiles:
+            filename = os.path.basename(soFile)
+            fileSize = os.path.getsize(soFile)
+            print(f"  📚 {filename} ({fileSize:,} bytes)")
     else:
         print("❌ No native libraries found in output!")
 
@@ -280,7 +317,7 @@ def build_executable():
                         matches = glob.glob(os.path.join(path, pattern), recursive=True)
                         for match in matches:
                             if os.path.isfile(match):
-                                dest = os.path.join(output_dir, os.path.basename(match))
+                                dest = os.path.join(outputDir, os.path.basename(match))
                                 shutil.copy2(match, dest)
                                 os.chmod(dest, 0o755)
                                 print(f"🔧 Copied: {os.path.basename(match)}")
@@ -288,61 +325,57 @@ def build_executable():
             print(f"❌ Manual copy failed: {e}")
 
     # Create wrapper script in root directory
-    wrapper_content = f"""#!/bin/bash
+    executableName = os.path.basename(executablePath)
+    wrapperContent = f"""#!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-cd "$SCRIPT_DIR/{output_dir}"
-exec ./{"rc-driver" if "rc-driver" in executable_path else "main"} "$@"
+cd "$SCRIPT_DIR/{outputDir}"
+exec ./{executableName} "$@"
 """
 
-    with open("rc-driver", "w") as f:
-        f.write(wrapper_content)
-    os.chmod("rc-driver", 0o755)
-    print("🔗 Created wrapper script: ./rc-driver")
+    with open("futaba-rc-driver", "w") as f:
+        f.write(wrapperContent)
+    os.chmod("futaba-rc-driver", 0o755)
+    print("🔗 Created wrapper script: ./futaba-rc-driver")
 
     # Show build statistics
     print("\n📊 Build Statistics:")
-    result = run_command(f"du -sh {output_dir}")
+    result = runCommand(f"du -sh {outputDir}")
     if result:
         print(f"📦 Distribution size: {result.split()[0]}")
 
-    file_count = len(
-        [f for f in os.listdir(output_dir) if os.path.isfile(os.path.join(output_dir, f))]
+    fileCount = len(
+        [f for f in os.listdir(outputDir) if os.path.isfile(os.path.join(outputDir, f))]
     )
-    print(f"📄 File count: {file_count}")
+    print(f"📄 File count: {fileCount}")
 
     # Test the executable
     print("\n🧪 Testing executable...")
-    test_result = run_command(
-        f"./{output_dir}/{'rc-driver' if 'rc-driver' in executable_path else 'main'} --version",
-        capture=True,
-    )
-    if test_result is not None:
+    executableName = os.path.basename(executablePath)
+    testResult = runCommand(f"./{outputDir}/{executableName} --version", capture=True)
+    if testResult is not None:
         print("✅ Executable test successful")
         return True
     else:
         print("⚠️  Executable test failed, trying --help...")
-        test_result = run_command(
-            f"./{output_dir}/{'rc-driver' if 'rc-driver' in executable_path else 'main'} --help",
-            capture=True,
-        )
-        if test_result is not None:
+        testResult = runCommand(f"./{outputDir}/{executableName} --help", capture=True)
+        if testResult is not None:
             print("✅ Executable runs (--help works)")
             return True
         else:
             print("⚠️  Executable may have issues")
-            return build_success
+            return buildSuccess
 
 
 if __name__ == "__main__":
-    print("🎮 RC Driver Build Script")
-    print("=" * 30)
+    print("🎮 Futaba RC Driver Build Script")
+    print("=" * 35)
 
-    success = build_executable()
+    success = buildExecutable()
 
     if success:
         print("\n🎉 Build completed successfully!")
         print("\n🚀 To run the driver:")
-        print("   sudo ./rc-driver")
+        print("   sudo ./futaba-rc-driver")
         print("\n📝 Note: sudo is required for uinput device access")
     else:
         print("\n❌ Build failed!")

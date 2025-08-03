@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package RC Driver into a standalone distribution."""
+"""Package Futaba RC Driver into a standalone distribution."""
 
 import os
 import shutil
@@ -9,8 +9,19 @@ import tarfile
 from datetime import datetime
 
 
-def run_command(cmd, cwd=None, capture=True):
-    """Run a command and handle errors."""
+def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
+    """Run a command and handle errors.
+
+    Args:
+        cmd: Command to run as shell string
+        cwd: Working directory for command execution
+        capture: Whether to capture and return output
+
+    Returns:
+        Command output if capture=True and successful, empty string if capture=False and successful,
+        None if command failed
+
+    """
     try:
         if capture:
             result = subprocess.run(
@@ -27,32 +38,48 @@ def run_command(cmd, cwd=None, capture=True):
         return None
 
 
-def get_version_info():
-    """Extract version and build info."""
+def getVersionInfo() -> tuple[str, str]:
+    """Extract version and build info from git and current timestamp.
+
+    Attempts to get version information from git tags, falls back to default
+    version if git is not available or no tags exist.
+
+    Returns:
+        Tuple containing (version, buildDate) strings
+
+    """
     version = "1.0.0"  # Default version
 
     # Try to get version from git
-    git_version = run_command("git describe --tags --always --dirty 2>/dev/null")
-    if git_version:
-        version = git_version
+    gitVersion = runCommand("git describe --tags --always --dirty 2>/dev/null")
+    if gitVersion:
+        version = gitVersion
 
-    build_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return version, build_date
+    buildDate = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return version, buildDate
 
 
-def create_readme():
-    """Create a comprehensive README for the distribution."""
-    readme_content = """# Futaba RC USB Driver - Standalone Distribution
+def createReadme() -> str:
+    """Create a comprehensive README for the distribution.
+
+    Generates complete documentation including installation instructions,
+    usage examples, troubleshooting guide, and system requirements.
+
+    Returns:
+        Complete README content as string
+
+    """
+    readmeContent = """# Futaba RC USB Driver - Standalone Distribution
 
 ## Quick Start
 
 1. Extract this archive
 2. Run the installer: `sudo ./install.sh`
-3. Or run directly: `sudo ./rc-driver`
+3. Or run directly: `sudo ./futaba-rc-driver`
 
 ## What's Included
 
-- `rc-driver` - Main executable (requires sudo for uinput access)
+- `futaba-rc-driver` - Main executable (requires sudo for uinput access)
 - `install.sh` - System installer script
 - `README.md` - This file
 - `LICENSE` - License information
@@ -67,14 +94,14 @@ def create_readme():
 
 ### Option 1: Quick Run (Temporary)
 ```bash
-sudo ./rc-driver
+sudo ./futaba-rc-driver
 ```
 
 ### Option 2: System Install (Permanent)
 ```bash
 sudo ./install.sh
 # Then run from anywhere:
-rc-driver
+futaba-rc-driver
 ```
 
 ## Supported Devices
@@ -88,21 +115,21 @@ The driver automatically detects connected Futaba receivers and creates virtual 
 
 ### Basic Usage
 1. Connect your Futaba USB receiver
-2. Run `sudo ./rc-driver`
+2. Run `sudo ./futaba-rc-driver`
 3. The driver will auto-detect and configure your receiver
 4. Use CTRL+C to stop
 
 ### Advanced Options
 ```bash
-sudo ./rc-driver --help          # Show all options
-sudo ./rc-driver --list-devices  # List detected receivers
-sudo ./rc-driver --calibrate     # Run calibration mode
+sudo ./futaba-rc-driver --help          # Show all options
+sudo ./futaba-rc-driver --list-devices  # List detected receivers
+sudo ./futaba-rc-driver --calibrate     # Run calibration mode
 ```
 
 ## Troubleshooting
 
 ### Permission Denied
-- Make sure you're running with sudo: `sudo ./rc-driver`
+- Make sure you're running with sudo: `sudo ./futaba-rc-driver`
 - Or add your user to input group: `sudo usermod -a -G input $USER`
 
 ### Device Not Detected
@@ -138,12 +165,23 @@ https://github.com/your-repo/futaba-usb-linux-driver
 ---
 Built with ❤️ for the RC community
 """
-    return readme_content
+    return readmeContent
 
 
-def create_install_script():
-    """Create system installation script."""
-    install_script = """#!/bin/bash
+def createInstallScript() -> str:
+    """Create system installation script.
+
+    Generates a comprehensive installer script that:
+    - Installs files to system directories
+    - Sets up USB permissions via udev rules
+    - Configures uinput module loading
+    - Creates systemd service for auto-start
+
+    Returns:
+        Complete installation script content as string
+
+    """
+    installScript = """#!/bin/bash
 # Futaba RC Driver System Installer
 
 set -e
@@ -167,22 +205,22 @@ echo "📦 Installing Futaba RC Driver..."
 echo "📁 Creating installation directory..."
 mkdir -p "$INSTALL_DIR"
 
-    # Copy files
+# Copy files
 echo "📋 Copying driver files..."
-cp rc-driver "$INSTALL_DIR/"
+cp futaba-rc-driver "$INSTALL_DIR/"
 cp README.md "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/rc-driver"
+chmod +x "$INSTALL_DIR/futaba-rc-driver"
 
 # Copy the entire distribution directory
 if [ -d "main.dist" ]; then
     cp -r main.dist "$INSTALL_DIR/"
-elif [ -d "rc-driver.dist" ]; then
-    cp -r rc-driver.dist "$INSTALL_DIR/"
+elif [ -d "futaba-rc-driver.dist" ]; then
+    cp -r futaba-rc-driver.dist "$INSTALL_DIR/"
 fi
 
 # Create symlink in PATH
 echo "🔗 Creating system command..."
-ln -sf "$INSTALL_DIR/rc-driver" "$BIN_DIR/rc-driver"
+ln -sf "$INSTALL_DIR/futaba-rc-driver" "$BIN_DIR/futaba-rc-driver"
 
 # Create udev rules for USB permissions
 echo "⚙️  Setting up USB permissions..."
@@ -216,7 +254,7 @@ Wants=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/opt/futaba-rc-driver/rc-driver
+ExecStart=/opt/futaba-rc-driver/futaba-rc-driver
 Restart=always
 RestartSec=5
 User=root
@@ -229,19 +267,27 @@ EOF
 echo "✅ Installation complete!"
 echo ""
 echo "🎯 Usage:"
-echo "  rc-driver                    # Run the driver"
-echo "  systemctl start futaba-rc-driver   # Start as service"
-echo "  systemctl enable futaba-rc-driver  # Auto-start at boot"
+echo "  futaba-rc-driver                           # Run the driver"
+echo "  systemctl start futaba-rc-driver           # Start as service"
+echo "  systemctl enable futaba-rc-driver          # Auto-start at boot"
 echo ""
 echo "📝 Note: You may need to log out and back in for group changes to take effect"
-echo "🔧 Test with: rc-driver --help"
+echo "🔧 Test with: futaba-rc-driver --help"
 """
-    return install_script
+    return installScript
 
 
-def create_uninstall_script():
-    """Create uninstall script."""
-    uninstall_script = """#!/bin/bash
+def createUninstallScript() -> str:
+    """Create uninstall script.
+
+    Generates a complete uninstaller that removes all installed files,
+    services, and configuration created by the installer.
+
+    Returns:
+        Complete uninstallation script content as string
+
+    """
+    uninstallScript = """#!/bin/bash
 # Futaba RC Driver Uninstaller
 
 set -e
@@ -265,7 +311,7 @@ systemctl disable futaba-rc-driver 2>/dev/null || true
 
 echo "📁 Removing installation files..."
 rm -rf "$INSTALL_DIR"
-rm -f "$BIN_DIR/rc-driver"
+rm -f "$BIN_DIR/futaba-rc-driver"
 rm -f "$SERVICE_DIR/futaba-rc-driver.service"
 
 echo "⚙️  Removing udev rules..."
@@ -278,142 +324,160 @@ udevadm trigger
 
 echo "✅ Uninstall complete!"
 """
-    return uninstall_script
+    return uninstallScript
 
 
-def package_distribution():
-    """Create the standalone distribution package."""
+def packageDistribution() -> None:
+    """Create the standalone distribution package.
+
+    Creates a complete distribution package including:
+    - Compiled executable and dependencies
+    - Documentation and installation scripts
+    - Compressed archives with checksums
+    - Quick install script for easy deployment
+
+    Raises:
+        SystemExit: If build directory is not found or other critical errors occur
+
+    """
     print("📦 Creating standalone distribution package...")
 
     # Find the build directory
-    build_dir = None
-    possible_dirs = ["rc-driver.dist", "main.dist"]
+    possibleBuildDirs = ["main.dist", "futaba-rc-driver.dist"]
+    buildDir = None
 
-    for dir_name in possible_dirs:
-        if os.path.exists(dir_name):
-            build_dir = dir_name
-            print(f"✅ Found build directory: {build_dir}")
+    for dirName in possibleBuildDirs:
+        if os.path.exists(dirName):
+            buildDir = dirName
+            print(f"✅ Found build directory: {buildDir}")
             break
 
-    if not build_dir:
+    if not buildDir:
         print("❌ No build found! Run build script first.")
-        print(f"   Looking for: {', '.join(possible_dirs)}")
+        print(f"   Looking for: {', '.join(possibleBuildDirs)}")
         sys.exit(1)
 
     # Get version info
-    version, build_date = get_version_info()
+    version, buildDate = getVersionInfo()
     print(f"📋 Version: {version}")
-    print(f"📅 Build: {build_date}")
+    print(f"📅 Build: {buildDate}")
 
     # Create package directory
-    package_name = f"futaba-rc-driver-{version}-linux-x86_64"
-    package_dir = f"dist/{package_name}"
+    packageName = f"futaba-rc-driver-{version}-linux-x86_64"
+    packageDir = f"dist/{packageName}"
 
-    print(f"📁 Creating package: {package_name}")
+    print(f"📁 Creating package: {packageName}")
 
     # Clean and create dist directory
     if os.path.exists("dist"):
         shutil.rmtree("dist")
-    os.makedirs(package_dir)
+    os.makedirs(packageDir)
 
     # Copy the main executable and its dependencies
     print("📋 Copying executable...")
-    shutil.copytree(build_dir, f"{package_dir}/{build_dir}")
+    shutil.copytree(buildDir, f"{packageDir}/{buildDir}")
 
-    # Find the actual executable name
-    exec_name = "rc-driver"  # Default
-    possible_execs = ["rc-driver", "main"]
+    # Find the actual executable
+    possibleExecutables = ["futaba-rc-driver", "main"]
+    executableName = None
 
-    for exe in possible_execs:
-        exe_path = os.path.join(build_dir, exe)
-        if os.path.exists(exe_path) and os.access(exe_path, os.X_OK):
-            exec_name = exe
-            print(f"✅ Found executable: {exe_path}")
+    for execName in possibleExecutables:
+        executablePath = os.path.join(buildDir, execName)
+        if os.path.exists(executablePath) and os.access(executablePath, os.X_OK):
+            executableName = execName
+            print(f"✅ Found executable: {executablePath}")
             break
 
+    if not executableName:
+        print(f"❌ No executable found in {buildDir}")
+        print("📁 Contents of build directory:")
+        for item in os.listdir(buildDir):
+            print(f"  - {item}")
+        sys.exit(1)
+
     # Create wrapper script that works from any location
-    wrapper_script = f"""#!/bin/bash
+    wrapperScript = f"""#!/bin/bash
 # Futaba RC Driver Wrapper
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-exec "$SCRIPT_DIR/{build_dir}/{exec_name}" "$@"
+exec "$SCRIPT_DIR/{buildDir}/{executableName}" "$@"
 """
 
-    with open(f"{package_dir}/rc-driver", "w") as f:
-        f.write(wrapper_script)
-    os.chmod(f"{package_dir}/rc-driver", 0o755)
+    with open(f"{packageDir}/futaba-rc-driver", "w") as f:
+        f.write(wrapperScript)
+    os.chmod(f"{packageDir}/futaba-rc-driver", 0o755)
 
     # Create documentation
     print("📄 Creating documentation...")
-    with open(f"{package_dir}/README.md", "w") as f:
-        f.write(create_readme())
+    with open(f"{packageDir}/README.md", "w") as f:
+        f.write(createReadme())
 
     # Create installation scripts
     print("🔧 Creating installation scripts...")
-    with open(f"{package_dir}/install.sh", "w") as f:
-        f.write(create_install_script())
-    os.chmod(f"{package_dir}/install.sh", 0o755)
+    with open(f"{packageDir}/install.sh", "w") as f:
+        f.write(createInstallScript())
+    os.chmod(f"{packageDir}/install.sh", 0o755)
 
-    with open(f"{package_dir}/uninstall.sh", "w") as f:
-        f.write(create_uninstall_script())
-    os.chmod(f"{package_dir}/uninstall.sh", 0o755)
+    with open(f"{packageDir}/uninstall.sh", "w") as f:
+        f.write(createUninstallScript())
+    os.chmod(f"{packageDir}/uninstall.sh", 0o755)
 
     # Copy license if it exists
     if os.path.exists("LICENSE"):
-        shutil.copy2("LICENSE", f"{package_dir}/")
+        shutil.copy2("LICENSE", f"{packageDir}/")
     else:
         # Create a basic license file
-        with open(f"{package_dir}/LICENSE", "w") as f:
+        with open(f"{packageDir}/LICENSE", "w") as f:
             f.write("MIT License - See project repository for full license text\n")
 
     # Create version info file
-    with open(f"{package_dir}/VERSION", "w") as f:
+    with open(f"{packageDir}/VERSION", "w") as f:
         f.write(f"Version: {version}\n")
-        f.write(f"Build Date: {build_date}\n")
+        f.write(f"Build Date: {buildDate}\n")
         f.write("Platform: Linux x86_64\n")
 
     # Calculate sizes
     print("📊 Calculating package size...")
-    du_result = run_command(f"du -sh {package_dir}")
-    if du_result:
-        package_size = du_result.split()[0]
-        print(f"📦 Package size: {package_size}")
+    duResult = runCommand(f"du -sh {packageDir}")
+    if duResult:
+        packageSize = duResult.split()[0]
+        print(f"📦 Package size: {packageSize}")
 
     # Create compressed archives
     print("🗜️  Creating compressed archives...")
 
     # Create tar.gz (most compatible)
-    tar_gz_name = f"dist/{package_name}.tar.gz"
-    with tarfile.open(tar_gz_name, "w:gz") as tar:
-        tar.add(package_dir, arcname=package_name)
+    tarGzName = f"dist/{packageName}.tar.gz"
+    with tarfile.open(tarGzName, "w:gz") as tar:
+        tar.add(packageDir, arcname=packageName)
 
     # Create tar.xz (smaller size)
-    tar_xz_name = f"dist/{package_name}.tar.xz"
-    run_command(f"cd dist && tar -cJf {os.path.basename(tar_xz_name)} {package_name}")
+    tarXzName = f"dist/{packageName}.tar.xz"
+    runCommand(f"cd dist && tar -cJf {os.path.basename(tarXzName)} {packageName}")
 
     # Get archive sizes
-    tar_gz_size = (
-        run_command(f"du -sh {tar_gz_name}").split()[0]
-        if run_command(f"du -sh {tar_gz_name}")
+    tarGzSize = (
+        runCommand(f"du -sh {tarGzName}").split()[0]
+        if runCommand(f"du -sh {tarGzName}")
         else "Unknown"
     )
-    tar_xz_size = (
-        run_command(f"du -sh {tar_xz_name}").split()[0]
-        if run_command(f"du -sh {tar_xz_name}")
+    tarXzSize = (
+        runCommand(f"du -sh {tarXzName}").split()[0]
+        if runCommand(f"du -sh {tarXzName}")
         else "Unknown"
     )
 
     # Create checksums
     print("🔐 Creating checksums...")
-    run_command(f"cd dist && sha256sum {package_name}.tar.gz > {package_name}.tar.gz.sha256")
-    run_command(f"cd dist && sha256sum {package_name}.tar.xz > {package_name}.tar.xz.sha256")
+    runCommand(f"cd dist && sha256sum {packageName}.tar.gz > {packageName}.tar.gz.sha256")
+    runCommand(f"cd dist && sha256sum {packageName}.tar.xz > {packageName}.tar.xz.sha256")
 
     # Create download script
-    download_script = f"""#!/bin/bash
+    downloadScript = f"""#!/bin/bash
 # Quick Download and Install Script for Futaba RC Driver
 
 set -e
 
-PACKAGE_NAME="{package_name}"
+PACKAGE_NAME="{packageName}"
 DOWNLOAD_URL="https://github.com/your-repo/releases/download/v{version}/"
 
 echo "🎮 Futaba RC Driver Quick Installer"
@@ -451,30 +515,30 @@ cd ..
 rm -rf "${{PACKAGE_NAME}}" "${{PACKAGE_NAME}}.tar.gz"
 
 echo "✅ Installation complete!"
-echo "🎯 Run with: rc-driver"
+echo "🎯 Run with: futaba-rc-driver"
 """
 
     with open("dist/quick-install.sh", "w") as f:
-        f.write(download_script)
+        f.write(downloadScript)
     os.chmod("dist/quick-install.sh", 0o755)
 
     # Summary
     print("\n🎉 Distribution package created successfully!")
     print("=" * 50)
-    print(f"📦 Package: {package_name}")
-    print(f"📏 Uncompressed: {package_size}")
-    print(f"🗜️  tar.gz: {tar_gz_size}")
-    print(f"🗜️  tar.xz: {tar_xz_size}")
+    print(f"📦 Package: {packageName}")
+    print(f"📏 Uncompressed: {packageSize}")
+    print(f"🗜️  tar.gz: {tarGzSize}")
+    print(f"🗜️  tar.xz: {tarXzSize}")
     print("📁 Location: dist/")
     print("\n📋 Files created:")
 
-    dist_files = os.listdir("dist")
-    for f in sorted(dist_files):
-        file_path = f"dist/{f}"
-        if os.path.isfile(file_path):
+    distFiles = os.listdir("dist")
+    for f in sorted(distFiles):
+        filePath = f"dist/{f}"
+        if os.path.isfile(filePath):
             size = (
-                run_command(f"du -sh {file_path}").split()[0]
-                if run_command(f"du -sh {file_path}")
+                runCommand(f"du -sh {filePath}").split()[0]
+                if runCommand(f"du -sh {filePath}")
                 else "?"
             )
             print(f"  📄 {f} ({size})")
@@ -483,10 +547,10 @@ echo "🎯 Run with: rc-driver"
 
     print("\n🚀 Ready for distribution!")
     print("📤 Upload these files for release:")
-    print(f"   • {package_name}.tar.gz")
-    print(f"   • {package_name}.tar.xz")
-    print(f"   • {package_name}.tar.gz.sha256")
-    print(f"   • {package_name}.tar.xz.sha256")
+    print(f"   • {packageName}.tar.gz")
+    print(f"   • {packageName}.tar.xz")
+    print(f"   • {packageName}.tar.gz.sha256")
+    print(f"   • {packageName}.tar.xz.sha256")
     print("   • quick-install.sh")
 
     print("\n💡 Users can install with:")
@@ -494,13 +558,13 @@ echo "🎯 Run with: rc-driver"
         "   wget https://your-site.com/quick-install.sh && chmod +x quick-install.sh && ./quick-install.sh"
     )
     print("   # OR")
-    print(f"   wget https://your-site.com/{package_name}.tar.gz")
-    print(f"   tar -xzf {package_name}.tar.gz")
-    print(f"   cd {package_name}")
+    print(f"   wget https://your-site.com/{packageName}.tar.gz")
+    print(f"   tar -xzf {packageName}.tar.gz")
+    print(f"   cd {packageName}")
     print("   sudo ./install.sh")
 
 
 if __name__ == "__main__":
     print("📦 Futaba RC Driver Packaging Tool")
     print("=" * 40)
-    package_distribution()
+    packageDistribution()
