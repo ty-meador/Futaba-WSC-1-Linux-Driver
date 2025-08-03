@@ -81,5 +81,5 @@ If you encounter any issues or would like to contribute:
 * goal is 100% Futaba device compatibility. The easiest way to help us with this is to test with any Futaba devices you have laying around and create an issue outlining your results.
 
 # Driver Limitations
- - The nature of the device is that of a user space virtual joystick. This has a vew inherent limitations
+ - The nature of the device is that of a user space virtual joystick. This has a few inherent limitations
    - If you start (or restart) the driver while VRC-Pro is running, you MUST go into the settings and select the Futaba adapter as your input device
