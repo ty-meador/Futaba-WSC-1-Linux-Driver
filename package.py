@@ -9,7 +9,11 @@ import tarfile
 from datetime import datetime
 
 
-def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
+def runCommand(
+    cmd: str,
+    cwd: str | None = None,
+    capture: bool = True,
+) -> str | None:
     """Run a command and handle errors.
 
     Args:
@@ -25,7 +29,12 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
     try:
         if capture:
             result = subprocess.run(
-                cmd, shell=True, check=True, cwd=cwd, capture_output=True, text=True
+                cmd,
+                shell=True,
+                check=True,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
             )
             return result.stdout.strip()
         else:
