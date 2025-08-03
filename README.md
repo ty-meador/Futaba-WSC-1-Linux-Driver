@@ -19,7 +19,7 @@ git clone https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver.git
 # Change working directory to the repo you just cloned
 cd futaba-usb-rc-linux-driver
 # install dependencies
-sudo ./install.sh
+pip3 install -r requirements.txt
 ...
 sudo ./run.sh
 Which device would you like to start?
@@ -34,6 +34,38 @@ CTRL + C to stop driver
 
 - If your device does not show up please consider supporting the project by [creating an issue](https://gitlab.com/Native-Coder/futaba-usb-rc-linux-driver/-/issues/new)
 
+## Building and Packaging
+From the root of the repository
+- Ensure all dependencies are installed: `pip install -r requirements.txt`
+- run `python3 ./build.py`
+
+To package the build into a stand-alone (a.k.a. "portable") install
+  - run `python3 ./package.py`
+  - This will create a directory called "dist" which includes:
+    - The built package
+    - A `tar.xyz` bundle of the built package
+    - shasums of all files
+    - `quick-install.sh` script
+
+## Running the portable build
+- cd into the directory where the built package is located
+  - ex: `cd futaba-rc-driver-9994302-linux-X86_64`
+- From here you can install, unintstall, and manually run the driver
+  - install: `sudo ./install.sh`
+  - uninstall: `sudo ./uninstall.sh`
+  - run: `./futaba-rc-driver`
+
+If all went well you should see somthing similar to the following
+```shell
+user@linux:~/projects/Futaba_USB_Linux_Driver/dist/futaba-rc-driver-99943d2-linux-x86_64$ sudo ./futaba-rc-driver 
+[sudo] password for user: 
+🎮 RC USB Receiver Driver
+==============================
+✅ Found 1 Futaba device(s)
+🚀 Auto-starting Futaba WSC-1(135)
+✅ Started Futaba WSC-1(135)
+🎯 Driver is running. Press CTRL+C to stop.
+```
 
 ## Issues and Contributing
 If you encounter any issues or would like to contribute:

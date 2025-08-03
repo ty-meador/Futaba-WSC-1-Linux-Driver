@@ -232,13 +232,6 @@ def buildExecutable() -> bool:
         "--include-package-data=Futaba",
         "--include-package-data=uinput",
         "--include-package-data=usb",
-        # Exclude unnecessary packages to keep size small
-        "--nofollow-import-to=numpy.f2py",
-        "--nofollow-import-to=numpy.distutils",
-        "--nofollow-import-to=numpy.testing",
-        "--nofollow-import-to=matplotlib",
-        "--nofollow-import-to=scipy",
-        "--nofollow-import-to=pandas",
         # Entry point
         "src/main.py",
     ]
