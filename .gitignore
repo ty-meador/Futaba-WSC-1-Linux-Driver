@@ -9,4 +9,4 @@ dist/*
 *build*
 *main.dist*
 *nuitka*.xml
-rc-driver
+futaba-rc-driver
