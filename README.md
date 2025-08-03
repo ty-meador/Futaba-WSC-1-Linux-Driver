@@ -3,7 +3,7 @@
 
 # Futaba USB RC Linux Driver 
 
-Python script that will remap the native hardware inputs to a virtual joystick device. This allows most windows games to play nicely with your hardware on Linux. In theory this should "just work" if any Futaba USB RC adapter but I've only tested with the Futaba WSC-1 on VRC-Pro
+Usermode driver for Futaba USB RC adapters. This allows most windows games to play nicely with your hardware on Linux. In theory this should "just work" for any Futaba USB RC adapter but I've only tested with the Futaba WSC-1 on VRC-Pro
 
 ## Credits
 This project was inspired by the [Futaba_T16IZ_Linux](https://github.com/shaozu/Futaba_T16IZ_Linux) repo which was inspired by [dji-mini-controller-linux-driver](https://github.com/catrielmuller/dji-mini-controller-linux-driver).
@@ -78,7 +78,7 @@ If you encounter any issues or would like to contribute:
 | [WSC-1](https://futabausa.com/product/wsc-1/) | [VRC-Pro](https://store.steampowered.com/app/335070/VRC_PRO/) |  ✓  |
 | [INTERLINK Plus](https://fccid.io/AZPFS0005H/User-Manual/Manual-232847) | [Real Flight Generation 2](https://forums.realflight.com/index.php?forums/realflight-g2.18/) | SAMPLES NEEDED | 
 | [T16IZ](https://futabausa.com/product/transmitter-16iz/) | NEEDS TESTING | NEEDS TESTING
-
+* goal is 100% Futaba device compatibility. The easiest way to help us with this is to test with any Futaba devices you have laying around and create an issue outlining your results.
 
 # Driver Limitations
  - The nature of the device is that of a user space virtual joystick. This has a vew inherent limitations
