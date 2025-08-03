@@ -74,16 +74,7 @@ DEFAULT_CONFIG: dict = {
     ],
 }
 
-DEFAULT_CALIBRATION: list = [
-    DEFAULT_INPUT_RANGE,
-    DEFAULT_INPUT_RANGE,
-    DEFAULT_INPUT_RANGE,
-    DEFAULT_INPUT_RANGE,
-    DEFAULT_INPUT_RANGE,
-    DEFAULT_INPUT_RANGE,
-    DEFAULT_INPUT_RANGE,
-    DEFAULT_INPUT_RANGE,
-]
+DEFAULT_CALIBRATION: list = [DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])]
 
 PRODUCTS: dict = {
     "default": 999,
@@ -101,27 +92,11 @@ DEFAULT_LOGGER: logging.Logger = logging.getLogger("driver")
 DEFAULT_LOGGER.setLevel(LOGLEVEL)
 DEFAULT_LOGGER.addHandler(DEFAULT_LOG_HANDLER)
 
-
-ROOT_DIR: str | None = None
-# Start from THIS file's directory
-currentFile = Path(__file__).resolve()  # Using resolve to get an absolute path.
-for parent in currentFile.parents:  # Iterate over every parent.
-    if (parent / "LICENSE").exists():  # We expect the LICENSE file to be in the root of the project
-        ROOT_DIR = os.path.abspath(parent)
-        break
-
-if ROOT_DIR is None:
-    raise RuntimeError(
-        "Unable to locate a file named 'LICENSE', therefore cannot determine the "
-        "projects root directory"
-    )
-
-SRC_PATH: str = os.path.join(ROOT_DIR, "src")
-LOG_PATH: str = os.path.join(ROOT_DIR, "logs")
-os.makedirs(LOG_PATH, exist_ok=True)
-DRIVER_PATH: str = os.path.join(SRC_PATH, "Futaba")
+DRIVER_PATH: str = Path(__file__).resolve().parent  # Using resolve to get an absolute path.
 CONFIG_PATH: str = os.path.join(DRIVER_PATH, "configs")
 CALIBRATION_PATH: str = os.path.join(DRIVER_PATH, "calibrations")
+LOG_PATH: str = os.path.join(DRIVER_PATH, "logs")
+os.makedirs(LOG_PATH, exist_ok=True)
 
 
 def findHIDInterface(coreDevice: usb.core.Device) -> usb.core.Interface | None:

@@ -1,0 +1,52 @@
+# Nuitka package configuration for Futaba RC Driver
+# This file configures the build process for creating a standalone executable
+
+build:
+  # Performance optimization settings
+  optimization: true
+  lto: true
+  
+  # Package dependencies to include
+  include-packages:
+    - Futaba
+    - usb
+    - uinput
+  
+  # Follow imports for critical packages
+  follow-imports:
+    - uinput
+    - usb
+    - Futaba
+  
+  # Include package data files
+  include-package-data:
+    - Futaba
+    - uinput
+    - usb
+  
+  # Linux-specific settings
+  linux-onefile: false  # Use standalone distribution instead
+  assume-yes-for-downloads: true
+  
+  # Output configuration
+  output-filename: futaba-rc-driver
+  remove-output: true
+  
+  # Plugins to enable
+  enable-plugins:
+    - anti-bloat
+    - implicit-imports
+  
+  # Packages to exclude for smaller size
+  nofollow-imports:
+    - numpy.f2py
+    - numpy.distutils
+    - numpy.testing
+    - matplotlib
+    - scipy
+    - pandas
+  
+  # Build process settings
+  show-progress: true
+  show-memory: true
+  verbose: true
