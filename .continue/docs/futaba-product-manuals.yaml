@@ -1,0 +1,6 @@
+name: Futaba Product Manuals
+version: 0.0.1
+schema: v1
+docs:
+  - name: Futaba Product Manuals
+    startUrl: https://futabausa.com/product-support/manuals/

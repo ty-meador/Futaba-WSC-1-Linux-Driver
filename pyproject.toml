@@ -129,8 +129,8 @@ show_error_codes = true
 exclude = ["docs", "test", "tests"]
 
 [tool.pyright]
-pythonVersion = "3.10"
-typeCheckingMode = "basic"
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
 # enable subset of "strict"
 reportDuplicateImport = true
 reportInvalidStubStatement = true

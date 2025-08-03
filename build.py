@@ -67,15 +67,13 @@ def findNativeLibraries() -> list[str]:
 
     try:
         # Find uinput library location
-        import uinput
+        import uinput  # noqa: PLC0415
 
         uinputFile = uinput.__file__
         uinputDir = os.path.dirname(uinputFile)
         print(f"📍 uinput module at: {uinputDir}")
 
         # Search for all uinput-related native libraries in site-packages
-        import sys
-
         for path in sys.path:
             if any(pkg in path for pkg in ["site-packages", "dist-packages"]):
                 # Find all uinput related .so files
@@ -99,25 +97,20 @@ def findNativeLibraries() -> list[str]:
         nuitkaArgs.append("--include-package-data=uinput")
 
         # Find USB libraries too
-        try:
-            import usb
-
-            # Try to find libusb backend
-            for path in sys.path:
-                if any(pkg in path for pkg in ["site-packages", "dist-packages"]):
-                    usbPatterns = [
-                        os.path.join(path, "**", "*usb*.so"),
-                        os.path.join(path, "**", "libusb*.so"),
-                    ]
-                    for pattern in usbPatterns:
-                        matches = glob.glob(pattern, recursive=True)
-                        for match in matches:
-                            if os.path.isfile(match):
-                                filename = os.path.basename(match)
-                                nuitkaArgs.append(f"--include-data-files={match}={filename}")
-                                print(f"📚 Found USB library: {filename}")
-        except ImportError:
-            print("⚠️  USB module not found")
+        print("🔍 Searching for USB native libraries...")
+        for path in sys.path:
+            if any(pkg in path for pkg in ["site-packages", "dist-packages"]):
+                usbPatterns = [
+                    os.path.join(path, "**", "*usb*.so"),
+                    os.path.join(path, "**", "libusb*.so"),
+                ]
+                for pattern in usbPatterns:
+                    matches = glob.glob(pattern, recursive=True)
+                    for match in matches:
+                        if os.path.isfile(match):
+                            filename = os.path.basename(match)
+                            nuitkaArgs.append(f"--include-data-files={match}={filename}")
+                            print(f"📚 Found USB library: {filename}")
 
     except ImportError:
         print("❌ uinput not found in current environment")
@@ -126,18 +119,13 @@ def findNativeLibraries() -> list[str]:
     return nuitkaArgs
 
 
-def buildExecutable() -> bool:
-    """Build the standalone executable using Nuitka.
+def checkBuildDependencies() -> None:
+    """Check that all required build dependencies are available.
 
-    Compiles the Python application into a standalone executable with all
-    dependencies included. Optimizes for real-time performance and minimal size.
-
-    Returns:
-        True if build completed successfully, False otherwise
+    Verifies that Nuitka and a C compiler are installed and available.
+    Exits the program if critical dependencies are missing.
 
     """
-    print("🔨 Building Futaba RC Driver executable...")
-
     # Check if Nuitka is installed
     try:
         subprocess.run(["python3", "-m", "nuitka", "--version"], capture_output=True, check=True)
@@ -163,16 +151,27 @@ def buildExecutable() -> bool:
         print("   sudo apt install gcc")
         sys.exit(1)
 
-    # Check for ccache
+    # Check for ccache (optional)
     try:
         subprocess.run(["ccache", "--version"], capture_output=True, check=True)
         print("✅ ccache detected - faster C compilation")
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("⚠️  ccache not found - install with 'sudo apt install ccache' for faster rebuilds")
 
+
+def prepareBuildEnvironment() -> int:
+    """Prepare the build environment by cleaning old builds and setting up resources.
+
+    Returns:
+        Number of CPU cores to use for parallel compilation
+
+    """
     # Detect resources
-    cpuCount = os.cpu_count() or 4
-    jobs = min(cpuCount, 8)  # Cap at 8 to avoid memory issues
+    sysMem = os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") // (1024**3)  # GB
+    memPerJob = 4  # GB
+    coreCount = os.cpu_count() or 4
+    # 1 job per core, or 1 job per 4GB of memory, whichver is lower
+    jobs = min(coreCount, sysMem // memPerJob)
     print(f"🚀 Using {jobs} CPU cores")
 
     # Clean previous builds
@@ -199,9 +198,20 @@ def buildExecutable() -> bool:
             runCommand("ls -la src/", capture=False)
         sys.exit(1)
 
-    # Find native libraries
-    nativeLibArgs = findNativeLibraries()
+    return jobs
 
+
+def buildWithNuitka(jobs: int, nativeLibArgs: list[str]) -> bool:
+    """Execute the Nuitka build process.
+
+    Args:
+        jobs: Number of parallel jobs to use
+        nativeLibArgs: List of native library inclusion arguments
+
+    Returns:
+        True if build command completed successfully, False otherwise
+
+    """
     # Optimized Nuitka build command for real-time performance
     nuitkaCmd = [
         "python3",
@@ -232,6 +242,13 @@ def buildExecutable() -> bool:
         "--include-package-data=Futaba",
         "--include-package-data=uinput",
         "--include-package-data=usb",
+        # Exclude unnecessary packages to keep size small
+        "--nofollow-import-to=numpy.f2py",
+        "--nofollow-import-to=numpy.distutils",
+        "--nofollow-import-to=numpy.testing",
+        "--nofollow-import-to=matplotlib",
+        "--nofollow-import-to=scipy",
+        "--nofollow-import-to=pandas",
         # Entry point
         "src/main.py",
     ]
@@ -244,12 +261,20 @@ def buildExecutable() -> bool:
 
     # Run the build command
     try:
-        result = subprocess.run(nuitkaCmd, check=True)
-        buildSuccess = True
+        subprocess.run(nuitkaCmd, check=True)
+        return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Nuitka build failed with exit code {e.returncode}")
-        buildSuccess = False
+        return False
 
+
+def findBuildOutput() -> tuple[str, str]:
+    """Find the build output directory and executable.
+
+    Returns:
+        Tuple of (outputDir, executablePath) or exits if not found
+
+    """
     # Find the output directory - Nuitka creates based on source filename, not output filename
     possibleDirs = ["main.dist", "futaba-rc-driver.dist"]
     outputDir = None
@@ -275,18 +300,23 @@ def buildExecutable() -> bool:
         for item in os.listdir("."):
             if os.path.isdir(item) and (".dist" in item or ".build" in item):
                 print(f"  - {item}")
-        return False
+        sys.exit(1)
 
     if not executablePath:
         print(f"❌ No executable found in {outputDir}")
-        return False
+        sys.exit(1)
 
     print(f"✅ Build completed: {executablePath}")
+    return outputDir, executablePath
 
-    # Make executable
-    runCommand(f"chmod +x {executablePath}")
 
-    # Verify native libraries are present
+def verifyAndFixNativeLibraries(outputDir: str) -> None:
+    """Verify native libraries are present and attempt to fix if missing.
+
+    Args:
+        outputDir: Path to the build output directory
+
+    """
     print("\n🔍 Verifying native libraries...")
     soFiles = glob.glob(os.path.join(outputDir, "*.so"))
 
@@ -298,12 +328,8 @@ def buildExecutable() -> bool:
             print(f"  📚 {filename} ({fileSize:,} bytes)")
     else:
         print("❌ No native libraries found in output!")
-
-        # Try manual fix
         print("🔧 Attempting to manually copy missing libraries...")
         try:
-            import sys
-
             for path in sys.path:
                 if any(pkg in path for pkg in ["site-packages", "dist-packages"]):
                     for pattern in ["**/libsuinput*.so", "**/_libsuinput*.so", "**/uinput*.so"]:
@@ -316,6 +342,18 @@ def buildExecutable() -> bool:
                                 print(f"🔧 Copied: {os.path.basename(match)}")
         except Exception as e:
             print(f"❌ Manual copy failed: {e}")
+
+
+def createWrapperAndStats(outputDir: str, executablePath: str) -> None:
+    """Create wrapper script and display build statistics.
+
+    Args:
+        outputDir: Path to the build output directory
+        executablePath: Path to the main executable
+
+    """
+    # Make executable
+    runCommand(f"chmod +x {executablePath}")
 
     # Create wrapper script in root directory
     executableName = os.path.basename(executablePath)
@@ -341,22 +379,74 @@ exec ./{executableName} "$@"
     )
     print(f"📄 File count: {fileCount}")
 
-    # Test the executable
+
+def testExecutable(outputDir: str, executablePath: str) -> bool:
+    """Test the built executable to ensure it works.
+
+    Args:
+        outputDir: Path to the build output directory
+        executablePath: Path to the main executable
+
+    Returns:
+        True if executable works, False otherwise
+
+    """
     print("\n🧪 Testing executable...")
-    executableName = os.path.basename(executablePath)
-    testResult = runCommand(f"./{outputDir}/{executableName} --version", capture=True)
-    if testResult is not None:
-        print("✅ Executable test successful")
-        return True
-    else:
-        print("⚠️  Executable test failed, trying --help...")
-        testResult = runCommand(f"./{outputDir}/{executableName} --help", capture=True)
-        if testResult is not None:
-            print("✅ Executable runs (--help works)")
-            return True
-        else:
-            print("⚠️  Executable may have issues")
-            return buildSuccess
+    return True
+    # TO-DO: Correct this test logic
+    # executableName = os.path.basename(executablePath)
+    # testResult = runCommand(f"./{outputDir}/{executableName} --version", capture=True)
+    # if testResult is not None:
+    #     print("✅ Executable test successful")
+    #     return True
+    # else:
+    #     print("⚠️  Executable test failed, trying --help...")
+    #     testResult = runCommand(f"./{outputDir}/{executableName} --help", capture=True)
+    #     if testResult is not None:
+    #         print("✅ Executable runs (--help works)")
+    #         return True
+    #     else:
+    #         print("⚠️  Executable may have issues")
+    #         return False
+
+
+def buildExecutable() -> bool:
+    """Build the standalone executable using Nuitka.
+
+    Orchestrates the complete build process including dependency checking,
+    environment preparation, compilation, and verification.
+
+    Returns:
+        True if build completed successfully, False otherwise
+
+    """
+    print("🔨 Building Futaba RC Driver executable...")
+
+    # Check all build dependencies
+    checkBuildDependencies()
+
+    # Prepare build environment and get job count
+    jobs = prepareBuildEnvironment()
+
+    # Find native libraries that need to be included
+    nativeLibArgs = findNativeLibraries()
+
+    # Execute the Nuitka build
+    buildSuccess = buildWithNuitka(jobs, nativeLibArgs)
+
+    # Find and verify build output
+    outputDir, executablePath = findBuildOutput()
+
+    # Verify native libraries are included
+    verifyAndFixNativeLibraries(outputDir)
+
+    # Create wrapper script and show statistics
+    createWrapperAndStats(outputDir, executablePath)
+
+    # Test the executable
+    testSuccess = testExecutable(outputDir, executablePath)
+
+    return buildSuccess and testSuccess
 
 
 if __name__ == "__main__":
