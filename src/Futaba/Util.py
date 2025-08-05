@@ -272,7 +272,7 @@ def newLogger(
 class DeviceConfig:
     """Stores the configuration settings for a single device."""
 
-    channelEvents: list[str]
+    channelEvents: list[str] = DEFAULT_CONFIG["channel_events"]
     deadZone: int = DEFAULT_DEADZONE
-    frameSize: int = 16
-    noiseFilter: int = 0
+    frameSize: int = DEFAULT_CONFIG["frame_size"]
+    noiseFilter: int = DEFAULT_NOISE_FILTER

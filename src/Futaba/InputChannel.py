@@ -140,9 +140,16 @@ class ChannelCalibration:
         inputMin, inputMid, inputMax = inputRange
         outputMin, outputMid, outputMax = outputRange
 
+        assert inputMin < inputMid < inputMax, "Insane input range"
+        assert outputMin < outputMid < outputMax, "Insane output range"
+
+        # If the input uses both positive and negative values we need to
+        # account for that in the array size
+        mapSize = abs(inputMax - inputMin) if inputMin < 0 else abs(inputMax)
+
         # Create a value map such that the index of the array represents
         # the input value, and the contents at that index is the output
-        allPossibleInputValues = array.array("i", [outputMin] * inputMax)
+        allPossibleInputValues = array.array("i", [outputMin] * mapSize)
 
         arrayRange = range(inputMin, inputMax)
         if reverse:
@@ -160,20 +167,6 @@ class ChannelCalibration:
                 right=outputMax,
             ),
         )
-
-        # return array.array(
-        #     "i",  # int
-        #     np.round(
-        #         np.interp(
-        #             allPossibleInputValues,
-        #             inputRange,
-        #             outputRange,
-        #             left=outputMin,
-        #             right=outputMax,
-        #         ),
-        #         0,  # No decimals
-        #     ).astype(int),
-        # )
 
     @classmethod
     def interpolate(
