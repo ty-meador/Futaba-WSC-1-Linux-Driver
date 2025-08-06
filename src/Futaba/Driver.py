@@ -227,9 +227,9 @@ class FutabaDeviceDriver:
 
     def stop(self) -> None:
         """Stop the driver and kill the subprocess."""
-        if not self.killswitch.is_set():
+        if hasattr(self, "killswitch") and not self.killswitch.is_set():
             self.killswitch.set()
-        if self.subProc is not None and self.subProc.is_alive():
+        if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
             self.subProc.join()
         self.subProc = None
 
