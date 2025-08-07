@@ -4,7 +4,6 @@
 import os
 import shutil
 import subprocess
-import sys
 import tarfile
 import tomllib
 from datetime import datetime
@@ -13,6 +12,19 @@ with open("pyproject.toml", "rb") as f:
     """Load pyproject.toml file."""
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
+
+BUILD_DIR = PYPROJECT["tool"]["build_tool"]["build_dir"]
+EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
+PACKAGE_DIR = PYPROJECT["tool"]["build_tool"]["package_dir"]
+INSTALL_DIR = PYPROJECT["tool"]["build_tool"]["install_dir"]
+BIN_DIR = PYPROJECT["tool"]["build_tool"]["bin_dir"]
+SERVICE_DIR = PYPROJECT["tool"]["build_tool"]["service_dir"]
+REPOSITORY = PYPROJECT["project"]["urls"]["Repository"]
+VERSION = PYPROJECT["project"]["version"]
+INSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["install_script_name"]
+UNINSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["uninstall_script_name"]
+WEB_INSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["web_install_script_name"]
+REPO = PYPROJECT["project"]["urls"]["Repository"]
 
 
 def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
@@ -78,15 +90,9 @@ def renderReadme() -> str:
     renderedTemplate = None
     with open("build-artifact-templates/README.md") as template:
         renderedTemplate = template.read()
-    renderedTemplate = renderedTemplate.replace(
-        "{{repo_url}}", PYPROJECT["project"]["urls"]["Repository"]
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{executable_name}}", {PYPROJECT["tool"]["build_tool"]["executable_name"]}
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{install_script_name}}", PYPROJECT["tool"]["build_tool"]["install_script_name"]
-    )
+    renderedTemplate = renderedTemplate.replace("{{repo_url}}", REPOSITORY)
+    renderedTemplate = renderedTemplate.replace("{{executable_name}}", EXECUTABLE_NAME)
+    renderedTemplate = renderedTemplate.replace("{{install_script_name}}", INSTALL_SCRIPT_NAME)
     return renderedTemplate
 
 
@@ -106,18 +112,10 @@ def renderInstallScript() -> str:
     renderedTemplate = None
     with open("build-artifact-templates/scripts/install.sh") as template:
         renderedTemplate = template.read()
-    renderedTemplate = renderedTemplate.replace(
-        "{{install_dir}}", PYPROJECT["tool"]["build_tool"]["install_dir"]
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{bin_dir}}", PYPROJECT["tool"]["build_tool"]["bin_dir"]
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{service_dir}}", PYPROJECT["tool"]["build_tool"]["service_dir"]
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{executable_name}}", {PYPROJECT["tool"]["build_tool"]["executable_name"]}
-    )
+    renderedTemplate = renderedTemplate.replace("{{install_dir}}", INSTALL_DIR)
+    renderedTemplate = renderedTemplate.replace("{{bin_dir}}", BIN_DIR)
+    renderedTemplate = renderedTemplate.replace("{{service_dir}}", SERVICE_DIR)
+    renderedTemplate = renderedTemplate.replace("{{executable_name}}", EXECUTABLE_NAME)
     return renderedTemplate
 
 
@@ -134,22 +132,14 @@ def renderUnInstallScript() -> str:
     renderedTemplate = None
     with open("build-artifact-templates/scripts/uninstall.sh") as template:
         renderedTemplate = template.read()
-    renderedTemplate = renderedTemplate.replace(
-        "{{install_dir}}", PYPROJECT["tool"]["build_tool"]["install_dir"]
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{bin_dir}}", PYPROJECT["tool"]["build_tool"]["bin_dir"]
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{service_dir}}", PYPROJECT["tool"]["build_tool"]["service_dir"]
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{executable_name}}", {PYPROJECT["tool"]["build_tool"]["executable_name"]}
-    )
+    renderedTemplate = renderedTemplate.replace("{{install_dir}}", INSTALL_DIR)
+    renderedTemplate = renderedTemplate.replace("{{bin_dir}}", BIN_DIR)
+    renderedTemplate = renderedTemplate.replace("{{service_dir}}", SERVICE_DIR)
+    renderedTemplate = renderedTemplate.replace("{{executable_name}}", EXECUTABLE_NAME)
     return renderedTemplate
 
 
-def renderWebInstaller() -> str:
+def renderWebInstaller(packageName, downloadUrl) -> str:
     """Create uninstall script.
 
     Generates a complete uninstaller that removes all installed files,
@@ -162,16 +152,12 @@ def renderWebInstaller() -> str:
     renderedTemplate = None
     with open("build-artifact-templates/scripts/web-installer.sh") as template:
         renderedTemplate = template.read()
-    renderedTemplate = renderedTemplate.replace(
-        "{{package_name}}", PYPROJECT["tool"]["build_tool"]["package_name"]
-    )
-    renderedTemplate = renderedTemplate.replace(
-        "{{download_url}}", PYPROJECT["tool"]["build_tool"]["download_url"]
-    )
+    renderedTemplate = renderedTemplate.replace("{{package_name}}", packageName)
+    renderedTemplate = renderedTemplate.replace("{{download_url}}", downloadUrl)
     return renderedTemplate
 
 
-def packageDistribution() -> None:
+def packageDistribution() -> None:  # noqa: PLR0915
     """Create the standalone distribution package.
 
     Creates a complete distribution package including:
@@ -186,29 +172,14 @@ def packageDistribution() -> None:
     """
     print("📦 Creating standalone distribution package...")
 
-    # Find the build directory
-    possibleBuildDirs = ["main.dist", "{PYPROJECT['tool']['build_tool']['executable_name']}.dist"]
-    buildDir = None
-
-    for dirName in possibleBuildDirs:
-        if os.path.exists(dirName):
-            buildDir = dirName
-            print(f"✅ Found build directory: {buildDir}")
-            break
-
-    if not buildDir:
-        print("❌ No build found! Run build script first.")
-        print(f"   Looking for: {', '.join(possibleBuildDirs)}")
-        sys.exit(1)
-
     # Get version info
     version, buildDate = getVersionInfo()
     print(f"📋 Version: {version}")
     print(f"📅 Build: {buildDate}")
 
     # Create package directory
-    packageName = f"{PYPROJECT['tool']['build_tool']['executable_name']}-{version}-linux-x86_64"
-    packageDir = f"dist/{packageName}"
+    packageName = f"{EXECUTABLE_NAME}-{version}-linux-x86_64"
+    packageDir = f"{PACKAGE_DIR}/{packageName}"
 
     print(f"📁 Creating package: {packageName}")
 
@@ -219,36 +190,18 @@ def packageDistribution() -> None:
 
     # Copy the main executable and its dependencies
     print("📋 Copying executable...")
-    shutil.copytree(buildDir, f"{packageDir}/{buildDir}")
-
-    # Find the actual executable
-    possibleExecutables = ["{PYPROJECT['tool']['build_tool']['executable_name']}", "main"]
-    executableName = None
-
-    for execName in possibleExecutables:
-        executablePath = os.path.join(buildDir, execName)
-        if os.path.exists(executablePath) and os.access(executablePath, os.X_OK):
-            executableName = execName
-            print(f"✅ Found executable: {executablePath}")
-            break
-
-    if not executableName:
-        print(f"❌ No executable found in {buildDir}")
-        print("📁 Contents of build directory:")
-        for item in os.listdir(buildDir):
-            print(f"  - {item}")
-        sys.exit(1)
+    shutil.copytree(BUILD_DIR, f"{packageDir}/{BUILD_DIR}")
 
     # Create wrapper script that works from any location
     wrapperScript = f"""#!/bin/bash
 # Futaba RC Driver Wrapper
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-exec "$SCRIPT_DIR/{buildDir}/{executableName}" "$@"
+exec "$SCRIPT_DIR/{BUILD_DIR}/{EXECUTABLE_NAME}" "$@"
 """
 
-    with open(f"{packageDir}/{PYPROJECT['tool']['build_tool']['executable_name']}", "w") as f:
+    with open(f"{packageDir}/{EXECUTABLE_NAME}", "w") as f:
         f.write(wrapperScript)
-    os.chmod(f"{packageDir}/{PYPROJECT['tool']['build_tool']['executable_name']}", 0o755)
+    os.chmod(f"{packageDir}/{EXECUTABLE_NAME}", 0o755)
 
     # Create documentation
     print("📄 Creating documentation...")
@@ -354,7 +307,8 @@ exec "$SCRIPT_DIR/{buildDir}/{executableName}" "$@"
 
     print("\n💡 Users can install with:")
     print(
-        "   wget https://your-site.com/quick-install.sh && chmod +x quick-install.sh && ./quick-install.sh"
+        "   wget https://your-site.com/quick-install.sh && chmod +x quick-install.sh "
+        "&& ./quick-install.sh"
     )
     print("   # OR")
     print(f"   wget https://your-site.com/{packageName}.tar.gz")
