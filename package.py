@@ -25,6 +25,7 @@ INSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["install_script_name"]
 UNINSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["uninstall_script_name"]
 WEB_INSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["web_install_script_name"]
 REPO = PYPROJECT["project"]["urls"]["Repository"]
+HOMEPAGE = PYPROJECT["project"]["urls"]["Homepage"]
 
 
 def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
@@ -269,7 +270,8 @@ exec "$SCRIPT_DIR/{BUILD_DIR}/{EXECUTABLE_NAME}" "$@"
     runCommand(f"cd dist && sha256sum {packageName}.tar.xz > {packageName}.tar.xz.sha256")
 
     # Create download script
-    webInstaller = renderWebInstaller()
+    downloadUrl = f"{HOMEPAGE}/{packageName}.tar.gz"
+    webInstaller = renderWebInstaller(packageName, downloadUrl)
     with open("dist/web-installer.sh", "w") as f:
         f.write(webInstaller)
     os.chmod("dist/web-installer.sh", 0o755)
