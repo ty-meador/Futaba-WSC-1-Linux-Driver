@@ -1,15 +1,26 @@
 [build-system]
-build-backend="nuitka.build_tools.nuitka_build_backend.NuitkaBuildBackend"
-requires=["nuitka==2.7.12"]
+build-backend = "nuitka.build_tools.nuitka_build_backend.NuitkaBuildBackend"
+requires = ["nuitka==2.7.12"]
 
 [project]
-dependencies=[
-  "pyusb==1.3.1",
-  "python-uinput==1.0.1",
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Environment :: Console :: Curses",
+  "Intended Audience :: End Users/Desktop",
+  "Natural Language :: English",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: System :: Hardware :: Hardware Drivers",
 ]
+dependencies = ["pyusb==1.3.1", "python-uinput==1.0.1"]
 description = "A Futaba RC Driver for Linux."
 name = "futaba-rc-driver"
 version = "0.3.15"
+
 
 [project.urls]
 Documentation = "https://tylermeador.com/futaba-rc-driver/docs"
@@ -17,19 +28,20 @@ Homepage = "https://tylermeador.com/futaba-rc-driver"
 Issues = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issues"
 Repository = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver"
 
+
 [tool.build_tool]
-install_script_name="install.sh"
-uninstall_script_name="uninstall.sh"
-web_install_script_name="web-installer.sh"
-executable_name="futaba-rc-driver"
-build_dir="build"
-package_dir="dist"
-install_dir="/opt/futaba-rc-driver"
-bin_dir="/usr/local/bin"
-service_dir="/etc/systemd/system"
+install_script_name = "install.sh"
+uninstall_script_name = "uninstall.sh"
+web_install_script_name = "web-installer.sh"
+executable_name = "futaba-rc-driver"
+build_dir = "build"
+package_dir = "dist"
+install_dir = "/opt/futaba-rc-driver"
+bin_dir = "/usr/local/bin"
+service_dir = "/etc/systemd/system"
 
 [tool.black]
-target-version = ['py310']
+target-version = ['py311']
 line-length = 120
 skip-string-normalization = true
 skip-magic-trailing-comma = true
@@ -61,7 +73,7 @@ skip_glob = ["docs/*", "setup.py"]
 filter_files = true
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 indent-width = 4
 extend-exclude = ["docs", "test", "tests"]
