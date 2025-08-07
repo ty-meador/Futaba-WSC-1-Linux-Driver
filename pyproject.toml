@@ -1,3 +1,15 @@
+[project]
+version = "0.3.15"
+name = "futaba-rc-driver"
+description = "A Futaba RC Driver for Linux."
+
+
+[tool.build_tool]
+install_script_name="install.sh"
+uninstall_script_name="uninstall.sh"
+web_install_script_name="web-installer.sh"
+executable_name="futaba-rc-driver"
+
 [tool.black]
 target-version = ['py310']
 line-length = 120
