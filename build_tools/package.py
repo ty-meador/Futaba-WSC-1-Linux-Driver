@@ -273,10 +273,12 @@ def packageDistribution() -> None:  # noqa: PLR0915
     runCommand(f"cd {packagePath} && sha256sum {tarXzName} > {tarXzName}.sha256")
 
     # Create web installer
-    downloadUrl = f"{HOMEPAGE}/{tarGzName}"
     renderTemplateToFile(
         SCRIPTS_TEMPLATES_DIR / WEB_INSTALL_SCRIPT_NAME,
-        {"package_name": packageName, "download_url": downloadUrl},
+        {
+            "package_name": packageName,
+            "download_url": f"{DISTRIBUTABLES_PAGE}/{packageName}/{tarGzName}",
+        },
         packagePath / WEB_INSTALL_SCRIPT_NAME,
     )
 
