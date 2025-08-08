@@ -315,8 +315,8 @@ def packageDistribution() -> None:  # noqa: PLR0915
 
     print("\n💡 Users can install with:")
     print(
-        f"   wget {DISTRIBUTABLES_PAGE}/{WEB_INSTALL_SCRIPT_NAME} && chmod +x {WEB_INSTALL_SCRIPT_NAME} "
-        f"&& ./{WEB_INSTALL_SCRIPT_NAME}"
+        f"   wget {DISTRIBUTABLES_PAGE}/{WEB_INSTALL_SCRIPT_NAME} "
+        f"&& chmod +x {WEB_INSTALL_SCRIPT_NAME} ./{WEB_INSTALL_SCRIPT_NAME}"
     )
     print("   # OR")
     print(f"   wget {DISTRIBUTABLES_PAGE}/{tarGzName}")

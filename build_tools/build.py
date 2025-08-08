@@ -1,37 +1,35 @@
 #!/usr/bin/env python3
 """Build script to create standalone executable for Futaba RC Driver."""
 
-import glob
-import os
-import shutil
 import subprocess
 import sys
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
 
-pwd = os.path.abspath(os.path.dirname(__file__))
-PROJECT_ROOT = os.path.join(pwd, "..")
-PYPROJECT_PATH = os.path.join(PROJECT_ROOT, "pyproject.toml")
+# Path constants using pathlib
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 
-with open(PYPROJECT_PATH, "rb") as f:
-    """Load pyproject.toml file."""
+# Load pyproject.toml
+with PYPROJECT_PATH.open("rb") as f:
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
 
-
-BUILD_DIR = os.path.join(PROJECT_ROOT, PYPROJECT["tool"]["build_tool"]["build_dir"])
+# Build configuration paths
+BUILD_DIR = PROJECT_ROOT / PYPROJECT["tool"]["build_tool"]["build_dir"]
 EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
-INSTALL_DIR = os.path.abspath(PYPROJECT["tool"]["build_tool"]["install_dir"])
+INSTALL_DIR = Path(PYPROJECT["tool"]["build_tool"]["install_dir"]).resolve()
 INSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["install_script_name"]
-PACKAGE_DIR = os.path.join(PROJECT_ROOT, PYPROJECT["tool"]["build_tool"]["package_dir"])
+PACKAGE_DIR = PROJECT_ROOT / PYPROJECT["tool"]["build_tool"]["package_dir"]
 UNINSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["uninstall_script_name"]
 WEB_INSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["web_install_script_name"]
 
 
 def runCommand(
     cmd: str | list[str],
-    cwd: str | None = None,
+    cwd: Path | None = None,
     capture: bool = True,
 ) -> str | None:
     """Run a command and handle errors.
@@ -119,10 +117,7 @@ def _find_libraries_by_patterns(patterns: list[str]) -> Iterator[Path]:
     """Find all library files matching the given patterns in package paths."""
     for package_path in _get_package_paths():
         for pattern in patterns:
-            full_pattern = package_path / "**" / pattern
-
-            for match in glob.glob(str(full_pattern), recursive=True):
-                lib_path = Path(match)
+            for lib_path in package_path.rglob(pattern):
                 if lib_path.is_file():
                     yield lib_path
 
@@ -203,27 +198,30 @@ def _cleanPreviousBuilds() -> None:
     """Remove previous build artifacts."""
     print("🧹 Cleaning previous builds...")
     dirsToClean = [
-        "build",
-        "main.dist",
-        "main.build",
-        f"{EXECUTABLE_NAME}.dist",
-        f"{EXECUTABLE_NAME}.build",
+        Path("build"),
+        Path("main.dist"),
+        Path("main.build"),
+        Path(f"{EXECUTABLE_NAME}.dist"),
+        Path(f"{EXECUTABLE_NAME}.build"),
         BUILD_DIR,
     ]
-    for d in dirsToClean:
-        if os.path.exists(d):
-            print(f"  Removing {d}")
-            shutil.rmtree(d)
+    for dir_path in dirsToClean:
+        if dir_path.exists():
+            print(f"  Removing {dir_path}")
+            import shutil
+
+            shutil.rmtree(dir_path)
 
 
 def _validateSource() -> None:
     """Verify source file exists."""
-    path = os.path.join(PROJECT_ROOT, "src", "main.py")
-    if not os.path.exists(path):
+    source_path = PROJECT_ROOT / "src" / "main.py"
+    if not source_path.exists():
         print("❌ src/main.py not found!")
         print("📁 Current directory contents:")
         runCommand("ls -la", capture=False)
-        if os.path.exists("src"):
+        src_dir = Path("src")
+        if src_dir.exists():
             print("📁 src/ directory contents:")
             runCommand("ls -la src/", capture=False)
         sys.exit(1)
@@ -231,9 +229,13 @@ def _validateSource() -> None:
 
 def _buildNuitkaCommand(nativeLibArgs) -> list:
     """Build the Nuitka command with all necessary arguments."""
+    import os
+
     cpuCount = os.cpu_count() or 4
     jobs = min(cpuCount, 12)
     print(f"🚀 Using {jobs} CPU cores")
+
+    source_main = PROJECT_ROOT / "src" / "main.py"
 
     nuitkaCmd = [
         "python3",
@@ -261,13 +263,13 @@ def _buildNuitkaCommand(nativeLibArgs) -> list:
         "--include-package-data=Futaba",
         "--include-package-data=uinput",
         "--include-package-data=usb",
-        os.path.abspath(os.path.join(PROJECT_ROOT, "src", "main.py")),
+        str(source_main),
     ]
     nuitkaCmd.extend(nativeLibArgs)
     return nuitkaCmd
 
 
-def _runBuild(nuitkaCmd) -> str:
+def _runBuild(nuitkaCmd) -> Path | None:
     """Execute the Nuitka build command and find the executable."""
     print("🎯 Running optimized Nuitka build:")
     print(f"   Command: {' '.join(nuitkaCmd[:6])}... (truncated)")
@@ -279,77 +281,80 @@ def _runBuild(nuitkaCmd) -> str:
         return None
 
     # Find executable
-    nuitkaOutputDir = "main.dist"
-    if not os.path.exists(nuitkaOutputDir):
-        print(f"❌ No build output directory found: {nuitkaOutputDir}")
+    nuitka_output_dir = Path("main.dist")
+    if not nuitka_output_dir.exists():
+        print(f"❌ No build output directory found: {nuitka_output_dir}")
         return None
 
     # Try specified name first, then fallback to 'main'
     for execName in [EXECUTABLE_NAME, "main"]:
-        execPath = os.path.join(nuitkaOutputDir, execName)
-        if os.path.exists(execPath):
-            print(f"✅ Build completed: {execPath}")
-            return execPath
+        exec_path = nuitka_output_dir / execName
+        if exec_path.exists():
+            print(f"✅ Build completed: {exec_path}")
+            return exec_path
 
-    print(f"❌ No executable found in {nuitkaOutputDir}")
+    print(f"❌ No executable found in {nuitka_output_dir}")
     return None
 
 
-def _setupExecutable(executablePath) -> None:
+def _setupExecutable(executablePath: Path) -> None:
     """Set up the executable distribution."""
+    import shutil
+
     # Make executable
     runCommand(f"chmod +x {executablePath}")
 
     # Verify native libraries
-    outputDir = os.path.dirname(executablePath)
-    _verifyNativeLibraries(outputDir)
+    output_dir = executablePath.parent
+    _verifyNativeLibraries(output_dir)
 
     # Move build and create wrapper
-    runCommand(f"mv {outputDir} {BUILD_DIR}")
+    shutil.move(str(output_dir), str(BUILD_DIR))
     _createWrapperScript()
     _showBuildStatistics()
 
 
-def _verifyNativeLibraries(outputDir) -> None:
+def _verifyNativeLibraries(outputDir: Path) -> None:
     """Verify that native libraries are present."""
     print("\n🔍 Verifying native libraries...")
-    soFiles = glob.glob(os.path.join(outputDir, "*.so"))
+    so_files = list(outputDir.glob("*.so"))
 
-    if soFiles:
+    if so_files:
         print("✅ Native libraries found:")
-        for soFile in soFiles:
-            filename = os.path.basename(soFile)
-            fileSize = os.path.getsize(soFile)
-            print(f"  📚 {filename} ({fileSize:,} bytes)")
+        for so_file in so_files:
+            file_size = so_file.stat().st_size
+            print(f"  📚 {so_file.name} ({file_size:,} bytes)")
     else:
         print("❌ No native libraries found in output!")
         # Try manual fix
         print("🔧 Attempting to manually copy missing libraries...")
         try:
-            for path in sys.path:
-                if any(pkg in path for pkg in ["site-packages", "dist-packages"]):
+            for path_str in sys.path:
+                path = Path(path_str)
+                if any(pkg in path.name for pkg in ["site-packages", "dist-packages"]):
                     for pattern in ["**/libsuinput*.so", "**/_libsuinput*.so", "**/uinput*.so"]:
-                        matches = glob.glob(os.path.join(path, pattern), recursive=True)
-                        for match in matches:
-                            if os.path.isfile(match):
-                                dest = os.path.join(outputDir, os.path.basename(match))
+                        for match in path.rglob(pattern[3:]):  # Remove **/ prefix for rglob
+                            if match.is_file():
+                                dest = outputDir / match.name
+                                import shutil
+
                                 shutil.copy2(match, dest)
-                                os.chmod(dest, 0o755)
-                                print(f"🔧 Copied: {os.path.basename(match)}")
+                                dest.chmod(0o755)
+                                print(f"🔧 Copied: {match.name}")
         except Exception as e:
             print(f"❌ Manual copy failed: {e}")
 
 
 def _createWrapperScript() -> None:
     """Create wrapper script in root directory."""
-    wrapperContent = f"""#!/bin/bash
+    wrapper_path = Path(EXECUTABLE_NAME)
+    wrapper_content = f"""#!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-cd "$SCRIPT_DIR/{BUILD_DIR}"
+cd "$SCRIPT_DIR/{BUILD_DIR.name}"
 exec ./{EXECUTABLE_NAME} "$@"
 """
-    with open(EXECUTABLE_NAME, "w") as f:
-        f.write(wrapperContent)
-    os.chmod(EXECUTABLE_NAME, 0o755)
+    wrapper_path.write_text(wrapper_content)
+    wrapper_path.chmod(0o755)
     print(f"🔗 Created wrapper script: ./{EXECUTABLE_NAME}")
 
 
@@ -360,22 +365,22 @@ def _showBuildStatistics() -> None:
     if result:
         print(f"📦 Distribution size: {result.split()[0]}")
 
-    fileCount = len(
-        [f for f in os.listdir(BUILD_DIR) if os.path.isfile(os.path.join(BUILD_DIR, f))]
-    )
-    print(f"📄 File count: {fileCount}")
+    file_count = len([f for f in BUILD_DIR.iterdir() if f.is_file()])
+    print(f"📄 File count: {file_count}")
 
 
 def _testExecutable() -> bool:
     """Test the built executable."""
     print("\n🧪 Testing executable...")
-    testResult = runCommand(f"{os.path.join(BUILD_DIR, EXECUTABLE_NAME)} --version", capture=True)
+    executable_path = BUILD_DIR / EXECUTABLE_NAME
+
+    testResult = runCommand(f"{executable_path} --version", capture=True)
     if testResult is not None:
         print("✅ Executable test successful")
         return True
     else:
         print("⚠️  Executable test failed, trying --help...")
-        testResult = runCommand(f"{os.path.join(BUILD_DIR, EXECUTABLE_NAME)} --help", capture=True)
+        testResult = runCommand(f"{executable_path} --help", capture=True)
         if testResult is not None:
             print("✅ Executable runs (--help works)")
             return True
