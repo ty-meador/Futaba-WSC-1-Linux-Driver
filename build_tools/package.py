@@ -110,7 +110,7 @@ def renderTemplateToFile(templatePath: Path, replacements: dict, outputPath: Pat
         rendered = templatePath.read_text()
         # Placeholders are in the form of {{i_am_a_placeholder}}
         for placeholder, value in replacements.items():
-            rendered = rendered.replace(f"{{{{{placeholder}}}}}", value)
+            rendered = rendered.replace(f"{{{{{str(placeholder)}}}}}", str(value))
 
         # Write file and set proper permissions
         outputPath.write_text(rendered)
@@ -158,7 +158,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     # Create wrapper script that works from any location
     renderTemplateToFile(
         SCRIPTS_TEMPLATES_DIR / "wrapper.sh",
-        {"executable_name": EXECUTABLE_NAME},
+        {"executable_path": f"{BUILD_DIR.name}/{EXECUTABLE_NAME}"},  # use relative path
         packagePath / EXECUTABLE_NAME,
     )
 
