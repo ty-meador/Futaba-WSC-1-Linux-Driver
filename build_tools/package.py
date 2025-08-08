@@ -1,35 +1,48 @@
 #!/usr/bin/env python3
 """Package Futaba RC Driver into a standalone distribution."""
 
-import os
 import shutil
 import subprocess
 import tarfile
 import tomllib
 from datetime import datetime
+from pathlib import Path
 
-PWD = os.path.abspath(os.path.dirname(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(PWD, ".."))
-PYPROJECT_PATH = os.path.join(PROJECT_ROOT, "pyproject.toml")
+# Project structure
+PWD = Path(__file__).parent.resolve()
+PROJECT_ROOT = PWD.parent
+PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 
+# Load project configuration
 with open(PYPROJECT_PATH, "rb") as f:
     """Load pyproject.toml file."""
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
 
-BIN_DIR = PYPROJECT["tool"]["build_tool"]["bin_dir"]
-BUILD_DIR = os.path.join(PROJECT_ROOT, PYPROJECT["tool"]["build_tool"]["build_dir"])
-EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
-HOMEPAGE = PYPROJECT["project"]["urls"]["Homepage"]
-DISTRIBUTABLES_PAGE = PYPROJECT["project"]["urls"]["Distributables"]
-INSTALL_DIR = PYPROJECT["tool"]["build_tool"]["install_dir"]
-INSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["install_script_name"]
-PACKAGE_DIR = os.path.join(PROJECT_ROOT, PYPROJECT["tool"]["build_tool"]["package_dir"])
-REPOSITORY = PYPROJECT["project"]["urls"]["Repository"]
-SERVICE_DIR = PYPROJECT["tool"]["build_tool"]["service_dir"]
-UNINSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["uninstall_script_name"]
-VERSION = PYPROJECT["project"]["version"]
-WEB_INSTALL_SCRIPT_NAME = PYPROJECT["tool"]["build_tool"]["web_install_script_name"]
+# Extract configuration values
+project_config = PYPROJECT["project"]
+build_config = PYPROJECT["tool"]["build_tool"]
+
+# Build configuration
+BIN_DIR = build_config["bin_dir"]
+BUILD_DIR = PROJECT_ROOT / build_config["build_dir"]
+EXECUTABLE_NAME = build_config["executable_name"]
+INSTALL_DIR = build_config["install_dir"]
+INSTALL_SCRIPT_NAME = build_config["install_script_name"]
+PACKAGE_DIR = PROJECT_ROOT / build_config["package_dir"]
+SERVICE_DIR = build_config["service_dir"]
+UNINSTALL_SCRIPT_NAME = build_config["uninstall_script_name"]
+WEB_INSTALL_SCRIPT_NAME = build_config["web_install_script_name"]
+
+# Project metadata
+HOMEPAGE = project_config["urls"]["Homepage"]
+DISTRIBUTABLES_PAGE = project_config["urls"]["Distributables"]
+REPOSITORY = project_config["urls"]["Repository"]
+VERSION = project_config["version"]
+
+# Template paths
+TEMPLATES_DIR = PWD / "build-artifact-templates"
+SCRIPTS_TEMPLATES_DIR = TEMPLATES_DIR / "scripts"
 
 
 def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
@@ -82,25 +95,29 @@ def getVersionInfo() -> tuple[str, str]:
     return version, buildDate
 
 
-def renderTemplate(templatePath: str, replacements: dict) -> str:
+def renderTemplateToFile(templatePath: Path, replacements: dict, outputPath: Path) -> str:
     """Render a template file with given replacements.
 
     Args:
-        templatePath (str): Path to the template file.
-        replacements (dict): Dictionary of placeholders and their corresponding values.
+        templatePath: Path to the template file.
+        replacements: Dictionary of placeholders and their corresponding values.
+        outputPath: The path to write the rendered file to.
 
     Returns:
         str: Rendered template content as string.
     """
-    rendered = ""
+    try:
+        rendered = templatePath.read_text()
+        # Placeholders are in the form of {{i_am_a_placeholder}}
+        for placeholder, value in replacements.items():
+            rendered = rendered.replace(f"{{{{{placeholder}}}}}", value)
 
-    with open(templatePath) as template:
-        rendered = template.read()
-
-    for placeholder, value in replacements.items():
-        rendered = rendered.replace(f"{{{{{placeholder}}}}}", value)
-
-    return rendered
+        # Write file and set proper permissions
+        outputPath.write_text(rendered)
+        outputPath.chmod(0o755)
+    except Exception as e:
+        raise RuntimeError("Failed to render template file.") from e
+    return True
 
 
 def packageDistribution() -> None:  # noqa: PLR0915
@@ -125,146 +142,143 @@ def packageDistribution() -> None:  # noqa: PLR0915
 
     # Create package directory
     packageName = f"{EXECUTABLE_NAME}-{version}-linux-x86_64"
+    packagePath = PACKAGE_DIR / packageName
 
     print(f"📁 Creating package: {packageName}")
 
     # Clean and create dist directory
-    if os.path.exists(PACKAGE_DIR):
+    if PACKAGE_DIR.exists():
         shutil.rmtree(PACKAGE_DIR)
-    os.makedirs(PACKAGE_DIR)
+    PACKAGE_DIR.mkdir(parents=True)
 
     # Copy the main executable and its dependencies
     print("📋 Copying executable...")
-    shutil.copytree(BUILD_DIR, os.path.join(PACKAGE_DIR, os.path.basename(BUILD_DIR)))
+    shutil.copytree(BUILD_DIR, packagePath / BUILD_DIR.name)
 
     # Create wrapper script that works from any location
-    wrapperScript = f"""#!/bin/bash
-# Futaba RC Driver Wrapper
-SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-exec "$SCRIPT_DIR/{os.path.basename(BUILD_DIR)}/{EXECUTABLE_NAME}" "$@"
-"""
-
-    with open(os.path.join(PACKAGE_DIR, EXECUTABLE_NAME), "w") as f:
-        f.write(wrapperScript)
-    os.chmod(f"{PACKAGE_DIR}/{EXECUTABLE_NAME}", 0o755)
+    renderTemplateToFile(
+        SCRIPTS_TEMPLATES_DIR / "wrapper.sh",
+        {"executable_name": EXECUTABLE_NAME},
+        packagePath / EXECUTABLE_NAME,
+    )
 
     print("📄 Creating documentation...")
 
     # Create README
-    readmePath = os.path.join(PWD, "build-artifact-templates", "README.md")
-    readmeReplacements = {
-        "version": VERSION,
-        "executable_name": EXECUTABLE_NAME,
-        "repo_url": REPOSITORY,
-        "install_script_name": INSTALL_SCRIPT_NAME,
-    }
-    with open(os.path.join(PACKAGE_DIR, "README.md"), "w") as f:
-        f.write(renderTemplate(readmePath, readmeReplacements))
+    renderTemplateToFile(
+        TEMPLATES_DIR / "README.md",
+        {
+            "version": VERSION,
+            "executable_name": EXECUTABLE_NAME,
+            "repo_url": REPOSITORY,
+            "install_script_name": INSTALL_SCRIPT_NAME,
+        },
+        packagePath / "README.md",
+    )
 
     print("🔧 Creating installation scripts...")
-    installScriptPath = os.path.join(
-        PWD, "build-artifact-templates", "scripts", INSTALL_SCRIPT_NAME
-    )
 
+    ##
     # create installer
-    installScriptReplacements = {
-        "repo_url": REPOSITORY,
-        "executable_name": EXECUTABLE_NAME,
-        "install_script_name": INSTALL_SCRIPT_NAME,
-        "install_dir": INSTALL_DIR,
-        "bin_dir": BIN_DIR,
-        "service_dir": SERVICE_DIR,
-    }
-    with open(os.path.join(PACKAGE_DIR, INSTALL_SCRIPT_NAME), "w") as f:
-        f.write(renderTemplate(installScriptPath, installScriptReplacements))
-    os.chmod(os.path.join(PACKAGE_DIR, INSTALL_SCRIPT_NAME), 0o755)
-
-    # Create uninstaller
-    uninstallScriptPath = os.path.join(
-        PWD, "build-artifact-templates", "scripts", INSTALL_SCRIPT_NAME
+    ##
+    renderTemplateToFile(
+        SCRIPTS_TEMPLATES_DIR / INSTALL_SCRIPT_NAME,
+        {
+            "repo_url": REPOSITORY,
+            "executable_name": EXECUTABLE_NAME,
+            "install_script_name": INSTALL_SCRIPT_NAME,
+            "install_dir": INSTALL_DIR,
+            "bin_dir": BIN_DIR,
+            "service_dir": SERVICE_DIR,
+        },
+        packagePath / INSTALL_SCRIPT_NAME,
     )
-    uninstallScriptReplacements = {
-        "repo_url": REPOSITORY,
-        "executable_name": EXECUTABLE_NAME,
-        "install_script_name": INSTALL_SCRIPT_NAME,
-        "install_dir": INSTALL_DIR,
-        "bin_dir": BIN_DIR,
-        "service_dir": SERVICE_DIR,
-    }
 
-    with open(os.path.join(PACKAGE_DIR, UNINSTALL_SCRIPT_NAME), "w") as f:
-        f.write(renderTemplate(uninstallScriptPath, uninstallScriptReplacements))
-    os.chmod(os.path.join(PACKAGE_DIR, UNINSTALL_SCRIPT_NAME), 0o755)
+    ##
+    # Create uninstaller
+    ##
+    renderTemplateToFile(
+        SCRIPTS_TEMPLATES_DIR / UNINSTALL_SCRIPT_NAME,
+        {
+            "repo_url": REPOSITORY,
+            "executable_name": EXECUTABLE_NAME,
+            "install_script_name": INSTALL_SCRIPT_NAME,
+            "install_dir": INSTALL_DIR,
+            "bin_dir": BIN_DIR,
+            "service_dir": SERVICE_DIR,
+        },
+        packagePath / UNINSTALL_SCRIPT_NAME,
+    )
 
+    ##
     # Copy license if it exists
-    if os.path.exists("LICENSE"):
-        shutil.copy2("LICENSE", f"{PACKAGE_DIR}/")
+    ##
+    licensePath = PROJECT_ROOT / "LICENSE"
+    packageLicensePath = packagePath / "LICENSE"
+    if licensePath.exists():
+        shutil.copy2(licensePath, packageLicensePath)
     else:
-        # Create a basic license file
-        with open(f"{PACKAGE_DIR}/LICENSE", "w") as f:
-            f.write("MIT License - See project repository for full license text\n")
+        raise PermissionError("Uable to find LICENSE, refusing to package.")
 
     # Create version info file
-    with open(f"{PACKAGE_DIR}/VERSION", "w") as f:
-        f.write(f"Version: {version}\n")
-        f.write(f"Build Date: {buildDate}\n")
-        f.write("Platform: Linux x86_64\n")
+    renderTemplateToFile(
+        TEMPLATES_DIR / "VERSION",
+        {"version": version, "build_date": buildDate},
+        packagePath / "VERSION",
+    )
 
-    # Calculate sizes
+    ##
+    # Create archives
+    ##
     print("📊 Calculating package size...")
-    duResult = runCommand(f"du -sh {PACKAGE_DIR}")
+    duResult = runCommand(f"du -sh {packagePath}")
     if duResult:
         packageSize = duResult.split()[0]
         print(f"📦 Package size: {packageSize}")
-    # Create compressed archives
-    print("🗜️  Creating compressed archives...")
 
-    parentDir = os.path.dirname(PACKAGE_DIR)
-    packageBaseName = os.path.basename(PACKAGE_DIR)
+    print("🗜️  Creating compressed archives...")
 
     # Create tar.gz outside the package dir first
     tarGzName = f"{packageName}.tar.gz"
-    tempTarGz = os.path.join(parentDir, tarGzName)
+    tempTarGz = PACKAGE_DIR / tarGzName
     with tarfile.open(tempTarGz, "w:gz") as tar:
-        tar.add(PACKAGE_DIR, arcname=packageBaseName)
+        tar.add(packagePath, arcname=packageName)
 
     # Create tar.xz outside the package dir
     tarXzName = f"{packageName}.tar.xz"
-    tempTarXz = os.path.join(parentDir, tarXzName)
-    runCommand(f"tar -cJf {tempTarXz} -C {parentDir} {packageBaseName}")
+    tempTarXz = PACKAGE_DIR / tarXzName
+    runCommand(f"tar -cJf {tempTarXz} -C {PACKAGE_DIR} {packageName}")
 
     # Now move them into the package directory
-    shutil.move(tempTarGz, os.path.join(PACKAGE_DIR, tarGzName))
-    shutil.move(tempTarXz, os.path.join(PACKAGE_DIR, tarXzName))
+    finalTarGz = packagePath / tarGzName
+    finalTarXz = packagePath / tarXzName
+    shutil.move(tempTarGz, finalTarGz)
+    shutil.move(tempTarXz, finalTarXz)
+
     # Get archive sizes
     tarGzSize = (
-        runCommand(f"du -sh {PACKAGE_DIR}/{tarGzName}").split()[0]
-        if runCommand(f"du -sh {PACKAGE_DIR}/{tarGzName}")
+        runCommand(f"du -sh {finalTarGz}").split()[0]
+        if runCommand(f"du -sh {finalTarGz}")
         else "Unknown"
     )
     tarXzSize = (
-        runCommand(f"du -sh {PACKAGE_DIR}/{tarXzName}").split()[0]
-        if runCommand(f"du -sh {PACKAGE_DIR}/{tarXzName}")
+        runCommand(f"du -sh {finalTarXz}").split()[0]
+        if runCommand(f"du -sh {finalTarXz}")
         else "Unknown"
     )
 
     # Create checksums
     print("🔐 Creating checksums...")
-    runCommand(f"cd {PACKAGE_DIR} && sha256sum {packageName}.tar.gz > {packageName}.tar.gz.sha256")
-    runCommand(f"cd {PACKAGE_DIR} && sha256sum {packageName}.tar.xz > {packageName}.tar.xz.sha256")
+    runCommand(f"cd {packagePath} && sha256sum {tarGzName} > {tarGzName}.sha256")
+    runCommand(f"cd {packagePath} && sha256sum {tarXzName} > {tarXzName}.sha256")
 
     # Create web installer
-    downloadUrl = f"{HOMEPAGE}/{packageName}.tar.gz"
-    webInstallerPath = os.path.join(
-        PWD, "build-artifact-templates", "scripts", WEB_INSTALL_SCRIPT_NAME
+    downloadUrl = f"{HOMEPAGE}/{tarGzName}"
+    renderTemplateToFile(
+        SCRIPTS_TEMPLATES_DIR / WEB_INSTALL_SCRIPT_NAME,
+        {"package_name": packageName, "download_url": downloadUrl},
+        packagePath / WEB_INSTALL_SCRIPT_NAME,
     )
-    webInstallerReplacements = {
-        "package_name": packageName,
-        "download_url": downloadUrl,
-    }
-    with open(os.path.join(PACKAGE_DIR, WEB_INSTALL_SCRIPT_NAME), "w") as f:
-        f.write(renderTemplate(webInstallerPath, webInstallerReplacements))
-    os.chmod(os.path.join(PACKAGE_DIR, WEB_INSTALL_SCRIPT_NAME), 0o755)
 
     # Summary
     print("\n🎉 Distribution package created successfully!")
@@ -276,25 +290,25 @@ exec "$SCRIPT_DIR/{os.path.basename(BUILD_DIR)}/{EXECUTABLE_NAME}" "$@"
     print("📁 Location: dist/")
     print("\n📋 Files created:")
 
-    distFiles = os.listdir(PACKAGE_DIR)
-    for f in sorted(distFiles):
-        filePath = f"dist/{f}"
-        if os.path.isfile(filePath):
+    distFiles = list(packagePath.iterdir())
+    for filePath in sorted(distFiles):
+        fileName = filePath.name
+        if filePath.is_file():
             size = (
                 runCommand(f"du -sh {filePath}").split()[0]
                 if runCommand(f"du -sh {filePath}")
                 else "?"
             )
-            print(f"  📄 {f} ({size})")
+            print(f"  📄 {fileName} ({size})")
         else:
-            print(f"  📁 {f}/")
+            print(f"  📁 {fileName}/")
 
     print("\n🚀 Ready for distribution!")
     print("📤 Upload these files for release:")
-    print(f"   • {packageName}.tar.gz")
-    print(f"   • {packageName}.tar.xz")
-    print(f"   • {packageName}.tar.gz.sha256")
-    print(f"   • {packageName}.tar.xz.sha256")
+    print(f"   • {tarGzName}")
+    print(f"   • {tarXzName}")
+    print(f"   • {tarGzName}.sha256")
+    print(f"   • {tarXzName}.sha256")
     print(f"   • {WEB_INSTALL_SCRIPT_NAME}")
 
     print("\n💡 Users can install with:")
@@ -303,8 +317,8 @@ exec "$SCRIPT_DIR/{os.path.basename(BUILD_DIR)}/{EXECUTABLE_NAME}" "$@"
         f"&& ./{WEB_INSTALL_SCRIPT_NAME}"
     )
     print("   # OR")
-    print(f"   wget {DISTRIBUTABLES_PAGE}/{packageName}.tar.gz")
-    print(f"   tar -xzf {packageName}.tar.gz")
+    print(f"   wget {DISTRIBUTABLES_PAGE}/{tarGzName}")
+    print(f"   tar -xzf {tarGzName}")
     print(f"   cd {packageName}")
     print(f"   sudo ./{INSTALL_SCRIPT_NAME}")
 
