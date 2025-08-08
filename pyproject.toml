@@ -25,6 +25,7 @@ version = "0.3.15"
 [project.urls]
 Documentation = "https://tylermeador.com/futaba-rc-driver/docs"
 Homepage = "https://tylermeador.com/futaba-rc-driver"
+Distributables = "https://tylermeador.com/futaba-rc-driver/dist"
 Issues = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issues"
 Repository = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver"
 

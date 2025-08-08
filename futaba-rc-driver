@@ -1,4 +1,4 @@
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/build"
+cd "$SCRIPT_DIR//home/ty/projects/Futaba_USB_Linux_Driver/build_tools/../build"
 exec ./futaba-rc-driver "$@"
