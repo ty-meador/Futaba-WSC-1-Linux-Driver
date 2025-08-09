@@ -4,496 +4,263 @@
 import subprocess
 import sys
 import tomllib
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+
+# Project structure
+PWD = Path(__file__).parent.resolve()
+PROJECT_ROOT = PWD.parent
+PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
+
+# Load project configuration
+with open(PYPROJECT_PATH, "rb") as f:
+    toml_data = tomllib.load(f)
+PYPROJECT = toml_data
+
+# Extract configuration values
+project_config = PYPROJECT["project"]
+build_config = PYPROJECT["tool"]["build_tool"]
+
+# Build configuration
+BUILD_DIR = PROJECT_ROOT / build_config["build_dir"]
+EXECUTABLE_NAME = build_config["executable_name"]
+
+# Additional build-specific paths
+SOURCE_MAIN = PROJECT_ROOT / "src" / "main.py"
+NUITKA_OUTPUT_DIR = PROJECT_ROOT / f"{SOURCE_MAIN.stem}.dist"
+WRAPPER_SCRIPT = PROJECT_ROOT / EXECUTABLE_NAME
+
+CLEAN_TARGETS = [BUILD_DIR, NUITKA_OUTPUT_DIR, WRAPPER_SCRIPT]
 
 
-class BuildPaths:
-    """Centralized path management for the build process."""
-
-    def __init__(self, scriptPath: Path):
-        self.scriptDir = scriptPath.resolve().parent
-        self.projectRoot = self.scriptDir.parent
-        self.pyprojectPath = self.projectRoot / "pyproject.toml"
-
-        # Load configuration
-        self._config = self._loadConfig()
-
-        # Build paths from config
-        self.buildDir = self.projectRoot / self._config["tool"]["build_tool"]["build_dir"]
-        self.executableName = self._config["tool"]["build_tool"]["executable_name"]
-        self.installDir = Path(self._config["tool"]["build_tool"]["install_dir"]).resolve()
-        self.installScriptName = self._config["tool"]["build_tool"]["install_script_name"]
-        self.packageDir = self.projectRoot / self._config["tool"]["build_tool"]["package_dir"]
-        self.uninstallScriptName = self._config["tool"]["build_tool"]["uninstall_script_name"]
-        self.webInstallScriptName = self._config["tool"]["build_tool"]["web_install_script_name"]
-
-        # Source paths
-        self.sourceMain = self.projectRoot / "src" / "main.py"
-        self.nuitkaOutputDir = Path("main.dist")
-        self.wrapperScript = Path(self.executableName)
-
-    def _loadConfig(self) -> dict[str, Any]:
-        """Load pyproject.toml configuration."""
-        with self.pyprojectPath.open("rb") as f:
-            return tomllib.load(f)
-
-    @property
-    def config(self) -> dict[str, Any]:
-        """Get the loaded configuration."""
-        return self._config
-
-    def getCleanTargets(self) -> list[Path]:
-        """Get list of paths to clean during build."""
-        return [
-            Path("build"),
-            Path("main.dist"),
-            Path("main.build"),
-            Path(f"{self.executableName}.dist"),
-            Path(f"{self.executableName}.build"),
-            self.buildDir,
-        ]
-
-
-class CommandRunner:
-    """Utility for running shell commands with consistent error handling."""
-
-    @staticmethod
-    def run(
-        cmd: str | list[str],
-        cwd: Path | None = None,
-        capture: bool = True,
-    ) -> str | None:
-        """Run a command and handle errors.
-
-        Args:
-            cmd: Command to run (string or list of arguments)
-            cwd: Working directory for command execution
-            capture: Whether to capture and return output
-
-        Returns:
-            Command output if capture=True and successful, empty string if capture=False and successful,
-            None if command failed
-        """
-        cmdStr = " ".join(cmd) if isinstance(cmd, list) else cmd
-
-        try:
+def runCommand(
+    cmd: str,
+    cwd: str | None = None,
+    capture: bool = True,
+) -> str | None:
+    """Run a command and handle errors."""
+    try:
+        if capture:
             result = subprocess.run(
                 cmd,
+                shell=True,
                 check=True,
                 cwd=cwd,
-                shell=isinstance(cmd, str),
-                capture_output=capture,
-                text=capture,
+                capture_output=True,
+                text=True,
             )
-            print(f"✓ {cmdStr}")
-            return result.stdout.strip() if capture else ""
-
-        except subprocess.CalledProcessError as e:
-            print(f"✗ {cmdStr}")
-            if capture and hasattr(e, "stderr") and e.stderr:
-                print(f"Error: {e.stderr}")
-            return None
-
-
-class EnvironmentValidator:
-    """Validates the build environment for required tools."""
-
-    def __init__(self, cmdRunner: CommandRunner):
-        self.cmdRunner = cmdRunner
-
-    def validate(self) -> None:
-        """Validate that all required tools are available."""
-        self._checkNuitka()
-        self._checkCCompiler()
-        self._checkCcache()
-
-    def _checkNuitka(self) -> None:
-        """Check if Nuitka is installed."""
-        try:
-            subprocess.run(
-                ["python3", "-m", "nuitka", "--version"], capture_output=True, check=True
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            raise BuildError("Nuitka not found. Install with: pip3 install nuitka") from e
-
-    def _checkCCompiler(self) -> None:
-        """Check for C compiler availability."""
-        compilerFound = False
-        for compiler in ["gcc", "clang", "cc"]:
-            try:
-                subprocess.run([compiler, "--version"], capture_output=True, check=True)
-                print(f"✅ Found C compiler: {compiler}")
-                compilerFound = True
-                break
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                continue
-
-        if not compilerFound:
-            print("❌ No C compiler found! Install with:")
-            print("   sudo apt install build-essential")
-            print("   # or")
-            print("   sudo apt install gcc")
-            sys.exit(1)
-
-    def _checkCcache(self) -> None:
-        """Check for ccache (optional optimization)."""
-        try:
-            subprocess.run(["ccache", "--version"], capture_output=True, check=True)
-            print("✅ ccache detected - faster C compilation")
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            print(
-                "⚠️  ccache not found - install with 'sudo apt install ccache' for faster rebuilds"
-            )
-
-
-class LibraryFinder:
-    """Finds and manages native libraries for inclusion in the build."""
-
-    def findNativeLibraries(self) -> list[str]:
-        """Find all native libraries that need to be included in the build.
-
-        Searches for uinput and USB-related native libraries in the Python environment
-        and prepares Nuitka arguments for including them in the distribution.
-
-        Returns:
-            List of Nuitka arguments for including native libraries
-        """
-        print("🔍 Locating native libraries...")
-
-        try:
-            import uinput  # noqa: PLC0415
-
-            print(f"📍 uinput module at: {Path(uinput.__file__).parent}")
-        except ImportError:
-            print("❌ uinput not found in current environment")
-            return []
-
-        nuitkaArgs = ["--include-package-data=uinput"]
-
-        # Library search patterns
-        libraryPatterns = {
-            "uinput": ["*uinput*.so", "_*uinput*.so", "libsuinput*.so", "_libsuinput*.so"],
-            "usb": ["*usb*.so", "libusb*.so"],
-        }
-
-        for libType, patterns in libraryPatterns.items():
-            foundLibraries = self._findLibrariesByPatterns(patterns)
-
-            for libPath in foundLibraries:
-                filename = libPath.name
-                nuitkaArgs.append(f"--include-data-files={libPath}={filename}")
-
-                emoji = "📚" if libType == "uinput" else "🔌"
-                print(f"{emoji} Found {libType} library: {filename}")
-
-        return nuitkaArgs
-
-    def _getPackagePaths(self) -> Iterator[Path]:
-        """Get all package installation paths from sys.path."""
-        for pathStr in sys.path:
-            path = Path(pathStr)
-            if any(pkg in path.name for pkg in ["site-packages", "dist-packages"]):
-                yield path
-
-    def _findLibrariesByPatterns(self, patterns: list[str]) -> Iterator[Path]:
-        """Find all library files matching the given patterns in package paths."""
-        for packagePath in self._getPackagePaths():
-            for pattern in patterns:
-                for libPath in packagePath.rglob(pattern):
-                    if libPath.is_file():
-                        yield libPath
-
-    def verifyNativeLibraries(self, outputDir: Path) -> None:
-        """Verify that native libraries are present in the output directory."""
-        print("\n🔍 Verifying native libraries...")
-        soFiles = list(outputDir.glob("*.so"))
-
-        if soFiles:
-            print("✅ Native libraries found:")
-            for soFile in soFiles:
-                fileSize = soFile.stat().st_size
-                print(f"  📚 {soFile.name} ({fileSize:,} bytes)")
+            return result.stdout.strip()
         else:
-            print("❌ No native libraries found in output!")
-            self._manualCopyLibraries(outputDir)
-
-    def _manualCopyLibraries(self, outputDir: Path) -> None:
-        """Attempt to manually copy missing libraries."""
-        print("🔧 Attempting to manually copy missing libraries...")
-        try:
-            for pathStr in sys.path:
-                path = Path(pathStr)
-                if any(pkg in path.name for pkg in ["site-packages", "dist-packages"]):
-                    for pattern in ["**/libsuinput*.so", "**/_libsuinput*.so", "**/uinput*.so"]:
-                        for match in path.rglob(pattern[3:]):  # Remove **/ prefix for rglob
-                            if match.is_file():
-                                dest = outputDir / match.name
-                                import shutil
-
-                                shutil.copy2(match, dest)
-                                dest.chmod(0o755)
-                                print(f"🔧 Copied: {match.name}")
-        except Exception as e:
-            print(f"❌ Manual copy failed: {e}")
-
-
-class NuitkaBuilder:
-    """Handles the Nuitka build process and configuration."""
-
-    def __init__(self, paths: BuildPaths, cmdRunner: CommandRunner, libFinder: LibraryFinder):
-        self.paths = paths
-        self.cmdRunner = cmdRunner
-        self.libFinder = libFinder
-
-    def build(self) -> Path | None:
-        """Execute the Nuitka build command and find the executable."""
-        nativeLibArgs = self.libFinder.findNativeLibraries()
-        nuitkaCmd = self._buildCommand(nativeLibArgs)
-
-        print("🎯 Running optimized Nuitka build:")
-        print(f"   Command: {' '.join(nuitkaCmd[:6])}... (truncated)")
-
-        try:
-            subprocess.run(nuitkaCmd, check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Nuitka build failed with exit code {e.returncode}")
-            return None
-
-        return self._findExecutable()
-
-    def _buildCommand(self, nativeLibArgs: list[str]) -> list[str]:
-        """Build the Nuitka command with all necessary arguments."""
-        import os
-
-        cpuCount = os.cpu_count() or 4
-        jobs = min(cpuCount, 12)
-        print(f"🚀 Using {jobs} CPU cores")
-
-        nuitkaCmd = [
-            "python3",
-            "-m",
-            "nuitka",
-            "--standalone",
-            "--assume-yes-for-downloads",
-            "--show-progress",
-            "--show-memory",
-            f"--output-filename={self.paths.executableName}",
-            "--remove-output",
-            f"--jobs={jobs}",
-            # Performance optimizations
-            "--lto=yes",
-            # Essential plugins
-            "--enable-plugin=anti-bloat",
-            "--enable-plugin=implicit-imports",
-            # Package inclusion
-            "--include-package=Futaba",
-            "--include-package=usb",
-            "--include-package=uinput",
-            "--follow-import-to=uinput",
-            "--follow-import-to=usb",
-            "--follow-import-to=Futaba",
-            "--include-package-data=Futaba",
-            "--include-package-data=uinput",
-            "--include-package-data=usb",
-            str(self.paths.sourceMain),
-        ]
-        nuitkaCmd.extend(nativeLibArgs)
-        return nuitkaCmd
-
-    def _findExecutable(self) -> Path | None:
-        """Find the built executable in the output directory."""
-        if not self.paths.nuitkaOutputDir.exists():
-            print(f"❌ No build output directory found: {self.paths.nuitkaOutputDir}")
-            return None
-
-        # Try specified name first, then fallback to 'main'
-        for execName in [self.paths.executableName, "main"]:
-            execPath = self.paths.nuitkaOutputDir / execName
-            if execPath.exists():
-                print(f"✅ Build completed: {execPath}")
-                return execPath
-
-        print(f"❌ No executable found in {self.paths.nuitkaOutputDir}")
+            subprocess.run(cmd, shell=True, check=True, cwd=cwd)
+            return ""
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Command failed: {cmd}")
+        if capture and e.stderr:
+            print(f"Error: {e.stderr}")
         return None
 
 
-class BuildCleaner:
-    """Handles cleaning of build artifacts."""
+def installDependencies():
+    """Install build dependencies."""
+    print("📦 Installing dependencies...")
 
-    def __init__(self, paths: BuildPaths):
-        self.paths = paths
+    # Install build requirements
+    buildDeps = PYPROJECT["build-system"]["requires"]
+    if runCommand(f"pip3 install {' '.join(buildDeps)}") is None:
+        sys.exit(1)
 
-    def clean(self) -> None:
-        """Remove previous build artifacts."""
-        print("🧹 Cleaning previous builds...")
-        import shutil
-
-        for dirPath in self.paths.getCleanTargets():
-            if dirPath.exists():
-                print(f"  Removing {dirPath}")
-                shutil.rmtree(dirPath)
+    # Install project requirements if they exist
+    if (PROJECT_ROOT / "requirements.txt").exists() and runCommand(
+        "pip3 install -r requirements.txt"
+    ):
+        sys.exit(1)
 
 
-class ExecutableManager:
-    """Manages executable setup, testing, and statistics."""
+def validateEnvironment():
+    """Check that required tools are available."""
+    print("🔍 Validating environment...")
 
-    def __init__(self, paths: BuildPaths, cmdRunner: CommandRunner, libFinder: LibraryFinder):
-        self.paths = paths
-        self.cmdRunner = cmdRunner
-        self.libFinder = libFinder
+    # Check Nuitka
+    try:
+        subprocess.run(["python3", "-m", "nuitka", "--version"], capture_output=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("❌ Nuitka not found. Install with: pip3 install nuitka")
+        sys.exit(1)
 
-    def setupExecutable(self, executablePath: Path) -> None:
-        """Set up the executable distribution."""
-        import shutil
+    # Check C compiler
+    for compiler in ["gcc", "clang", "cc"]:
+        try:
+            subprocess.run([compiler, "--version"], capture_output=True, check=True)
+            print(f"✅ Found C compiler: {compiler}")
+            break
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    else:
+        print("❌ No C compiler found! Install with: sudo apt install build-essential")
+        sys.exit(1)
 
-        # Make executable
-        self.cmdRunner.run(f"chmod +x {executablePath}")
 
-        # Verify native libraries
-        outputDir = executablePath.parent
-        self.libFinder.verifyNativeLibraries(outputDir)
+def cleanBuild():
+    """Remove previous build artifacts."""
+    print("🧹 Cleaning previous builds...")
+    import shutil
 
-        # Move build and create wrapper
-        shutil.move(str(outputDir), str(self.paths.buildDir))
-        self._createWrapperScript()
-        self._showBuildStatistics()
+    for target in CLEAN_TARGETS:
+        if target.exists():
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
 
-    def testExecutable(self) -> bool:
-        """Test the built executable."""
-        print("\n🧪 Testing executable...")
-        executablePath = self.paths.buildDir / self.paths.executableName
 
-        testResult = self.cmdRunner.run(f"{executablePath} --version", capture=True)
-        if testResult is not None:
+def findNativeLibraries():
+    """Find native libraries to include."""
+    print("🔍 Locating native libraries...")
+
+    nuitkaArgs = ["--include-package-data=uinput"]
+
+    try:
+        import uinput
+
+        print(f"📍 uinput found at: {Path(uinput.__file__).parent}")
+    except ImportError:
+        print("❌ uinput not found")
+        return nuitkaArgs
+
+    # Find .so files in package paths
+    for pathStr in sys.path:
+        path = Path(pathStr)
+        if "site-packages" in path.name or "dist-packages" in path.name:
+            for pattern in ["*uinput*.so", "*usb*.so"]:
+                for libPath in path.rglob(pattern):
+                    if libPath.is_file():
+                        nuitkaArgs.append(f"--include-data-files={libPath}={libPath.name}")
+                        print(f"📚 Found library: {libPath.name}")
+
+    return nuitkaArgs
+
+
+def buildExecutable():
+    """Build the executable with Nuitka."""
+    print("🔨 Building executable...")
+
+    if not SOURCE_MAIN.exists():
+        print(f"❌ Source file not found: {SOURCE_MAIN}")
+        sys.exit(1)
+
+    # Get native library args
+    nativeLibArgs = findNativeLibraries()
+
+    # Build Nuitka command
+    import os
+
+    jobs = min(os.cpu_count() or 4, 12)
+
+    cmd = [
+        "python3",
+        "-m",
+        "nuitka",
+        "--standalone",
+        "--assume-yes-for-downloads",
+        "--show-progress",
+        f"--output-filename={EXECUTABLE_NAME}",
+        "--remove-output",
+        f"--jobs={jobs}",
+        "--lto=yes",
+        "--enable-plugin=anti-bloat",
+        "--enable-plugin=implicit-imports",
+        "--include-package=Futaba",
+        "--include-package=usb",
+        "--include-package=uinput",
+        "--follow-import-to=uinput",
+        "--follow-import-to=usb",
+        "--follow-import-to=Futaba",
+        "--include-package-data=Futaba",
+        "--include-package-data=uinput",
+        "--include-package-data=usb",
+        str(SOURCE_MAIN),
+    ]
+    cmd.extend(nativeLibArgs)
+
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError:
+        print("❌ Nuitka build failed")
+        return None
+
+    # Find the executable
+    for execName in [EXECUTABLE_NAME, "main"]:
+        execPath = NUITKA_OUTPUT_DIR / execName
+        if execPath.exists():
+            return execPath
+
+    print(f"❌ No executable found in {NUITKA_OUTPUT_DIR}")
+    return None
+
+
+def setupExecutable(execPath):
+    """Set up the final executable distribution."""
+    import shutil
+
+    print("🔧 Setting up executable...")
+
+    # Make executable
+    execPath.chmod(0o755)
+
+    # Move to final location
+    if BUILD_DIR.exists():
+        shutil.rmtree(BUILD_DIR)
+    shutil.move(str(execPath.parent), str(BUILD_DIR))
+
+    # Create wrapper script
+    wrapperContent = f"""#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+cd "$SCRIPT_DIR/{BUILD_DIR.name}"
+exec ./{EXECUTABLE_NAME} "$@"
+"""
+    WRAPPER_SCRIPT.write_text(wrapperContent)
+    WRAPPER_SCRIPT.chmod(0o755)
+
+    # Show stats
+    result = runCommand(f"du -sh {BUILD_DIR}")
+    if result:
+        print(f"📦 Distribution size: {result.split()[0]}")
+
+
+def testExecutable():
+    """Test the built executable."""
+    print("🧪 Testing executable...")
+    execPath = BUILD_DIR / EXECUTABLE_NAME
+
+    # Try --version first, then --help
+    for arg in ["--version", "--help"]:
+        if runCommand(f"{execPath} {arg}", capture=True) is not None:
             print("✅ Executable test successful")
             return True
-        else:
-            print("⚠️  Executable test failed, trying --help...")
-            testResult = self.cmdRunner.run(f"{executablePath} --help", capture=True)
-            if testResult is not None:
-                print("✅ Executable runs (--help works)")
-                return True
-            else:
-                print("⚠️  Executable may have issues")
-                return False
 
-    def _createWrapperScript(self) -> None:
-        """Create wrapper script in root directory."""
-        wrapperContent = f"""#!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-cd "$SCRIPT_DIR/{self.paths.buildDir.name}"
-exec ./{self.paths.executableName} "$@"
-"""
-        self.paths.wrapperScript.write_text(wrapperContent)
-        self.paths.wrapperScript.chmod(0o755)
-        print(f"🔗 Created wrapper script: ./{self.paths.executableName}")
-
-    def _showBuildStatistics(self) -> None:
-        """Display build statistics."""
-        print("\n📊 Build Statistics:")
-        result = self.cmdRunner.run(f"du -sh {self.paths.buildDir}")
-        if result:
-            print(f"📦 Distribution size: {result.split()[0]}")
-
-        fileCount = len([f for f in self.paths.buildDir.iterdir() if f.is_file()])
-        print(f"📄 File count: {fileCount}")
+    print("⚠️  Executable may have issues")
+    return False
 
 
-class DependencyInstaller:
-    """Handles installation of build dependencies."""
-
-    def __init__(self, paths: BuildPaths, cmdRunner: CommandRunner):
-        self.paths = paths
-        self.cmdRunner = cmdRunner
-
-    def installBuildDependencies(self) -> None:
-        """Install the packages necessary to build the executable."""
-        buildDependencies = self.paths.config["build-system"]["requires"]
-        self.cmdRunner.run(f"pip3 install {' '.join(buildDependencies)}")
-        self.cmdRunner.run("pip3 install -r requirements.txt")
-
-
-class BuildError(Exception):
-    """Custom exception for build-related errors."""
-
-    pass
-
-
-class BuildOrchestrator:
-    """Main orchestrator for the build process."""
-
-    def __init__(self):
-        self.paths = BuildPaths(Path(__file__))
-        self.cmdRunner = CommandRunner()
-        self.envValidator = EnvironmentValidator(self.cmdRunner)
-        self.libFinder = LibraryFinder()
-        self.nuitkaBuilder = NuitkaBuilder(self.paths, self.cmdRunner, self.libFinder)
-        self.buildCleaner = BuildCleaner(self.paths)
-        self.executableManager = ExecutableManager(self.paths, self.cmdRunner, self.libFinder)
-        self.dependencyInstaller = DependencyInstaller(self.paths, self.cmdRunner)
-
-    def buildExecutable(self) -> bool:
-        """Build the standalone executable using Nuitka.
-
-        Compiles the Python application into a standalone executable with all
-        dependencies included. Optimizes for real-time performance and minimal size.
-
-        Returns:
-            True if build completed successfully, False otherwise
-        """
-        print("🔨 Building Futaba RC Driver executable...")
-
-        try:
-            self.envValidator.validate()
-            self.buildCleaner.clean()
-            self._validateSource()
-
-            executablePath = self.nuitkaBuilder.build()
-            if not executablePath:
-                return False
-
-            self.executableManager.setupExecutable(executablePath)
-            return self.executableManager.testExecutable()
-
-        except BuildError as e:
-            print(f"❌ {e}")
-            return False
-
-    def _validateSource(self) -> None:
-        """Verify source file exists."""
-        if not self.paths.sourceMain.exists():
-            print("❌ src/main.py not found!")
-            print("📁 Current directory contents:")
-            self.cmdRunner.run("ls -la", capture=False)
-            srcDir = Path("src")
-            if srcDir.exists():
-                print("📁 src/ directory contents:")
-                self.cmdRunner.run("ls -la src/", capture=False)
-            sys.exit(1)
-
-
-def main() -> None:
-    """Main entry point for the build script."""
+def main():
+    """Main entry point."""
     print("🎮 Futaba RC Driver Build Script")
     print("=" * 35)
 
-    orchestrator = BuildOrchestrator()
-    orchestrator.dependencyInstaller.installBuildDependencies()
-    success = orchestrator.buildExecutable()
+    installDependencies()
+    validateEnvironment()
+    cleanBuild()
 
-    if success:
+    execPath = buildExecutable()
+    if not execPath:
+        sys.exit(1)
+
+    setupExecutable(execPath)
+
+    if testExecutable():
         print("\n🎉 Build completed successfully!")
-        print("\n🚀 To run the driver:")
-        print(f"   sudo ./{orchestrator.paths.executableName}")
-        print("\n📝 Note: sudo is required for uinput device access")
+        print(f"\n🚀 To run: sudo ./{EXECUTABLE_NAME}")
     else:
-        print("\n❌ Build failed!")
-        print("\n💡 Troubleshooting:")
-        print("1. Ensure all dependencies are installed: pip install -r requirements.txt")
-        print("2. Check that uinput kernel module is loaded: lsmod | grep uinput")
-        print("3. Try a simpler build: python3 -m nuitka --standalone src/main.py")
+        print("\n❌ Build completed but executable test failed")
         sys.exit(1)
 
 

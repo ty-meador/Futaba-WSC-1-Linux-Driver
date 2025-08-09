@@ -144,6 +144,7 @@ def run(
     # - Runs until main process sets the killswitch event
     # - if runFlag is not set then inputs will not be processed
     while not killswitchIsSet():
+        rawData = None
         try:
             # Prevent busy waiting if we aren't actively running
             if not runFlag.is_set():
