@@ -1,6 +1,6 @@
 [build-system]
-build-backend = "nuitka.build_tools.nuitka_build_backend.NuitkaBuildBackend"
-requires = ["nuitka==2.7.12"]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0", "wheel"]
 
 [project]
 classifiers = [
