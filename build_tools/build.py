@@ -64,7 +64,10 @@ def installDependencies():
     print("📦 Installing dependencies...")
 
     # Install build requirements
-    buildDeps = PYPROJECT["build-system"]["requires"]
+    buildDeps = [
+        *PYPROJECT["build-system"]["requires"],
+        *PYPROJECT["project"]["dependencies"],
+    ]
     if runCommand(f"pip3 install {' '.join(buildDeps)}") is None:
         sys.exit(1)
 
