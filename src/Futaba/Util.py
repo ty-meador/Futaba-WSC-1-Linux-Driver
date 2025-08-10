@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import handlers
 from pathlib import Path
 
@@ -272,7 +272,7 @@ def newLogger(
 class DeviceConfig:
     """Stores the configuration settings for a single device."""
 
-    channelEvents: list[str]
+    channelEvents: list[str] = field(default_factory=lambda: DEFAULT_CONFIG["channel_events"])
     deadZone: int = DEFAULT_DEADZONE
-    frameSize: int = 16
-    noiseFilter: int = 0
+    frameSize: int = field(default_factory=lambda: DEFAULT_CONFIG["frame_size"])
+    noiseFilter: int = DEFAULT_NOISE_FILTER

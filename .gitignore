@@ -3,10 +3,9 @@ __pycache__
 *.env
 *.log
 *.txt
-*.continue
 .venv
 dist/*
-*build*
+build/*
 *main.dist*
 *nuitka*.xml
 futaba-rc-driver

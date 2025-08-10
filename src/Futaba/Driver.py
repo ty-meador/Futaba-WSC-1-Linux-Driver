@@ -208,28 +208,31 @@ class FutabaDeviceDriver:
 
     def start(self) -> DriverState:
         """Start the driver if it is not running."""
-        if self.getState() != DriverState.RUNNING:
-            if self.killswitch.is_set():
-                self.killswitch.clear()
-                self.logger.debug("-> Killswitch cleared")
-            if not self.runFlag.is_set():
-                self.runFlag.set()
-                self.logger.debug("-> runFlag set")
+        if self.getState() == DriverState.RUNNING:
+            return self.getState()
 
-            self.subProc = multiprocessing.Process(
-                name=f"{self.name} Driver",
-                target=Worker.run,
-                args=self._toSubprocTuple(),
-            )
-            self.subProc.start()
+        if self.killswitch.is_set():
+            self.killswitch.clear()
+            self.logger.debug("-> Killswitch cleared")
+        if not self.runFlag.is_set():
+            self.runFlag.set()
+            self.logger.debug("-> runFlag set")
+
+        self.subProc = multiprocessing.Process(
+            name=f"{self.name} Driver",
+            target=Worker.run,
+            args=self._toSubprocTuple(),
+        )
+        self.subProc.start()
 
         return self.getState()
 
     def stop(self) -> None:
         """Stop the driver and kill the subprocess."""
-        if not self.killswitch.is_set():
+        # It's possible for the constructor to fail before one or any of these are instantiated
+        if hasattr(self, "killswitch") and not self.killswitch.is_set():
             self.killswitch.set()
-        if self.subProc is not None and self.subProc.is_alive():
+        if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
             self.subProc.join()
         self.subProc = None
 

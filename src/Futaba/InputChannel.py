@@ -1,6 +1,7 @@
 """Classes for handling input channels."""
 
 import array
+import bisect
 import logging
 import sys
 import typing
@@ -140,9 +141,16 @@ class ChannelCalibration:
         inputMin, inputMid, inputMax = inputRange
         outputMin, outputMid, outputMax = outputRange
 
+        assert inputMin < inputMid < inputMax, "Insane input range"
+        assert outputMin < outputMid < outputMax, "Insane output range"
+
+        # If the input uses both positive and negative values we need to
+        # account for that in the array size
+        mapSize = abs(inputMax - inputMin) if inputMin < 0 else abs(inputMax)
+
         # Create a value map such that the index of the array represents
         # the input value, and the contents at that index is the output
-        allPossibleInputValues = array.array("i", [outputMin] * inputMax)
+        allPossibleInputValues = array.array("i", [outputMin] * mapSize)
 
         arrayRange = range(inputMin, inputMax)
         if reverse:
@@ -160,20 +168,6 @@ class ChannelCalibration:
                 right=outputMax,
             ),
         )
-
-        # return array.array(
-        #     "i",  # int
-        #     np.round(
-        #         np.interp(
-        #             allPossibleInputValues,
-        #             inputRange,
-        #             outputRange,
-        #             left=outputMin,
-        #             right=outputMax,
-        #         ),
-        #         0,  # No decimals
-        #     ).astype(int),
-        # )
 
     @classmethod
     def interpolate(
@@ -208,21 +202,19 @@ class ChannelCalibration:
                 continue
 
             # Find the right interval for interpolation
-            for i in range(len(xPoints) - 1):
-                if xPoints[i] <= x <= xPoints[i + 1]:
-                    # Linear interpolation formula: y = y1 + (y2-y1) * (x-x1)/(x2-x1)
-                    x1, x2 = xPoints[i], xPoints[i + 1]
-                    y1, y2 = yPoints[i], yPoints[i + 1]
+            i = bisect.bisect_right(xPoints, x) - 1
 
-                    if x2 == x1:  # Avoid division by zero  # noqa: SIM108
-                        interpolated = y1
-                    else:
-                        # Use float division, then round to integer
-                        interpolated = y1 + (y2 - y1) * (x - x1) / (x2 - x1)
+            # Linear interpolation
+            x1, x2 = xPoints[i], xPoints[i + 1]
+            y1, y2 = yPoints[i], yPoints[i + 1]
 
-                    result.append(int(round(interpolated)))
-                    break
+            interpolated = (
+                y1
+                if x2 == x1  # Avoid division by zero
+                else y1 + (y2 - y1) * (x - x1) / (x2 - x1)
+            )
 
+            result.append(int(round(interpolated)))
         return result
 
 
