@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools~=61.0", "wheel", "nuitka~=2.7.12"]
 
 [project]
 classifiers = [
