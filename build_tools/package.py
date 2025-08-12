@@ -30,7 +30,6 @@ EXECUTABLE_NAME = build_config["executable_name"]
 INSTALL_DIR = build_config["install_dir"]
 INSTALL_SCRIPT_NAME = build_config["install_script_name"]
 PACKAGE_DIR = PROJECT_ROOT / build_config["package_dir"]
-SERVICE_DIR = build_config["service_dir"]
 UNINSTALL_SCRIPT_NAME = build_config["uninstall_script_name"]
 WEB_INSTALL_SCRIPT_NAME = build_config["web_install_script_name"]
 
@@ -41,7 +40,7 @@ REPOSITORY = project_config["urls"]["Repository"]
 VERSION = project_config["version"]
 
 # Template paths
-TEMPLATES_DIR = PWD / "build-artifact-templates"
+TEMPLATES_DIR = PWD / "artifact-templates"
 SCRIPTS_TEMPLATES_DIR = TEMPLATES_DIR / "scripts"
 
 
@@ -61,7 +60,12 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
     try:
         if capture:
             result = subprocess.run(
-                cmd, shell=True, check=True, cwd=cwd, capture_output=True, text=True
+                cmd,
+                shell=True,
+                check=True,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
             )
             return result.stdout.strip()
         else:
@@ -189,7 +193,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
             "install_script_name": INSTALL_SCRIPT_NAME,
             "install_dir": INSTALL_DIR,
             "bin_dir": BIN_DIR,
-            "service_dir": SERVICE_DIR,
+            "artifact_dir": SCRIPTS_TEMPLATES_DIR,
         },
         packagePath / INSTALL_SCRIPT_NAME,
     )
@@ -205,7 +209,6 @@ def packageDistribution() -> None:  # noqa: PLR0915
             "install_script_name": INSTALL_SCRIPT_NAME,
             "install_dir": INSTALL_DIR,
             "bin_dir": BIN_DIR,
-            "service_dir": SERVICE_DIR,
         },
         packagePath / UNINSTALL_SCRIPT_NAME,
     )
@@ -220,7 +223,14 @@ def packageDistribution() -> None:  # noqa: PLR0915
     else:
         raise PermissionError("Uable to find LICENSE, refusing to package.")
 
+    ##
+    # Copy udev fules
+    ##
+    shutil.copy2(TEMPLATES_DIR / "udev.rules", packagePath / "udev.rules")
+
+    ##
     # Create version info file
+    ##
     renderTemplateToFile(
         TEMPLATES_DIR / "VERSION",
         {"version": version, "build_date": buildDate},

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!./.venv/bin/python
 """Build script to create standalone executable for Futaba RC Driver."""
 
 import subprocess
