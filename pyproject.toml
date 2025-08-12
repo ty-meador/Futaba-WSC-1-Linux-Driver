@@ -37,7 +37,7 @@ executable_name = "futaba-rc-driver"
 build_dir = "build"
 package_dir = "dist"
 install_dir = "${HOME}/.local/opt/futaba-rc-driver"
-bin_dir = "${HOME}/.local/bin/futaba-rc-driver"
+bin_dir = "${HOME}/.local/bin"
 
 [tool.black]
 target-version = ['py311']

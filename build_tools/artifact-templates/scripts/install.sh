@@ -116,15 +116,17 @@ echo "✅ Installation complete!"
 echo ""
 echo "🎯 Usage:"
 echo "  ${EXECUTABLE}                              # Run the driver manually"
-echo "  ${INSTALL_DIR}/${EXECUTABLE}       # Start if not already running"
+
+(${INSTALL_DIR}/${EXECUTABLE} > ${HOME}/.${EXECUTABLE}-logs.txt 2>&1 &)
 
 if [ "${GROUP_CHANGE_NEEDED:-false}" = true ]; then
     echo ""
-    echo "⚠️  IMPORTANT: You need to log out and back in for group changes to take effect"
-    echo "   After logging back in, the driver will start automatically"
+    echo "⚠️  IMPORTANT: The driver will start automatically when you log in."
+    echo "    If you are using a SteamDeck and are experiencing issues try desktop mode."
 fi
 
 echo ""
 echo "🚀 The driver will now start automatically when you log in"
 echo "🔧 Test installation: ${EXECUTABLE} --help"
 echo "📝 Driver runs continuously in the background and prevents duplicate instances"
+echo "🥇 Driver started, good luck!"
