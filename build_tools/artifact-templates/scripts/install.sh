@@ -59,7 +59,6 @@ for profile in "${HOME}/.profile" "${HOME}/.bashrc" "${HOME}/.zshrc"; do
         # Check if already added
         header="Futaba RC Driver"
         if ! grep -q "^# ${header}$" "${profile}" 2>/dev/null; then
-            echo "" >> "${profile}"
             echo "# ${header}" >> "${profile}"
             echo "(${INSTALL_DIR}/${EXECUTABLE} > ${HOME}/.${EXECUTABLE}-logs.txt 2>&1 &)" >> "${profile}"
             echo "" >> "${profile}"
@@ -115,18 +114,17 @@ echo ""
 echo "✅ Installation complete!"
 echo ""
 echo "🎯 Usage:"
-echo "  ${EXECUTABLE}                              # Run the driver manually"
+echo "  ${EXECUTABLE}  # Run the driver manually"
 
 (${INSTALL_DIR}/${EXECUTABLE} > ${HOME}/.${EXECUTABLE}-logs.txt 2>&1 &)
 
 if [ "${GROUP_CHANGE_NEEDED:-false}" = true ]; then
-    echo ""
     echo "⚠️  IMPORTANT: The driver will start automatically when you log in."
     echo "    If you are using a SteamDeck and are experiencing issues try desktop mode."
 fi
 
-echo ""
 echo "🚀 The driver will now start automatically when you log in"
 echo "🔧 Test installation: ${EXECUTABLE} --help"
 echo "📝 Driver runs continuously in the background and prevents duplicate instances"
 echo "🥇 Driver started, good luck!"
+echo ""
