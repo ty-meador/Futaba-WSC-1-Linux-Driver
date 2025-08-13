@@ -29,7 +29,6 @@ Distributables = "https://tylermeador.com/futaba-rc-driver/dist"
 Issues = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issues"
 Repository = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver"
 
-
 [tool.build_tool]
 install_script_name = "install.sh"
 uninstall_script_name = "uninstall.sh"
@@ -37,9 +36,8 @@ web_install_script_name = "web-installer.sh"
 executable_name = "futaba-rc-driver"
 build_dir = "build"
 package_dir = "dist"
-install_dir = "/opt/futaba-rc-driver"
-bin_dir = "/usr/local/bin"
-service_dir = "/etc/systemd/system"
+install_dir = "${HOME}/.local/opt/futaba-rc-driver"
+bin_dir = "${HOME}/.local/bin"
 
 [tool.black]
 target-version = ['py311']

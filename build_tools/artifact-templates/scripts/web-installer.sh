@@ -85,7 +85,7 @@ tar -xzf "${PACKAGE_NAME}.tar.gz"
 
 echo "🚀 Running installer..."
 cd "$PACKAGE_NAME"
-sudo ./install.sh
+./install.sh
 
 # Steam Deck specific post-installation
 if [ "$IS_STEAMOS" = true ] && [ $? -eq 0 ]; then

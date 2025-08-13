@@ -1,0 +1,16 @@
+# Futaba RC USB receivers - Known vendor/product IDs
+
+# ??
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1008", MODE="664", GROUP="plugdev", TAG+="uaccess"
+
+# Lakeview Research (USB development tools/chips)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0925", MODE="664", GROUP="plugdev", TAG+="uaccess"
+
+# Microchip Technology (very common for USB controllers)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="04d8", MODE="664", GROUP="plugdev", TAG+="uaccess"
+
+# ??
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1781", MODE="664", GROUP="plugdev", TAG+="uaccess"
+
+# Allow plugdev group to access uinput
+KERNEL=="uinput", GROUP="plugdev", MODE="664", TAG+="uaccess"

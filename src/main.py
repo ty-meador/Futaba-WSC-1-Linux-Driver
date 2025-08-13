@@ -1,12 +1,21 @@
 #!/usr/bin/python3
-"""The main program - run with `sudo python3 main.py`."""
+"""The main program - run with `sudo python3 main.py`.
 
+Futaba RC Driver  Copyright (C) 2025  Ty Meador (gitlab="Native-Coder")
+This program comes with ABSOLUTELY NO WARRANTY;.
+This is free software, and you are welcome to redistribute it
+under certain conditions; See GNU GPL V3 for more info.
+"""
+
+import os
+import subprocess
 import time
 from argparse import ArgumentParser
 
 import Futaba
 
 parser = ArgumentParser()
+
 
 parser.add_argument(
     "--autostart",
@@ -83,19 +92,61 @@ def cliMode(args):
     try:
         while True:
             # Block indefinitely so that background process stays alive
-            time.sleep(100)
+            time.sleep(1000)
     except KeyboardInterrupt:
         pass
 
     print("Goodbye!")
 
 
+def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
+    """Run a command and handle errors.
+
+    Args:
+        cmd: Command to run as shell string
+        cwd: Working directory for command execution
+        capture: Whether to capture and return output
+
+    Returns:
+        Command output if capture=True and successful, empty string if capture=False and successful,
+        None if command failed
+
+    """
+    try:
+        if capture:
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                check=True,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+            )
+            return result.stdout.strip()
+        else:
+            subprocess.run(cmd, shell=True, check=True, cwd=cwd)
+            return ""
+    except subprocess.CalledProcessError as e:
+        if capture and e.stderr:
+            print(f"Error: {e.stderr}")
+        return None
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
+    # Reliably finds the drivers process
+    pids = runCommand("pgrep '^futaba-rc-'")
+    if pids is not None:
+        pids = tuple(
+            filter(
+                lambda pid: int(pid) != int(os.getpid()),
+                pids.split("\n"),
+            )
+        )
 
-    # TO-DO
-    if args.ui:
+    if pids is not None and len(pids) > 0:
+        print("Driver already running. Have Fun!")
+    elif args.ui:
         raise RuntimeError("Not yet Impelmented")
-        # DriverUI(args).run()
     else:
         cliMode(args)

@@ -1,10 +1,15 @@
-#!/usr/bin/env python3
+#!./.venv/bin/python
 """Build script to create standalone executable for Futaba RC Driver."""
 
+import shutil
 import subprocess
 import sys
 import tomllib
+from argparse import ArgumentParser
 from pathlib import Path
+
+parser = ArgumentParser()
+parser.add_argument("--clean", action="store_true")
 
 # Project structure
 PWD = Path(__file__).parent.resolve()
@@ -29,7 +34,16 @@ SOURCE_MAIN = PROJECT_ROOT / "src" / "main.py"
 NUITKA_OUTPUT_DIR = PROJECT_ROOT / f"{SOURCE_MAIN.stem}.dist"
 WRAPPER_SCRIPT = PROJECT_ROOT / EXECUTABLE_NAME
 
-CLEAN_TARGETS = [BUILD_DIR, NUITKA_OUTPUT_DIR, WRAPPER_SCRIPT]
+
+def cleanArtifacts():
+    """Remove previous build artifacts."""
+    print("🧹 Cleaning previous builds...")
+    for dep in [BUILD_DIR, NUITKA_OUTPUT_DIR, WRAPPER_SCRIPT]:
+        if dep.is_file():
+            dep.unlink()
+        elif dep.is_dir():
+            shutil.rmtree(dep)
+    print("✨ Done!")
 
 
 def runCommand(
@@ -100,19 +114,6 @@ def validateEnvironment():
     else:
         print("❌ No C compiler found! Install with: sudo apt install build-essential")
         sys.exit(1)
-
-
-def cleanBuild():
-    """Remove previous build artifacts."""
-    print("🧹 Cleaning previous builds...")
-    import shutil
-
-    for target in CLEAN_TARGETS:
-        if target.exists():
-            if target.is_dir():
-                shutil.rmtree(target)
-            else:
-                target.unlink()
 
 
 def findNativeLibraries():
@@ -251,7 +252,7 @@ def main():
 
     installDependencies()
     validateEnvironment()
-    cleanBuild()
+    cleanArtifacts()
 
     execPath = buildExecutable()
     if not execPath:
@@ -268,4 +269,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parser.parse_args()
+    if args.clean:
+        cleanArtifacts()
+    else:
+        main()
