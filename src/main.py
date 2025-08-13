@@ -145,7 +145,7 @@ if __name__ == "__main__":
         )
 
     if pids is not None and len(pids) > 0:
-        print("Driver already running. Have Fun!")
+        print("🏁 Driver already running. Have Fun!")
     elif args.ui:
         raise RuntimeError("Not yet Impelmented")
     else:
