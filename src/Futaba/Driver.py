@@ -29,6 +29,15 @@ class FutabaDeviceDriver:
     ##
     # Instance Methods
     ##
+    def enableCalibrationMode(self, callback):
+        """Enable calibration mode.
+
+        Args:
+            callback (function): Function to be called on every data frame.
+        """
+        self.callback = callback
+        self.workerCtl.echoFlag = True
+
     def getState(self) -> DriverState:
         """Get the current state of the driver.
 
@@ -344,6 +353,11 @@ class FutabaDeviceDriver:
             int: The noise filter value.
         """
         return self.config["noise_filter"]
+
+    @property
+    def pipe(self) -> multiprocessing.Pipe:
+        """A duple pipe providing real-time communication to the running driver."""
+        return self.frontPipe
 
     @property
     def productName(self) -> str:
