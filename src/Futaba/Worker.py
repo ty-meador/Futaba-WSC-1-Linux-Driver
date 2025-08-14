@@ -1,19 +1,9 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # ruff: noqa: PLC0415, C901, PLR0915, PLR0912
 
-from enum import Enum, auto
-
 from .InputChannel import ChannelDict
 from .IPC import WorkerControl
 from .Util import DeviceConfig
-
-
-class WorkerCommand(Enum):
-    """Stores various worker commmand signals."""
-
-    START = auto()
-    STOP = auto()
-    KILL = auto()
 
 
 ##
