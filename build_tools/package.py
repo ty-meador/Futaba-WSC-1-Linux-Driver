@@ -11,6 +11,7 @@ from pathlib import Path
 
 parser = ArgumentParser()
 parser.add_argument("--clean", action="store_true")
+parser.add_argument("--clean-all", action="store_true")
 
 # Project structure
 PWD = Path(__file__).parent.resolve()
@@ -344,7 +345,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     print(f"   wget {DISTRIBUTABLES_PAGE}/{tarGzName}")
     print(f"   tar -xzf {tarGzName}")
     print(f"   cd {packageName}")
-    print(f"   sudo ./{INSTALL_SCRIPT_NAME}")
+    print(f"   ./{INSTALL_SCRIPT_NAME}")
 
 
 if __name__ == "__main__":
@@ -352,6 +353,9 @@ if __name__ == "__main__":
     print("=" * 40)
     args = parser.parse_args()
     if args.clean:
+        cleanArtifacts()
+    elif args.clean_all:
+        print(runCommand(f"{PWD}/build.py --clean"))
         cleanArtifacts()
     else:
         packageDistribution()

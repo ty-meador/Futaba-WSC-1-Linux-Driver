@@ -10,6 +10,7 @@ from pathlib import Path
 
 parser = ArgumentParser()
 parser.add_argument("--clean", action="store_true")
+parser.add_argument("--clean-all", action="store_true")
 
 # Project structure
 PWD = Path(__file__).parent.resolve()
@@ -271,6 +272,9 @@ def main():
 if __name__ == "__main__":
     args = parser.parse_args()
     if args.clean:
+        cleanArtifacts()
+    elif args.clean_all:
+        print(runCommand(f"{PWD}/package.py --clean"))
         cleanArtifacts()
     else:
         main()
