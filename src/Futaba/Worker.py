@@ -180,9 +180,11 @@ def run(
                 if echoFlagIsSet():  # Echo back the data frames info - useful for calibration
                     pipe.send(
                         tuple(
-                            channelEventsMap[channel],
-                            rawValue,
-                            calibration[rawValue],
+                            [
+                                channelEventsMap[channel],
+                                rawValue,
+                                calibration[rawValue],
+                            ]
                         )
                     )
         except usb.core.USBTimeoutError:

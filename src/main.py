@@ -89,10 +89,23 @@ def cliMode(args):
     print(f"Started {device['name']}")
     print("CTRL + C to stop driver")
 
+    pipe = manager.getPipe(device["key"])
+
+    # In main.py:
+    device_driver = manager.futabaDevices[device["key"]]
+    pipe_from_manager = manager.getPipe(device["key"])
+    pipe_from_driver = device_driver.pipe
+
+    print(f"Same object? {pipe_from_manager is pipe_from_driver}")
+    print(f"Manager pipe fileno: {pipe_from_manager.fileno()}")
+    print(f"Driver pipe fileno: {pipe_from_driver.fileno()}")
+
     try:
+        # Block indefinitely so that background process stays alive
         while True:
-            # Block indefinitely so that background process stays alive
-            time.sleep(1)
+            while pipe.poll():
+                print(pipe.recv())
+            time.sleep(0.1)
     except KeyboardInterrupt:
         pass
 

@@ -1,6 +1,7 @@
 """Module provides a simple interface to spawn and manage multiple Futaba RC to USB adapters."""
 
 import atexit
+import multiprocessing
 import typing
 
 import usb
@@ -20,6 +21,13 @@ class FutabaDeviceManager:
             RuntimeError: Raised if no Futaba USB devices are detected
 
         """
+        self._futabaDevices = tuple(
+            [
+                FutabaDeviceDriver(device)
+                for device in usb.core.find(find_all=True)
+                if FutabaDeviceDriver.deviceIsSupported(device)
+            ]
+        )
         if len(self.futabaDevices) == 0:
             raise DeviceNotFoundError
 
@@ -29,13 +37,7 @@ class FutabaDeviceManager:
     @property
     def futabaDevices(self) -> tuple[FutabaDeviceDriver, ...]:
         """A tuple of supported Futaba devices."""
-        return tuple(
-            [
-                FutabaDeviceDriver(device)
-                for device in usb.core.find(find_all=True)
-                if FutabaDeviceDriver.deviceIsSupported(device)
-            ]
-        )
+        return self._futabaDevices
 
     def findDevice(self, endpoint: int | None = None) -> usb.core.Device | None:
         """Find the Futaba device that has the provided endpoint.
@@ -69,6 +71,21 @@ class FutabaDeviceManager:
         """
         try:
             return self.futabaDevices[deviceIndex].getState()
+        except Exception as e:
+            self.logger.warning(e)
+            return None
+
+    def getPipe(self, deviceIndex: int) -> multiprocessing.Pipe:
+        """Get a duplex pipe for real-time driver communication.
+
+        Args:
+            deviceIndex (int): The device that you want the pipe for
+
+        Returns:
+            multiprocessing.Pipe: Front-end of a duplex pipe
+        """
+        try:
+            return self.futabaDevices[deviceIndex].pipe
         except Exception as e:
             self.logger.warning(e)
             return None

@@ -26,18 +26,6 @@ class DriverState(Enum):
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device."""
 
-    ##
-    # Instance Methods
-    ##
-    def enableCalibrationMode(self, callback):
-        """Enable calibration mode.
-
-        Args:
-            callback (function): Function to be called on every data frame.
-        """
-        self.callback = callback
-        self.workerCtl.echoFlag = True
-
     def getState(self) -> DriverState:
         """Get the current state of the driver.
 
@@ -233,6 +221,7 @@ class FutabaDeviceDriver:
         self.subProc = None
         self.frontPipe, self.backPipe = multiprocessing.Pipe()
         self.workerCtl = WorkerControl(pipe=self.backPipe)
+        self.workerCtl.echoFlag.set()
 
         ##
         # Device stuff
