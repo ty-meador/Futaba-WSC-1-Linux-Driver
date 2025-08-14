@@ -84,14 +84,14 @@ def run(
         except PermissionError:
             print("Warning: Cannot set process priority")
 
-    # Extract event names and value maps from device channels in parallel
-    # zip(*[...]) unpacks the list of tuples and transposes them:
-    # - channelEventsMap gets all the uinput event attributes
-    # - channelCalibrations gets all the corresponding value mapping dictionaries
-    # strict=True force a 1:1 mapping between events and values
     channelEventsMap, channelCalibrations = zip(
         *[
-            (getattr(uinput, channel["eventName"]), channel["valueMap"])
+            (
+                # Extract name in cfv file -> uinput property
+                getattr(uinput, channel["eventName"]),
+                # Channel calibration map
+                channel["valueMap"],
+            )
             for channel in deviceChannels
         ],
         strict=True,
@@ -124,7 +124,7 @@ def run(
     ##
     frameSize = deviceConfig.frameSize
 
-    channelEventsMap = tuple(reversed(channelEventsMap))
+    channelEventsMap = tuple(channelEventsMap)
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
@@ -181,7 +181,8 @@ def run(
                     calibration[rawValue],
                     syn=True,
                 )
-                if echoFlagIsSet():
+
+                if echoFlagIsSet():  # Echo back the data frames info - useful for calibration
                     pipe.send(
                         tuple(
                             channelEventsMap[channel],
@@ -191,7 +192,7 @@ def run(
                     )
         except usb.core.USBTimeoutError:
             pass
-        except KeyboardInterrupt:  # Legacy from when this used to run in the same process.
+        except KeyboardInterrupt:
             controller.killswitch.set()
             pass
         except Exception as e:
