@@ -25,7 +25,7 @@ def run(
 
     Args:
         controller (WorkerControl): The worker controller used to control this subproc
-        frameSize (int): The number of bytes to request from the usb device at one time.
+        deviceConfig (dict): The devices configuration.
         deviceChannels (list[ChannelDict]) a tuple where each value contained is a calibrated value
         map for its corresponding channel.
         name (str): The name the device will show up as.
@@ -86,10 +86,15 @@ def run(
         ],
         strict=True,
     )
-    noiseFilter = (
-        deviceConfig.noiseFilter if deviceConfig.noiseFilter else utils.DEFAULT_NOISE_FILTER
-    )
-    deadZone = deviceConfig.deadZone if deviceConfig.deadZone else utils.DEFAULT_DEADZONE
+
+    noiseFilter = utils.DEFAULT_NOISE_FILTER
+    if deviceConfig.noiseFilter:
+        noiseFilter = deviceConfig.noiseFilter
+
+    deadZone = utils.DEFAULT_DEADZONE
+    if deviceConfig.deadZone:
+        deadZone = deviceConfig.deadZone
+
     # Create a virtual device for the found device
     virtualDevice = uinput.Device(
         tuple(
