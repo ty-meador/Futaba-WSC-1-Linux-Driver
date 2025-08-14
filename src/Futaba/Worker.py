@@ -1,10 +1,10 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # ruff: noqa: PLC0415, C901, PLR0915, PLR0912
 
-import multiprocessing
 from enum import Enum, auto
 
 from .InputChannel import ChannelDict
+from .IPC import WorkerControl
 from .Util import DeviceConfig
 
 
@@ -22,8 +22,7 @@ class WorkerCommand(Enum):
 # contains more statments that would otherwise be tolerated
 ##
 def run(
-    killswitch: multiprocessing.Event,
-    runFlag: multiprocessing.Event,
+    controller: WorkerControl,
     deviceConfig: DeviceConfig,
     deviceChannels: list[ChannelDict],
     name: str,
@@ -35,9 +34,7 @@ def run(
     `multiprocessing.Process(target=_workerProcess,...)`
 
     Args:
-        killswitch (multiprocessing.Event): This worker will run an infinite loop until this event
-        is set.
-        runFlag (multiprocessing.Event): This worker will process device inputs if this is set.
+        controller (WorkerControl): The worker controller used to control this subproc
         frameSize (int): The number of bytes to request from the usb device at one time.
         deviceChannels (list[ChannelDict]) a tuple where each value contained is a calibrated value
         map for its corresponding channel.
@@ -90,9 +87,9 @@ def run(
     # Extract event names and value maps from device channels in parallel
     # zip(*[...]) unpacks the list of tuples and transposes them:
     # - channelEventsMap gets all the uinput event attributes
-    # - channelValueMaps gets all the corresponding value mapping dictionaries
+    # - channelCalibrations gets all the corresponding value mapping dictionaries
     # strict=True force a 1:1 mapping between events and values
-    channelEventsMap, channelValueMaps = zip(
+    channelEventsMap, channelCalibrations = zip(
         *[
             (getattr(uinput, channel["eventName"]), channel["valueMap"])
             for channel in deviceChannels
@@ -131,7 +128,10 @@ def run(
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
-    killswitchIsSet = killswitch.is_set
+    killswitchIsSet = controller.killswitch.is_set
+    runFlagIsSet = controller.runFlag.is_set
+    echoFlagIsSet = controller.echoFlag.is_set
+    pipe = controller.pipe
     readDevice = coreDevice.read
 
     if coreDevice.is_kernel_driver_active(0):
@@ -147,7 +147,7 @@ def run(
         rawData = None
         try:
             # Prevent busy waiting if we aren't actively running
-            if not runFlag.is_set():
+            if not runFlagIsSet():
                 sleep(0.01)
                 continue
 
@@ -164,28 +164,39 @@ def run(
 
             for i in range(0, len(rawData), 2):
                 channel = i // 2
-                valueMap = channelValueMaps[channel]
+                calibration = channelCalibrations[channel]
                 rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
-                maxInputVal = len(valueMap) - 1  # account for off-by-one
+                maxInputVal = len(calibration) - 1  # account for off-by-one
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
+                # The way that we generate the calibration table means there will always be an
+                # "index 0", and it will always have the lowest possible value.
                 elif rawValue < 0:
                     rawValue = 0
 
                 emit(  # Pass our calibrated input to the virtual device
                     channelEventsMap[channel],
-                    valueMap[rawValue],
+                    calibration[rawValue],
                     syn=True,
                 )
+                if echoFlagIsSet():
+                    pipe.send(
+                        tuple(
+                            channelEventsMap[channel],
+                            rawValue,
+                            calibration[rawValue],
+                        )
+                    )
         except usb.core.USBTimeoutError:
             pass
-        except KeyboardInterrupt:
+        except KeyboardInterrupt:  # Legacy from when this used to run in the same process.
+            controller.killswitch.set()
             pass
         except Exception as e:
             # We want to capture everything and log it to a file and then re-raise it.
-            # This is because this will be running in a seperate process and such such
+            # This is because this will be running in a seperate process and as such
             # print statements don't do much good.
             logger.critical(e)
             raise e

@@ -11,6 +11,7 @@ import usb
 from . import Util as utils
 from . import Worker
 from .InputChannel import InputChannel
+from .IPC import WorkerControl
 
 
 class DriverState(Enum):
@@ -26,6 +27,173 @@ class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device."""
 
     ##
+    # Instance Methods
+    ##
+    def getState(self) -> DriverState:
+        """Get the current state of the driver.
+
+        Returns:
+            DriverState: The current state of the driver.
+
+        """
+        if self.subProc is not None and self.subProc.is_alive():
+            if self.workerCtl.runFlag.is_set():
+                self.state = DriverState.RUNNING
+            else:
+                self.state = DriverState.SUSPENDED
+        else:
+            self.state = DriverState.STOPPED
+        return self.state
+
+    def start(self) -> DriverState:
+        """Start the driver if it is not running."""
+        if self.getState() == DriverState.RUNNING:
+            return self.getState()
+
+        if self.workerCtl.killswitch.is_set():
+            self.workerCtl.killswitch.clear()
+            self.logger.debug("-> killswitch cleared")
+        if not self.workerCtl.runFlag.is_set():
+            self.workerCtl.runFlag.set()
+            self.logger.debug("-> runFlag set")
+
+        self.subProc = multiprocessing.Process(
+            name=f"{self.name} Driver",
+            target=Worker.run,
+            args=self._toSubprocTuple(),
+        )
+        self.subProc.start()
+
+        return self.getState()
+
+    def stop(self) -> None:
+        """Stop the driver and kill the subprocess."""
+        # It's possible for the constructor to fail before one or any of these are instantiated
+        if hasattr(self, "workerCtl.killswitch") and not self.workerCtl.killswitch.is_set():
+            self.workerCtl.killswitch.set()
+        # Give the worker up to 1 second to shut down gracefully
+        if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
+            self.subProc.join(timeout=1.0)
+        # Force shutdown
+        if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
+            self.subProc.terminate()
+            self.subProc.join()
+        self.subProc = None
+
+    def suspend(self) -> None:
+        """Suspend the driver without killing the subprocess."""
+        if self.workerCtl.runFlag.is_set():
+            self.workerCtl.runFlag.clear()
+
+    def toDict(self) -> dict[str, Any]:
+        """Create a dictionary representation of this driver."""
+        return dict(
+            {
+                "config": self.config,
+                "deviceChannels": len(self.deviceChannels),
+                "interruptEndpoint": self.interruptEndpoint,
+                "product": self.productName,
+                "productID": self.productID,
+                "manufacturer": self.manufacturer,
+                "name": self.name,
+                "serialNumber": self.serialNumber,
+                "speed": self.speed,
+            }
+        )
+
+    ##
+    # Private Methods
+    ##
+    def _loadConfig(self, productName: str) -> dict[str, Any]:
+        """Load the device config.
+
+        Load the device config and fall back to the default config file if one doesn't exist.
+
+        Args:
+            productName (str): The name of the product to load the config for.
+
+        Returns:
+            dict: A dictionary containing the driver settings
+
+        """
+        config = None
+
+        filePath = os.path.join(utils.CONFIG_PATH, f"{productName}.json")
+        defaultPath = os.path.join(utils.CONFIG_PATH, "default.json")
+
+        self.logger.debug(f"loading {filePath}")
+        config = utils.loadJsonFile(filePath)
+
+        if config is None:
+            self.logger.debug(f"device config not found, loading {defaultPath}")
+            config = utils.loadJsonFile(defaultPath)
+        if config is None:
+            self.logger.debug("using hard-coded defaults")
+            config = utils.DEFAULT_CONFIG
+
+        self.logger.debug(f"config={config}")
+        return config
+
+    def _loadCalibration(self, productName: str) -> list[list[int]]:
+        """Load the calibration file for the given product.
+
+        Args:
+            productName (str): The name of the product to load the
+            calibration for. Defaults to None.
+
+        Returns:
+            list of list: Each inner list will contain calibration data for a channel.
+
+        """
+        filePath = os.path.join(utils.CALIBRATION_PATH, f"{productName}.json")
+        defaultPath = os.path.join(utils.CALIBRATION_PATH, "default.json")
+
+        # Load this products calibration file by default
+        self.logger.debug(f"loading {filePath}")
+        channelCalibrations = utils.loadJsonFile(filePath)
+        # If that fails, load the default config file
+        if channelCalibrations is None:
+            self.logger.debug(f"loading{defaultPath}")
+            channelCalibrations = utils.loadJsonFile(defaultPath)
+        # If that fails, use the hard-coded values
+        if channelCalibrations is None:
+            self.logger.debug("using hard-coded defaults")
+            channelCalibrations = utils.DEFAULT_CALIBRATION
+
+        self.logger.debug(f"channelCalibrations={channelCalibrations}")
+        return channelCalibrations
+
+    def _toSubprocTuple(
+        self,
+    ) -> tuple[
+        WorkerControl,
+        int,  # frameSize
+        list[dict[str, Any]],  # device Channels
+        str,  # name
+        int,  # interrupt endpoint
+    ]:
+        """Create a tuple that is compatable with the worker function.
+
+        Returns:
+            tuple: The tuple that you will pass to the worker function
+
+        """
+        return tuple(
+            [
+                self.workerCtl,
+                utils.DeviceConfig(
+                    channelEvents=self.config["channel_events"],
+                    deadZone=self.config["dead_zone"],
+                    frameSize=self.config["frame_size"],
+                    noiseFilter=self.config["noise_filter"],
+                ),
+                tuple([channel.toDict() for channel in self.deviceChannels]),
+                self.name,
+                self.interruptEndpoint,
+            ]
+        )
+
+    ##
     # Magic Methods
     ##
     def __init__(self, device: usb.core.Device) -> None:
@@ -38,6 +206,9 @@ class FutabaDeviceDriver:
             TypeError: If device is not of type usb.core.Device
 
         """
+        ##
+        # meta-stuff
+        ##
         self.state = DriverState.INITIALIZING
         self.endpoint = utils.getInterruptAddress(device)
         self.deviceInfo = utils.getCoreDeviceInfo(self.endpoint)
@@ -46,10 +217,17 @@ class FutabaDeviceDriver:
             raise TypeError("Unable to find interrupt endpoint for device")
 
         self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
-        self.subProc = None
-        self.killswitch = multiprocessing.Event()
-        self.runFlag = multiprocessing.Event()
 
+        ##
+        # Worker subproc stuff
+        ##
+        self.subProc = None
+        self.frontPipe, self.backPipe = multiprocessing.Pipe()
+        self.workerCtl = WorkerControl(pipe=self.backPipe)
+
+        ##
+        # Device stuff
+        ##
         self.config = self._loadConfig(self.productName)
         self.deviceChannels = [
             InputChannel(eventName, calibration, False, logger=self.logger)
@@ -59,7 +237,7 @@ class FutabaDeviceDriver:
                 strict=True,  # 1 event name and 1 calibration per channel
             )
         ]
-        # self.frontPipe, self.backPipe = multiprocessing.Pipe()
+
         atexit.register(self.stop)
 
     def __eq__(self, other: object) -> bool:
@@ -186,167 +364,3 @@ class FutabaDeviceDriver:
     def speed(self) -> str:
         """USB generation speed supported by the device."""
         return self.deviceInfo["speed"]
-
-    ##
-    # Instance Methods
-    ##
-    def getState(self) -> DriverState:
-        """Get the current state of the driver.
-
-        Returns:
-            DriverState: The current state of the driver.
-
-        """
-        if self.subProc is not None and self.subProc.is_alive():
-            if self.runFlag.is_set():
-                self.state = DriverState.RUNNING
-            else:
-                self.state = DriverState.SUSPENDED
-        else:
-            self.state = DriverState.STOPPED
-        return self.state
-
-    def start(self) -> DriverState:
-        """Start the driver if it is not running."""
-        if self.getState() == DriverState.RUNNING:
-            return self.getState()
-
-        if self.killswitch.is_set():
-            self.killswitch.clear()
-            self.logger.debug("-> Killswitch cleared")
-        if not self.runFlag.is_set():
-            self.runFlag.set()
-            self.logger.debug("-> runFlag set")
-
-        self.subProc = multiprocessing.Process(
-            name=f"{self.name} Driver",
-            target=Worker.run,
-            args=self._toSubprocTuple(),
-        )
-        self.subProc.start()
-
-        return self.getState()
-
-    def stop(self) -> None:
-        """Stop the driver and kill the subprocess."""
-        # It's possible for the constructor to fail before one or any of these are instantiated
-        if hasattr(self, "killswitch") and not self.killswitch.is_set():
-            self.killswitch.set()
-        if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
-            self.subProc.join()
-        self.subProc = None
-
-    def suspend(self) -> None:
-        """Suspend the driver without killing the subprocess."""
-        if self.runFlag.is_set():
-            self.runFlag.clear()
-
-    def toDict(self) -> dict[str, Any]:
-        """Create a dictionary representation of this driver."""
-        return dict(
-            {
-                "config": self.config,
-                "deviceChannels": len(self.deviceChannels),
-                "interruptEndpoint": self.interruptEndpoint,
-                "product": self.productName,
-                "productID": self.productID,
-                "manufacturer": self.manufacturer,
-                "name": self.name,
-                "serialNumber": self.serialNumber,
-                "speed": self.speed,
-            }
-        )
-
-    ##
-    # Private Methods
-    ##
-    def _loadConfig(self, productName: str) -> dict[str, Any]:
-        """Load the device config.
-
-        Load the device config and fall back to the default config file if one doesn't exist.
-
-        Args:
-            productName (str): The name of the product to load the config for.
-
-        Returns:
-            dict: A dictionary containing the driver settings
-
-        """
-        config = None
-
-        filePath = os.path.join(utils.CONFIG_PATH, f"{productName}.json")
-        defaultPath = os.path.join(utils.CONFIG_PATH, "default.json")
-
-        self.logger.debug(f"loading {filePath}")
-        config = utils.loadJsonFile(filePath)
-
-        if config is None:
-            self.logger.debug(f"device config not found, loading {defaultPath}")
-            config = utils.loadJsonFile(defaultPath)
-        if config is None:
-            self.logger.debug("using hard-coded defaults")
-            config = utils.DEFAULT_CONFIG
-
-        self.logger.debug(f"config={config}")
-        return config
-
-    def _loadCalibration(self, productName: str) -> list[list[int]]:
-        """Load the calibration file for the given product.
-
-        Args:
-            productName (str): The name of the product to load the
-            calibration for. Defaults to None.
-
-        Returns:
-            list of list: Each inner list will contain calibration data for a channel.
-
-        """
-        filePath = os.path.join(utils.CALIBRATION_PATH, f"{productName}.json")
-        defaultPath = os.path.join(utils.CALIBRATION_PATH, "default.json")
-
-        # Load this products calibration file by default
-        self.logger.debug(f"loading {filePath}")
-        channelCalibrations = utils.loadJsonFile(filePath)
-        # If that fails, load the default config file
-        if channelCalibrations is None:
-            self.logger.debug(f"loading{defaultPath}")
-            channelCalibrations = utils.loadJsonFile(defaultPath)
-        # If that fails, use the hard-coded values
-        if channelCalibrations is None:
-            self.logger.debug("using hard-coded defaults")
-            channelCalibrations = utils.DEFAULT_CALIBRATION
-
-        self.logger.debug(f"channelCalibrations={channelCalibrations}")
-        return channelCalibrations
-
-    def _toSubprocTuple(
-        self,
-    ) -> tuple[
-        multiprocessing.Event,  # Killswitch
-        multiprocessing.Event,  # runFlag
-        int,  # frameSize
-        list[dict[str, Any]],  # device Channels
-        str,  # name
-        int,  # interrupt endpoint
-    ]:
-        """Create a tuple that is compatable with the worker function.
-
-        Returns:
-            tuple: The tuple that you will pass to the worker function
-
-        """
-        return tuple(
-            [
-                self.killswitch,
-                self.runFlag,
-                utils.DeviceConfig(
-                    channelEvents=self.config["channel_events"],
-                    deadZone=self.config["dead_zone"],
-                    frameSize=self.config["frame_size"],
-                    noiseFilter=self.config["noise_filter"],
-                ),
-                tuple([channel.toDict() for channel in self.deviceChannels]),
-                self.name,
-                self.interruptEndpoint,
-            ]
-        )

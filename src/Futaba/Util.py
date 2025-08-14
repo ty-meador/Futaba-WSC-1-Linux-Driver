@@ -252,7 +252,7 @@ def newLogger(
 
     """
     if level is None:
-        level = logging.INFO
+        level = logging.DEBUG
     if fileName is None:
         fileName = re.sub(r"\W", "_", name) + ".txt"
 

@@ -92,10 +92,11 @@ def cliMode(args):
     try:
         while True:
             # Block indefinitely so that background process stays alive
-            time.sleep(1000)
+            time.sleep(1)
     except KeyboardInterrupt:
         pass
 
+    manager.stopAll()
     print("Goodbye!")
 
 
