@@ -1,0 +1,27 @@
+Metadata-Version: 2.1
+Name: futaba-rc-driver
+Version: 0.3.15
+Summary: A Futaba RC Driver for Linux.
+Home-page: https://tylermeador.com/futaba-rc-driver
+License: UNKNOWN
+Project-URL: Documentation, https://tylermeador.com/futaba-rc-driver/docs
+Project-URL: Homepage, https://tylermeador.com/futaba-rc-driver
+Project-URL: Distributables, https://tylermeador.com/futaba-rc-driver/dist
+Project-URL: Issues, https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issues
+Project-URL: Repository, https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Console
+Classifier: Environment :: Console :: Curses
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: Natural Language :: English
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Topic :: System :: Hardware :: Hardware Drivers
+License-File: LICENSE
+
+UNKNOWN
+
