@@ -11,11 +11,24 @@ import curses
 import os
 import subprocess
 import time
+import tomllib
 from argparse import ArgumentParser
+from pathlib import Path
 
 import Futaba
 from UI import MainMenu, WindowCoords
 from UI.Calibration import CalibrationWidget
+
+# Project structure
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
+
+# Load project configuration
+with open(PYPROJECT_PATH, "rb") as f:
+    """Load pyproject.toml file."""
+    toml_data = tomllib.load(f)
+PYPROJECT = toml_data
+EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
 
 parser = ArgumentParser()
 
@@ -205,7 +218,9 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
 if __name__ == "__main__":
     args = parser.parse_args()
     # Reliably finds the drivers process
-    pids = runCommand("pgrep '^futaba-rc-'")
+    # kernel truncates names to 16 characters (including null-termination character)
+    # so we can only match against up to 15 characters
+    pids = runCommand(f"pgrep '^{EXECUTABLE_NAME[:15]}'")
     if pids is not None:
         pids = tuple(
             filter(
