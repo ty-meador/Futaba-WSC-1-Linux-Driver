@@ -7,12 +7,15 @@ This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
 
+import curses
 import os
 import subprocess
 import time
 from argparse import ArgumentParser
 
 import Futaba
+from UI import MainMenu, WindowCoords
+from UI.Calibration import CalibrationWidget
 
 parser = ArgumentParser()
 
@@ -50,6 +53,72 @@ parser.add_argument(
     "--ui",
     help="Launch the terminal based UI",
 )
+
+
+def uiMode(parentScreen):
+    """Run the driver with a text mode ui."""
+    # def onDeviceFrame(eventName, rawValue, calibratedValue):
+    #     """Process a device frame and update the calibration window.
+
+    #     Args:
+    #         eventName (str): The channel event name.
+    #         rawValue (int): The raw value output by the device.
+    #         calibratedValue (int):  The calibrated value that corresponds to the raw value.
+
+    #     """
+    #     a = 3500 - 550
+    #     b = 40 - -40
+
+    #     if eventName == (3, 0):
+    #         calibWindow.setSteeringPos(int((((rawValue - 550) * b) / a) - 40))
+    #     elif eventName == (3, 1):
+    #         calibWindow.setThrottlePos(int((((rawValue - 550) * b) / a) - 40))
+
+    ##
+    # Keycodes
+    ##
+    SPACE = 10
+    ENTER = 32
+    # LEFT_ARROW = 68
+    UP_ARROW = 65
+    # RIGHT_ARROW = 67
+    DOWN_ARROW = 66
+
+    yMax, xMax = parentScreen.getmaxyx()
+    xMaxOverTwo = xMax // 2
+
+    deviceManager = Futaba.DeviceManager()
+
+    menu = MainMenu(
+        WindowCoords(x=0, y=0, width=xMaxOverTwo, height=yMax),
+        [device for device in deviceManager.listDevices()],
+    )
+
+    menu.render()
+
+    while True:
+        inpt = menu.getch()
+        if inpt == UP_ARROW:
+            menu.up()
+        elif inpt == DOWN_ARROW:
+            menu.down()
+        elif inpt in (SPACE, ENTER):
+            selectedDevice = menu.getItem()
+            deviceManager.start(selectedDevice["key"])
+            calibWindow = CalibrationWidget(
+                WindowCoords(
+                    y=0,
+                    x=xMaxOverTwo,
+                    width=xMaxOverTwo,
+                    height=yMax,
+                )
+            )
+            calibWindow.render()
+            # while True:
+            #     value = deviceManager.poll(selectedDevice["key"])
+            #     if value:
+            #         onDeviceFrame(*value)
+            #     time.sleep(0.2)
 
 
 def cliMode(args):
@@ -148,6 +217,6 @@ if __name__ == "__main__":
     if pids is not None and len(pids) > 0:
         print("🏁 Driver already running. Have Fun!")
     elif args.ui:
-        raise RuntimeError("Not yet Impelmented")
+        curses.wrapper(uiMode)
     else:
         cliMode(args)
