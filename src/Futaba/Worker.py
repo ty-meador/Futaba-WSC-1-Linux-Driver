@@ -96,6 +96,7 @@ def run(
         deadZone = deviceConfig.deadZone
 
     # Create a virtual device for the found device
+    channelEventsMap = tuple(channelEventsMap)
     virtualDevice = uinput.Device(
         tuple(
             [
@@ -119,7 +120,6 @@ def run(
     ##
     frameSize = deviceConfig.frameSize
 
-    channelEventsMap = tuple(channelEventsMap)
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
@@ -178,18 +178,12 @@ def run(
                 )
 
                 if echoFlagIsSet():  # Echo back the data frames info - useful for calibration
-                    pipe.send(
-                        tuple(
-                            [
-                                channelEventsMap[channel],
-                                rawValue,
-                                calibration[rawValue],
-                            ]
-                        )
-                    )
+                    pipe.send(tuple([channelEventsMap[channel], rawValue, calibration[rawValue]]))
+
         except usb.core.USBTimeoutError:
             pass
         except KeyboardInterrupt:
+            # Set our own killswitch and exit gracefully
             controller.killswitch.set()
             pass
         except Exception as e:
