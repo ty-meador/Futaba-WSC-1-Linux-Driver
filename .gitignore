@@ -9,3 +9,4 @@ build/*
 *main.dist*
 *nuitka*.xml
 futaba-rc-driver
+*.egg-info*
