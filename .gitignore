@@ -10,3 +10,4 @@ build/*
 *nuitka*.xml
 futaba-rc-driver
 *logs/*
+*.egg*
