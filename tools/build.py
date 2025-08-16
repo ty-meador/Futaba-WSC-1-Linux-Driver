@@ -4,47 +4,22 @@
 import shutil
 import subprocess
 import sys
-import tomllib
 from argparse import ArgumentParser
 from pathlib import Path
 
+from clean import cleanBuildArtifacts
+from util import (
+    BUILD_DIR,
+    EXECUTABLE_NAME,
+    NUITKA_OUTPUT_DIR,
+    PROJECT_ROOT,
+    PYPROJECT,
+    SOURCE_MAIN,
+    WRAPPER_SCRIPT,
+)
+
 parser = ArgumentParser()
 parser.add_argument("--clean", action="store_true")
-parser.add_argument("--clean-all", action="store_true")
-
-# Project structure
-PWD = Path(__file__).parent.resolve()
-PROJECT_ROOT = PWD.parent
-PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
-
-# Load project configuration
-with open(PYPROJECT_PATH, "rb") as f:
-    toml_data = tomllib.load(f)
-PYPROJECT = toml_data
-
-# Extract configuration values
-project_config = PYPROJECT["project"]
-build_config = PYPROJECT["tool"]["build_tool"]
-
-# Build configuration
-BUILD_DIR = PROJECT_ROOT / build_config["build_dir"]
-EXECUTABLE_NAME = build_config["executable_name"]
-
-# Additional build-specific paths
-SOURCE_MAIN = PROJECT_ROOT / "src" / "main.py"
-NUITKA_OUTPUT_DIR = PROJECT_ROOT / f"{SOURCE_MAIN.stem}.dist"
-WRAPPER_SCRIPT = PROJECT_ROOT / EXECUTABLE_NAME
-
-
-def cleanArtifacts():
-    """Remove previous build artifacts."""
-    print("🧹 Cleaning previous builds...")
-    for dep in [BUILD_DIR, NUITKA_OUTPUT_DIR, WRAPPER_SCRIPT]:
-        if dep.is_file():
-            dep.unlink()
-        elif dep.is_dir():
-            shutil.rmtree(dep)
-    print("✨ Done!")
 
 
 def runCommand(
@@ -182,6 +157,7 @@ def buildExecutable():
         "--include-package-data=Futaba",
         "--include-package-data=uinput",
         "--include-package-data=usb",
+        "--include-data-files=pyproject.toml=pyproject.toml",
         str(SOURCE_MAIN),
     ]
     cmd.extend(nativeLibArgs)
@@ -204,8 +180,6 @@ def buildExecutable():
 
 def setupExecutable(execPath):
     """Set up the final executable distribution."""
-    import shutil
-
     print("🔧 Setting up executable...")
 
     # Make executable
@@ -246,14 +220,14 @@ def testExecutable():
     return False
 
 
-def main():
+def build():
     """Main entry point."""
     print("🎮 Futaba RC Driver Build Script")
     print("=" * 35)
 
     installDependencies()
     validateEnvironment()
-    cleanArtifacts()
+    cleanBuildArtifacts()
 
     execPath = buildExecutable()
     if not execPath:
@@ -272,9 +246,6 @@ def main():
 if __name__ == "__main__":
     args = parser.parse_args()
     if args.clean:
-        cleanArtifacts()
-    elif args.clean_all:
-        print(runCommand(f"{PWD}/package.py --clean"))
-        cleanArtifacts()
+        cleanBuildArtifacts()
     else:
-        main()
+        build()

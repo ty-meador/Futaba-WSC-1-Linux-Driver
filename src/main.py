@@ -22,8 +22,14 @@ from UI import MainMenu, WindowCoords
 from UI.Calibration import CalibrationWidget
 
 # Project structure
-PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
+PWD = Path(__file__).parent.resolve()
+PARENT = PWD.parent
+
+PYPROJECT_PATH = PARENT / "pyproject.toml"
+if not PYPROJECT_PATH.exists():
+    PYPROJECT_PATH = PWD / "pyproject.toml"
+if not PYPROJECT_PATH.exists():
+    raise FileNotFoundError("Unable to locate pyproject.toml")
 
 # Load project configuration
 with open(PYPROJECT_PATH, "rb") as f:
@@ -32,45 +38,17 @@ with open(PYPROJECT_PATH, "rb") as f:
 PYPROJECT = toml_data
 EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
 LOCK_SOCKET = None
+
 parser = ArgumentParser()
+parser.add_argument("--autostart", action="store_true", help="Start the first device found")
+parser.add_argument("--bus", help="The bus of the device you want to start a driver for")
+parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
+parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
+parser.add_argument("--port", help="The port of the device you want start a driver for")
+parser.add_argument("--ui", help="Launch the terminal based UI")
 
 
-parser.add_argument(
-    "--autostart",
-    action="store_true",
-    help="Start the first device found",
-)
-
-parser.add_argument(
-    "--bus",
-    help="The bus of the device you want to start a driver for",
-)
-
-parser.add_argument(
-    "--calibrate",
-    action="store_true",
-    help="Used for calibration",
-)
-
-
-parser.add_argument(
-    "--endpoint",
-    help="Start a driver on the device at this endpoint",
-)
-
-parser.add_argument(
-    "--port",
-    help="The port of the device you want start a driver for",
-)
-
-
-parser.add_argument(
-    "--ui",
-    help="Launch the terminal based UI",
-)
-
-
-def cliMode(args):
+def cliMode(args) -> None:
     """Run the driver in cli-mode.
 
     Args:
@@ -118,7 +96,7 @@ def cliMode(args):
     print("Goodbye!")
 
 
-def uiMode(parentScreen):
+def uiMode(parentScreen) -> None:
     """Run the driver with a text mode ui."""
     # def onDeviceFrame(eventName, rawValue, calibratedValue):
     #     """Process a device frame and update the calibration window.
