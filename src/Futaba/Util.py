@@ -77,12 +77,12 @@ DEFAULT_CONFIG: dict = {
 DEFAULT_CALIBRATION: list = [DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])]
 
 PRODUCTS: dict = {
-    "default": 999,
+    "default": 1948,  # 🥚
     "WSC-1": 10,
     "T16IZ": 11,
     10: "WSC-1",
     11: "T16IZ",
-    999: "default",
+    1948: "default",
 }
 
 

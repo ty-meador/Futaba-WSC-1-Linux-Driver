@@ -143,7 +143,7 @@ class CalibrationWidget(Window):
         # Create the progress bar characters
         segments = self.barSegmentsLeft if isLeftSide else self.barSegmentsRight
 
-        # Calculate bar characters using your original logic
+        # Calculate bar characters
         stepsPerChar = len(segments)
         fullChars = absProgress // stepsPerChar
         remainder = absProgress % stepsPerChar
@@ -154,7 +154,7 @@ class CalibrationWidget(Window):
 
         partialBar = "" if remainder == 0 else segments[remainder - 1]
 
-        # Combine segments based on direction (your original logic)
+        # Combine segments based on direction
         barChars = partialBar + fullBars if isLeftSide else fullBars + partialBar
 
         # Now position everything with center segment truly centered

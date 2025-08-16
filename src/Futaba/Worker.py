@@ -76,12 +76,7 @@ def run(
 
     channelEventsMap, channelCalibrations = zip(
         *[
-            (
-                # Extract name in cfv file -> uinput property
-                getattr(uinput, channel["eventName"]),
-                # Channel calibration map
-                channel["valueMap"],
-            )
+            (getattr(uinput, channel["eventName"]), channel["valueMap"])
             for channel in deviceChannels
         ],
         strict=True,
@@ -100,13 +95,7 @@ def run(
     virtualDevice = uinput.Device(
         tuple(
             [
-                event
-                + (
-                    utils.EVENT_MIN_VAL,
-                    utils.EVENT_MAX_VAL,
-                    deadZone,
-                    noiseFilter,
-                )
+                event + (utils.EVENT_MIN_VAL, utils.EVENT_MAX_VAL, deadZone, noiseFilter)
                 for event in channelEventsMap
             ]
         ),

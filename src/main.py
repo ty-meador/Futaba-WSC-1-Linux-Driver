@@ -7,6 +7,7 @@ This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
 
+import atexit
 import curses
 import socket
 import subprocess
@@ -30,7 +31,7 @@ with open(PYPROJECT_PATH, "rb") as f:
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
 EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
-
+LOCK_SOCKET = None
 parser = ArgumentParser()
 
 
@@ -219,15 +220,15 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    # Socket-lock method to prevent duplicate driver instances
-    port = 1962  # 🥚 IYKYK
-    alreadyRunning = False
-    lockSocket = None
+    lockPort = 1962  # 🥚
 
+    # Socket-lock method to prevent duplicate driver instances
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(("127.0.0.1", port))
-        lockSocket = sock  # Not running, assign the socket to keep it bound
+        LOCK_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        LOCK_SOCKET.bind(("127.0.0.1", lockPort))
+
+        # Ensure socket is cleaned up on exit
+        atexit.register(lambda: LOCK_SOCKET.close() if LOCK_SOCKET else None)
     except OSError:
         print("🏁 Driver already running. Have Fun!")
         sys.exit(1)
