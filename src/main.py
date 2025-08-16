@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 import tomllib
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 import Futaba
@@ -48,7 +48,7 @@ parser.add_argument("--port", help="The port of the device you want start a driv
 parser.add_argument("--ui", help="Launch the terminal based UI")
 
 
-def cliMode(args) -> None:
+def cliMode(args: Namespace) -> None:
     """Run the driver in cli-mode.
 
     Args:
@@ -96,7 +96,7 @@ def cliMode(args) -> None:
     print("Goodbye!")
 
 
-def uiMode(parentScreen) -> None:
+def uiMode(parentScreen: curses.window) -> None:
     """Run the driver with a text mode ui."""
     ##
     # Keycodes
@@ -176,9 +176,8 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    lockPort = 1962  # 🥚
-
     # Socket-lock method to prevent duplicate driver instances
+    lockPort = 1962  # 🥚
     try:
         LOCK_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         LOCK_SOCKET.bind(("127.0.0.1", lockPort))
