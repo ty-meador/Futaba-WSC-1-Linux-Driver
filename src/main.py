@@ -98,23 +98,6 @@ def cliMode(args) -> None:
 
 def uiMode(parentScreen) -> None:
     """Run the driver with a text mode ui."""
-    # def onDeviceFrame(eventName, rawValue, calibratedValue):
-    #     """Process a device frame and update the calibration window.
-
-    #     Args:
-    #         eventName (str): The channel event name.
-    #         rawValue (int): The raw value output by the device.
-    #         calibratedValue (int):  The calibrated value that corresponds to the raw value.
-
-    #     """
-    #     a = 3500 - 550
-    #     b = 40 - -40
-
-    #     if eventName == (3, 0):
-    #         calibWindow.setSteeringPos(int((((rawValue - 550) * b) / a) - 40))
-    #     elif eventName == (3, 1):
-    #         calibWindow.setThrottlePos(int((((rawValue - 550) * b) / a) - 40))
-
     ##
     # Keycodes
     ##
@@ -155,11 +138,6 @@ def uiMode(parentScreen) -> None:
                 )
             )
             calibWindow.render()
-            # while True:
-            #     value = deviceManager.poll(selectedDevice["key"])
-            #     if value:
-            #         onDeviceFrame(*value)
-            #     time.sleep(0.2)
 
 
 def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:

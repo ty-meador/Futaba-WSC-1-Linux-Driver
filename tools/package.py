@@ -205,14 +205,14 @@ def packageDistribution() -> None:  # noqa: PLR0915
         PROJECT_ROOT / "NOTICE",
     ]
 
-    missing = [f for f in pkgCriticalFiles if not f.exists()]
+    missing = [pkgFile for pkgFile in pkgCriticalFiles if not pkgFile.exists()]
     if missing:
         raise FileNotFoundError(
             f"🚨UNABLE TO FIND >{', '.join(map(str, missing))}< REFUSING TO PACKAGE🚨"
         )
 
-    for f in pkgCriticalFiles:
-        shutil.copy2(f, packagePath)
+    for pkgFile in pkgCriticalFiles:
+        shutil.copy2(pkgFile, packagePath)
 
     ##
     # Create version info file
