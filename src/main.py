@@ -8,8 +8,9 @@ under certain conditions; See GNU GPL V3 for more info.
 """
 
 import curses
-import os
+import socket
 import subprocess
+import sys
 import time
 import tomllib
 from argparse import ArgumentParser
@@ -66,6 +67,54 @@ parser.add_argument(
     "--ui",
     help="Launch the terminal based UI",
 )
+
+
+def cliMode(args):
+    """Run the driver in cli-mode.
+
+    Args:
+        args (argparse.ArgumentParser.arg): Arguments passed to the cli
+
+    Raises:
+        RuntimeError: Raised if the specified device cannot be found
+
+    """
+    manager = Futaba.DeviceManager()
+
+    device = None
+    if args.endpoint is not None:
+        device = manager.findDevice(endpoint=args.endpoint)
+    else:
+        selection = None
+        deviceList = manager.listDevices()
+        deviceCount = len(deviceList)
+
+        if deviceCount == 1 or args.autostart:
+            print(f"Found {deviceCount} Futaba devices, autostarting {deviceList[0]['name']}")
+            device = deviceList[0]
+        elif deviceCount > 1:
+            print("Which device would you like to start?")
+            for device in deviceList:
+                print(f"[ {device['key']} ] : {device['name']}")
+            selection = int(input())
+            device = deviceList[selection]
+
+    if device is None:
+        raise RuntimeError("Could not find a Futaba device at the specified endpoint")
+
+    manager.start(device["key"])
+    print(f"Started {device['name']}")
+    print("CTRL + C to stop driver")
+
+    # Block indefinitely so that background process stays alive
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
+
+    manager.stopAll()
+    print("Goodbye!")
 
 
 def uiMode(parentScreen):
@@ -134,54 +183,6 @@ def uiMode(parentScreen):
             #     time.sleep(0.2)
 
 
-def cliMode(args):
-    """Run the driver in cli-mode.
-
-    Args:
-        args (argparse.ArgumentParser.arg): Arguments passed to the cli
-
-    Raises:
-        RuntimeError: Raised if the specified device cannot be found
-
-    """
-    manager = Futaba.DeviceManager()
-
-    device = None
-    if args.endpoint is not None:
-        device = manager.findDevice(endpoint=args.endpoint)
-    else:
-        selection = None
-        deviceList = manager.listDevices()
-        deviceCount = len(deviceList)
-
-        if deviceCount == 1 or args.autostart:
-            print(f"Found {deviceCount} Futaba devices, autostarting {deviceList[0]['name']}")
-            device = deviceList[0]
-        elif deviceCount > 1:
-            print("Which device would you like to start?")
-            for device in deviceList:
-                print(f"[ {device['key']} ] : {device['name']}")
-            selection = int(input())
-            device = deviceList[selection]
-
-    if device is None:
-        raise RuntimeError("Could not find a Futaba device at the specified endpoint")
-
-    manager.start(device["key"])
-    print(f"Started {device['name']}")
-    print("CTRL + C to stop driver")
-
-    # Block indefinitely so that background process stays alive
-    try:
-        while True:
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        pass
-
-    manager.stopAll()
-    print("Goodbye!")
-
-
 def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
     """Run a command and handle errors.
 
@@ -217,21 +218,21 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    # Reliably finds the drivers process
-    # kernel truncates names to 16 characters (including null-termination character)
-    # so we can only match against up to 15 characters
-    pids = runCommand(f"pgrep '^{EXECUTABLE_NAME[:15]}'")
-    if pids is not None:
-        pids = tuple(
-            filter(
-                lambda pid: int(pid) != int(os.getpid()),
-                pids.split("\n"),
-            )
-        )
 
-    if pids is not None and len(pids) > 0:
+    # Socket-lock method to prevent duplicate driver instances
+    port = 1962  # 🥚 IYKYK
+    alreadyRunning = False
+    lockSocket = None
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(("127.0.0.1", port))
+        lockSocket = sock  # Not running, assign the socket to keep it bound
+    except OSError:
         print("🏁 Driver already running. Have Fun!")
-    elif args.ui:
+        sys.exit(1)
+
+    if args.ui:
         curses.wrapper(uiMode)
     else:
         cliMode(args)
