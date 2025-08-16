@@ -203,7 +203,6 @@ def packageDistribution() -> None:  # noqa: PLR0915
         PROJECT_ROOT / "LICENSE",
         TEMPLATES_DIR / "udev.rules",
         PROJECT_ROOT / "NOTICE",
-        PROJECT_ROOT / "pyproject.toml",
     ]
 
     missing = [f for f in pkgCriticalFiles if not f.exists()]
