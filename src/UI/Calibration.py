@@ -71,6 +71,8 @@ class CalibrationWidget(
             value (int): The current steering position
 
         """
+        # Negative = throttle
+        # positive = brake
         perc = value / MAX * -1
         self.throttlePos = int(perc * self.length)
         self.render()
@@ -82,6 +84,8 @@ class CalibrationWidget(
             value (int): The current steering position
 
         """
+        # Negative = left
+        # positive = right
         perc = value / MAX
         self.steeringPos = int(perc * self.length)
         self.render()
