@@ -42,3 +42,35 @@ SCRIPTS_TEMPLATES_DIR = TEMPLATES_DIR / "scripts"
 SOURCE_MAIN = PROJECT_ROOT / "src" / "main.py"
 NUITKA_OUTPUT_DIR = PROJECT_ROOT / f"{SOURCE_MAIN.stem}.dist"
 WRAPPER_SCRIPT = PROJECT_ROOT / EXECUTABLE_NAME
+
+
+def renderTemplate(
+    templatePath: Path,
+    replacements: dict,
+    outputPath: Path = None,
+) -> str | None:
+    """Render a template file with given replacements.
+
+    Args:
+        templatePath: Path to the template file.
+        replacements: Dictionary of placeholders and their corresponding values.
+        outputPath: The path to write the rendered file to.
+
+    Returns:
+        str: Rendered template content as string.
+    """
+    try:
+        rendered = templatePath.read_text()
+        # Placeholders are in the form of {{i_am_a_placeholder}}
+        for placeholder, value in replacements.items():
+            rendered = rendered.replace(f"{{{{{str(placeholder)}}}}}", str(value))
+
+        # Write file and set proper permissions
+        if outputPath:
+            outputPath.write_text(rendered)
+            outputPath.chmod(0o755)
+
+        return rendered
+    except Exception as e:
+        raise RuntimeError("Failed to render template file.") from e
+    return True

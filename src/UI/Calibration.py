@@ -13,8 +13,13 @@
 
 from .Window import Window
 
+MIN = -32768
+MAX = 32767
 
-class CalibrationWidget(Window):
+
+class CalibrationWidget(
+    Window,
+):
     """Draw the status UI element."""
 
     def __init__(self, windowCoords):
@@ -66,7 +71,8 @@ class CalibrationWidget(Window):
             value (int): The current steering position
 
         """
-        self.throttlePos = value - 2048
+        perc = value / MAX * -1
+        self.throttlePos = int(perc * self.length)
         self.render()
 
     def setSteeringPos(self, value):
@@ -76,7 +82,8 @@ class CalibrationWidget(Window):
             value (int): The current steering position
 
         """
-        self.steeringPos = -2048
+        perc = value / MAX
+        self.steeringPos = int(perc * self.length)
         self.render()
 
     def _render(self):

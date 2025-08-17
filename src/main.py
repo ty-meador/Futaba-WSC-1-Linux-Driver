@@ -45,7 +45,7 @@ parser.add_argument("--bus", help="The bus of the device you want to start a dri
 parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
 parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
 parser.add_argument("--port", help="The port of the device you want start a driver for")
-parser.add_argument("--ui", help="Launch the terminal based UI")
+parser.add_argument("--ui", action="store_true", help="Launch the terminal based UI")
 
 
 def cliMode(args: Namespace) -> None:
@@ -85,9 +85,13 @@ def cliMode(args: Namespace) -> None:
     print(f"Started {device['name']}")
     print("CTRL + C to stop driver")
 
+    pipe = manager.getPipe(device["key"])
+    print(pipe)
     # Block indefinitely so that background process stays alive
     try:
         while True:
+            while pipe.poll():
+                print(pipe.recv())
             time.sleep(0.1)
     except KeyboardInterrupt:
         pass
@@ -96,7 +100,10 @@ def cliMode(args: Namespace) -> None:
     print("Goodbye!")
 
 
-def uiMode(parentScreen: curses.window) -> None:
+def uiMode(
+    parentScreen: curses.window,
+    args: Namespace,
+) -> None:
     """Run the driver with a text mode ui."""
     ##
     # Keycodes
@@ -120,6 +127,9 @@ def uiMode(parentScreen: curses.window) -> None:
 
     menu.render()
 
+    selectedDevice = None
+    pipe = None
+
     while True:
         inpt = menu.getch()
         if inpt == UP_ARROW:
@@ -137,7 +147,20 @@ def uiMode(parentScreen: curses.window) -> None:
                     height=yMax,
                 )
             )
-            calibWindow.render()
+            pipe = deviceManager.getPipe(selectedDevice["key"])
+
+        if pipe:
+            while True:
+                while pipe.poll():
+                    [evt, rawV, calibV] = pipe.recv()
+                    # Steering
+                    if evt == (3, 0):
+                        calibWindow.setSteeringPos(calibV)
+                    # Throttle
+                    elif evt == (3, 1):
+                        calibWindow.setThrottlePos(calibV)
+
+        calibWindow.render()
 
 
 def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
@@ -189,6 +212,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if args.ui:
-        curses.wrapper(uiMode)
+        curses.wrapper(uiMode, args)
     else:
         cliMode(args)

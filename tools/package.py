@@ -6,7 +6,6 @@ import subprocess
 import tarfile
 from argparse import ArgumentParser
 from datetime import datetime
-from pathlib import Path
 
 from clean import cleanPackageArtifacts
 from util import (
@@ -24,6 +23,7 @@ from util import (
     UNINSTALL_SCRIPT_NAME,
     VERSION,
     WEB_INSTALL_SCRIPT_NAME,
+    renderTemplate,
 )
 
 parser = ArgumentParser()
@@ -85,31 +85,6 @@ def getVersionInfo() -> tuple[str, str]:
     return version, buildDate
 
 
-def renderTemplateToFile(templatePath: Path, replacements: dict, outputPath: Path) -> str:
-    """Render a template file with given replacements.
-
-    Args:
-        templatePath: Path to the template file.
-        replacements: Dictionary of placeholders and their corresponding values.
-        outputPath: The path to write the rendered file to.
-
-    Returns:
-        str: Rendered template content as string.
-    """
-    try:
-        rendered = templatePath.read_text()
-        # Placeholders are in the form of {{i_am_a_placeholder}}
-        for placeholder, value in replacements.items():
-            rendered = rendered.replace(f"{{{{{str(placeholder)}}}}}", str(value))
-
-        # Write file and set proper permissions
-        outputPath.write_text(rendered)
-        outputPath.chmod(0o755)
-    except Exception as e:
-        raise RuntimeError("Failed to render template file.") from e
-    return True
-
-
 def packageDistribution() -> None:  # noqa: PLR0915
     """Create the standalone distribution package.
 
@@ -146,7 +121,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     shutil.copytree(BUILD_DIR, packagePath / BUILD_DIR.name)
 
     # Create wrapper script that works from any location
-    renderTemplateToFile(
+    renderTemplate(
         SCRIPTS_TEMPLATES_DIR / "wrapper.sh",
         {"executable_path": f"{BUILD_DIR.name}/{EXECUTABLE_NAME}"},  # use relative path
         packagePath / EXECUTABLE_NAME,
@@ -155,7 +130,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     print("📄 Creating documentation...")
 
     # Create README
-    renderTemplateToFile(
+    renderTemplate(
         TEMPLATES_DIR / "README.md",
         {
             "version": VERSION,
@@ -171,7 +146,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     # create installer
     ##
-    renderTemplateToFile(
+    renderTemplate(
         SCRIPTS_TEMPLATES_DIR / INSTALL_SCRIPT_NAME,
         {
             "repo_url": REPOSITORY,
@@ -187,7 +162,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     # Create uninstaller
     ##
-    renderTemplateToFile(
+    renderTemplate(
         SCRIPTS_TEMPLATES_DIR / UNINSTALL_SCRIPT_NAME,
         {
             "repo_url": REPOSITORY,
@@ -217,7 +192,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     # Create version info file
     ##
-    renderTemplateToFile(
+    renderTemplate(
         TEMPLATES_DIR / "VERSION",
         {"version": version, "build_date": buildDate},
         packagePath / "VERSION",
@@ -269,7 +244,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     runCommand(f"cd {packagePath} && sha256sum {tarXzName} > {tarXzName}.sha256")
 
     # Create web installer
-    renderTemplateToFile(
+    renderTemplate(
         SCRIPTS_TEMPLATES_DIR / WEB_INSTALL_SCRIPT_NAME,
         {
             "package_name": packageName,

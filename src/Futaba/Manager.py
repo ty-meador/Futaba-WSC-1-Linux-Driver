@@ -84,11 +84,7 @@ class FutabaDeviceManager:
         Returns:
             multiprocessing.Pipe: Front-end of a duplex pipe
         """
-        try:
-            return self.futabaDevices[deviceIndex].pipe
-        except Exception as e:
-            self.logger.warning(e)
-            return None
+        return self.futabaDevices[deviceIndex].pipe
 
     def listDevices(self) -> list[dict]:
         """Get an ordered list of available devices.
