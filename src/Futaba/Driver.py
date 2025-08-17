@@ -221,8 +221,10 @@ class FutabaDeviceDriver:
         self.subProc = None
         self.frontPipe, self.backPipe = multiprocessing.Pipe()
         self.workerCtl = WorkerControl(pipe=self.backPipe)
-        self.workerCtl.echoFlag.set()
-        print(self.frontPipe, self.backPipe)
+
+        # self.workerCtl.echoFlag.set()
+        # print(self.frontPipe, self.backPipe)
+
         ##
         # Device stuff
         ##
