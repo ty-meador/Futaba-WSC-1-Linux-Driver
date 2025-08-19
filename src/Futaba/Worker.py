@@ -56,7 +56,7 @@ def run(
     logger = utils.newLogger(f"{name}_subproc")
 
     coreDevice = None
-    coreDevice = utils.getCoreDevice(interruptEndpoint)
+    coreDevice = utils.findEndpointDevice(interruptEndpoint)
     if coreDevice is None:
         raise DeviceNotFoundError
 

@@ -119,11 +119,11 @@ class FutabaDeviceDriver:
         defaultPath = os.path.join(utils.CONFIG_PATH, "default.json")
 
         self.logger.debug(f"loading {filePath}")
-        config = utils.loadJsonFile(filePath)
+        config = utils.parseJsonFile(filePath)
 
         if config is None:
             self.logger.debug(f"device config not found, loading {defaultPath}")
-            config = utils.loadJsonFile(defaultPath)
+            config = utils.parseJsonFile(defaultPath)
         if config is None:
             self.logger.debug("using hard-coded defaults")
             config = utils.DEFAULT_CONFIG
@@ -147,11 +147,11 @@ class FutabaDeviceDriver:
 
         # Load this products calibration file by default
         self.logger.debug(f"loading {filePath}")
-        channelCalibrations = utils.loadJsonFile(filePath)
+        channelCalibrations = utils.parseJsonFile(filePath)
         # If that fails, load the default config file
         if channelCalibrations is None:
             self.logger.debug(f"loading{defaultPath}")
-            channelCalibrations = utils.loadJsonFile(defaultPath)
+            channelCalibrations = utils.parseJsonFile(defaultPath)
         # If that fails, use the hard-coded values
         if channelCalibrations is None:
             self.logger.debug("using hard-coded defaults")
@@ -207,8 +207,19 @@ class FutabaDeviceDriver:
         # meta-stuff
         ##
         self.state = DriverState.INITIALIZING
-        self.endpoint = utils.getInterruptAddress(device)
-        self.deviceInfo = utils.getCoreDeviceInfo(self.endpoint)
+        self.endpoint = utils.findInterruptEndpoint(device)
+        self.deviceInfo = (
+            {
+                "productID": device.idProduct,
+                "serialNumber": device.serial_number,
+                "product": device.product,
+                "manufacturer": device.manufacturer,
+                "speed": device.speed,
+                "interruptEndpoint": utils.findInterruptEndpoint(device),
+            }
+            if device
+            else None
+        )
 
         if self.endpoint is None:
             raise TypeError("Unable to find interrupt endpoint for device")
@@ -223,7 +234,6 @@ class FutabaDeviceDriver:
         self.workerCtl = WorkerControl(pipe=self.backPipe)
 
         # self.workerCtl.echoFlag.set()
-        # print(self.frontPipe, self.backPipe)
 
         ##
         # Device stuff
@@ -289,10 +299,6 @@ class FutabaDeviceDriver:
 
         """
         if coreDevice.idVendor != utils.FUTABA_VENDOR_ID:
-            return False
-
-        hidInterface = utils.findHIDInterface(coreDevice)
-        if hidInterface is None:
             return False
 
         endpoint = utils.findInterruptEndpoint(coreDevice)

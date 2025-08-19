@@ -54,7 +54,7 @@ class FutabaDeviceManager:
 
         """
         if endpoint is not None:
-            return utils.getCoreDevice(endpoint)
+            return utils.findEndpointDevice(endpoint)
         return None
 
     def getDeviceStatus(self, deviceIndex: int) -> DriverState | None:

@@ -99,49 +99,17 @@ LOG_PATH: str = os.path.join(DRIVER_PATH, "logs")
 os.makedirs(LOG_PATH, exist_ok=True)
 
 
-def findHIDInterface(coreDevice: usb.core.Device) -> usb.core.Interface | None:
-    """Find the HID interface for the given device.
+@dataclass(frozen=True, slots=True)
+class DeviceConfig:
+    """Stores the configuration settings for a single device."""
 
-    Args:
-        coreDevice (usb.core.Device): The device to search
-
-    Returns:
-        usb.core.Device.interface: The HID interface if one exists
-        None: Returned when:
-            - No device found with matching vendor ID and endpoint
-            - Multiple devices found (ambiguous result)
-            - Device access fails
-
-    """
-    for config in coreDevice:
-        for interface in config:
-            if interface.bInterfaceClass == HID_INTERFACE:
-                return interface
-    return None
+    channelEvents: list[str] = field(default_factory=lambda: DEFAULT_CONFIG["channel_events"])
+    deadZone: int = DEFAULT_DEADZONE
+    frameSize: int = field(default_factory=lambda: DEFAULT_CONFIG["frame_size"])
+    noiseFilter: int = DEFAULT_NOISE_FILTER
 
 
-def findInterruptEndpoint(coreDevice: usb.core.Device) -> int | None:
-    """Find the USB interrupt endpoint for the given HID interface.
-
-    Args:
-        coreDevice (usb.core.Device): The core device to find the interrupt endpoint of.
-
-    Returns:
-        int: The address of the endpoint if one exists, None if none exist.
-
-    """
-    hidInterface = findHIDInterface(coreDevice)
-    if hidInterface:
-        for endpoint in hidInterface:
-            if (
-                usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
-                and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
-            ):
-                return endpoint.bEndpointAddress
-    return None
-
-
-def getCoreDevice(endpoint: int) -> usb.core.Device | bool:
+def findEndpointDevice(endpoint: int) -> usb.core.Device | bool:
     """Get the core USB device handle that has the provided enpoint.
 
     Args:
@@ -164,32 +132,7 @@ def getCoreDevice(endpoint: int) -> usb.core.Device | bool:
     return results[0]
 
 
-def getCoreDeviceInfo(endpoint: int) -> dict | None:
-    """Find the core device on the given bus and port.
-
-    Args:
-        endpoint (int): The endpoint address of the device you want info for
-
-    Returns:
-        usb.core.Device: The core device at the provided bus and port0
-
-    """
-    device = getCoreDevice(endpoint)
-    return (
-        {
-            "productID": device.idProduct,
-            "serialNumber": device.serial_number,
-            "product": device.product,
-            "manufacturer": device.manufacturer,
-            "speed": device.speed,
-            "interruptEndpoint": findInterruptEndpoint(device),
-        }
-        if device
-        else None
-    )
-
-
-def getInterruptAddress(device: usb.core.Device) -> int:
+def findInterruptEndpoint(device: usb.core.Device) -> int:
     """Take in a device and returns is interrupt enpoint address.
 
     Args:
@@ -214,22 +157,6 @@ def getInterruptAddress(device: usb.core.Device) -> int:
                 ):
                     return endpoint.bEndpointAddress
     raise RuntimeError("No interrupt endpoint found!")
-
-
-def loadJsonFile(filePath: Path | str) -> dict:
-    """Load a JSON file into a dictionary.
-
-    Args:
-        filePath (str): The path to the json file you want to load
-
-    Returns:
-        dict: The parsed json
-
-    """
-    parsedJson = None
-    with open(filePath, encoding="utf-8") as jsonFile:
-        parsedJson = json.load(jsonFile)
-    return parsedJson
 
 
 def newLogger(
@@ -268,11 +195,17 @@ def newLogger(
     return logger
 
 
-@dataclass(frozen=True, slots=True)
-class DeviceConfig:
-    """Stores the configuration settings for a single device."""
+def parseJsonFile(filePath: Path | str) -> dict:
+    """Load a JSON file into a dictionary.
 
-    channelEvents: list[str] = field(default_factory=lambda: DEFAULT_CONFIG["channel_events"])
-    deadZone: int = DEFAULT_DEADZONE
-    frameSize: int = field(default_factory=lambda: DEFAULT_CONFIG["frame_size"])
-    noiseFilter: int = DEFAULT_NOISE_FILTER
+    Args:
+        filePath (str): The path to the json file you want to load
+
+    Returns:
+        dict: The parsed json
+
+    """
+    parsedJson = None
+    with open(filePath, encoding="utf-8") as jsonFile:
+        parsedJson = json.load(jsonFile)
+    return parsedJson

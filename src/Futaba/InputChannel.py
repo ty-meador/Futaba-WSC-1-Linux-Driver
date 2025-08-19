@@ -178,7 +178,7 @@ class ChannelCalibration:
         left: int | None = None,
         right: int | None = None,
     ) -> list[int]:
-        """Pure Python 1D linear interpolation to replace numpy.interp().
+        """Perform a 1-d interpolation.
 
         Args:
             xVals: Values to interpolate at
