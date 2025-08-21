@@ -85,17 +85,17 @@ def cliMode(args: Namespace) -> None:
     print(f"Started {device['name']}")
     print("CTRL + C to stop driver")
 
-    pipe = manager.getPipe(device["key"])
-    calibrator = Futaba.InputChannel.ChannelCalibrator()
-    print(pipe)
+    # pipe = manager.getPipe(device["key"])
+    # calibrator = Futaba.InputChannel.ChannelCalibrator()
+    # print(pipe)
     # Block indefinitely so that background process stays alive
     try:
         while True:
-            while pipe.poll():
-                calibrator.minMax(pipe.recv())
+            #     while pipe.poll():
+            #         calibrator.minMax(pipe.recv())
             time.sleep(0.1)
     except KeyboardInterrupt:
-        print(calibrator._generateCalibration())
+        # print(calibrator._generateCalibration())
         pass
 
     manager.stopAll()

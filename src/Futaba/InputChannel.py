@@ -143,8 +143,12 @@ class ChannelCalibration:
         inputMin, inputMid, inputMax = inputRange
         outputMin, outputMid, outputMax = outputRange
 
-        assert inputMin < inputMid < inputMax, "Insane input range"
-        assert outputMin < outputMid < outputMax, "Insane output range"
+        assert inputMin < inputMid < inputMax, (
+            f"Insane input range ({inputMin}, {inputMid}, {inputMax})"
+        )
+        assert outputMin < outputMid < outputMax, (
+            f"Insane output range ({inputMin}, {inputMid}, {inputMax})"
+        )
 
         # If the input uses both positive and negative values we need to
         # account for that in the array size
@@ -295,21 +299,29 @@ class ChannelCalibrator:
         # Update midpoint
         self.knownChannels[channel]["mid"] = rawV
 
-    def generateFile(self, fileName: str):
+    def generateFile(self, fileName: str) -> None:
         """Generate a calibration file."""
         calibration = self._generateCalibration()
         with open(fileName, "w") as calibrationFile:
             json.dump(calibration, calibrationFile, indent=4)
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Create a Channel calibrator."""
         self.knownChannels = {}
 
-    def _defaultBounds(self, default=None) -> dict:
+    def _defaultBounds(self, default=None) -> dict[str, int]:
         return {"min": default, "mid": default, "max": default}
 
-    def _generateCalibration(self):
+    def _generateCalibration(self) -> list[list]:
         """Generate the devices calibration object."""
         container = []
         for channelData in self.knownChannels.values():
+            # Account for channels that might not be used by the transmitter
+            # FIXME - We have to do this because the interpolation function used to generate the
+            # calibrated value map requires an ascending input range to be considered "sane".
+            # TODO - Think of a better way
+            if channelData["min"] == channelData["mid"] == channelData["max"]:
+                channelData["min"] = channelData["mid"] - 1
+                channelData["max"] = channelData["mid"] + 1
             container.append([channelData["min"], channelData["mid"], channelData["max"]])
         return container
