@@ -2,6 +2,7 @@
 
 import array
 import bisect
+import json
 import logging
 import sys
 import typing
@@ -9,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import Util as utils
+from .IPC import DataFrame
 
 
 class ChannelDict(typing.TypedDict):
@@ -224,7 +226,6 @@ class InputChannel:
 
     eventName: str
     calibrationRange: typing.Iterable[int]
-
     isReversed: bool = False
     logger: object = field(default_factory=lambda: utils.newLogger("InputChannel"))
     valueMap: array.array = field(default_factory=lambda: [])
@@ -265,3 +266,50 @@ class InputChannel:
     def toDict(self) -> dict[str, Any]:
         """Generate a dictionary representation of this input channel."""
         return ChannelDict(eventName=self.eventName, valueMap=self.valueMap)
+
+
+class ChannelCalibrator:
+    """Generates a channel calibration for the running device."""
+
+    def minMax(self, dataFrame: DataFrame) -> None:
+        """Update min and max values."""
+        channel, rawV, calV = dataFrame
+
+        # Detect new channels
+        if channel not in self.knownChannels:
+            self.knownChannels[channel] = self._defaultBounds(rawV)
+        # Update boundaries
+        elif rawV < self.knownChannels[channel]["min"]:
+            self.knownChannels[channel]["min"] = rawV
+        elif rawV > self.knownChannels[channel]["max"]:
+            self.knownChannels[channel]["max"] = rawV
+
+    def mid(self, dataFrame: DataFrame) -> None:
+        """Update mid value."""
+        channel, rawV, calV = dataFrame
+
+        # Detect new channels
+        if channel not in self.knownChannels:
+            self.knownChannels[channel] = self._defaultBounds(rawV)
+
+        # Update midpoint
+        self.knownChannels[channel]["mid"] = rawV
+
+    def generateFile(self, fileName: str):
+        """Generate a calibration file."""
+        calibration = self._generateCalibration()
+        with open(fileName, "w") as calibrationFile:
+            json.dump(calibration, calibrationFile, indent=4)
+
+    def __init__(self):
+        self.knownChannels = {}
+
+    def _defaultBounds(self, default=None) -> dict:
+        return {"min": default, "mid": default, "max": default}
+
+    def _generateCalibration(self):
+        """Generate the devices calibration object."""
+        container = []
+        for channelData in self.knownChannels.values():
+            container.append([channelData["min"], channelData["mid"], channelData["max"]])
+        return container

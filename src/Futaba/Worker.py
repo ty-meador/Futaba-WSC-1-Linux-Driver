@@ -2,7 +2,7 @@
 # ruff: noqa: PLC0415, C901, PLR0915, PLR0912
 
 from .InputChannel import ChannelDict
-from .IPC import WorkerControl
+from .IPC import DataFrame, WorkerControl
 from .Util import DeviceConfig
 
 
@@ -167,7 +167,13 @@ def run(
                 )
 
                 if echoFlagIsSet():  # Echo back the data frames info - useful for calibration
-                    pipe.send(tuple([channelEventsMap[channel], rawValue, calibration[rawValue]]))
+                    pipe.send(
+                        DataFrame(
+                            channelEventsMap[channel],
+                            rawValue,
+                            calibration[rawValue],
+                        )
+                    )
 
         except usb.core.USBTimeoutError:
             pass

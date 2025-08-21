@@ -85,15 +85,17 @@ def cliMode(args: Namespace) -> None:
     print(f"Started {device['name']}")
     print("CTRL + C to stop driver")
 
-    # pipe = manager.getPipe(device["key"])
-    # print(pipe)
+    pipe = manager.getPipe(device["key"])
+    calibrator = Futaba.InputChannel.ChannelCalibrator()
+    print(pipe)
     # Block indefinitely so that background process stays alive
     try:
         while True:
-            # while pipe.poll():
-            #     print(pipe.recv())
+            while pipe.poll():
+                calibrator.minMax(pipe.recv())
             time.sleep(0.1)
     except KeyboardInterrupt:
+        print(calibrator._generateCalibration())
         pass
 
     manager.stopAll()
@@ -200,7 +202,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Socket-lock method to prevent duplicate driver instances
-    lockPort = 1962  # 🥚
+    lockPort = 1962  # 🥚 📻🎮
     try:
         LOCK_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         LOCK_SOCKET.bind(("127.0.0.1", lockPort))

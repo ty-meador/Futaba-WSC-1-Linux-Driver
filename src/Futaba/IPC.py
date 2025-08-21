@@ -12,3 +12,15 @@ class WorkerControl:
     killswitch: multiprocessing.Event = field(default_factory=multiprocessing.Event)
     runFlag: multiprocessing.Event = field(default_factory=multiprocessing.Event)
     echoFlag: multiprocessing.Event = field(default_factory=multiprocessing.Event)
+
+
+@dataclass(slots=True, frozen=True)
+class DataFrame:
+    """Class representation of a single data frame."""
+
+    event: str
+    rawValue: int
+    calibratedValue: int
+
+    def __iter__(self):
+        return iter((self.event, self.rawValue, self.calibratedValue))
