@@ -7,12 +7,13 @@ This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
 
+import asyncio
 import atexit
+import contextlib
 import curses
 import socket
 import subprocess
 import sys
-import time
 import tomllib
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -48,24 +49,24 @@ parser.add_argument("--port", help="The port of the device you want start a driv
 parser.add_argument("--ui", action="store_true", help="Launch the terminal based UI")
 
 
-def cliMode(args: Namespace) -> None:
+def cliMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
     """Run the driver in cli-mode.
 
     Args:
         args (argparse.ArgumentParser.arg): Arguments passed to the cli
+        mgr (Futaba.DeviceManager): The global device manager
 
     Raises:
         RuntimeError: Raised if the specified device cannot be found
 
     """
-    manager = Futaba.DeviceManager()
-
     device = None
+
     if args.endpoint is not None:
-        device = manager.findDevice(endpoint=args.endpoint)
+        device = mgr.findDevice(endpoint=args.endpoint)
     else:
         selection = None
-        deviceList = manager.listDevices()
+        deviceList = mgr.listDevices()
         deviceCount = len(deviceList)
 
         if deviceCount == 1 or args.autostart:
@@ -81,31 +82,12 @@ def cliMode(args: Namespace) -> None:
     if device is None:
         raise RuntimeError("Could not find a Futaba device at the specified endpoint")
 
-    manager.start(device["key"])
+    mgr.start(device["key"])
     print(f"Started {device['name']}")
     print("CTRL + C to stop driver")
 
-    # pipe = manager.getPipe(device["key"])
-    # calibrator = Futaba.InputChannel.ChannelCalibrator()
-    # print(pipe)
-    # Block indefinitely so that background process stays alive
-    try:
-        while True:
-            #     while pipe.poll():
-            #         calibrator.minMax(pipe.recv())
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        # print(calibrator._generateCalibration())
-        pass
 
-    manager.stopAll()
-    print("Goodbye!")
-
-
-def uiMode(
-    parentScreen: curses.window,
-    args: Namespace,
-) -> None:
+def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManager) -> None:
     """Run the driver with a text mode ui."""
     ##
     # Keycodes
@@ -152,9 +134,12 @@ def uiMode(
             pipe = deviceManager.getPipe(selectedDevice["key"])
 
         if pipe:
+            calibrator = Futaba.InputChannel.ChannelCalibrator()
             while True:
                 while pipe.poll():
-                    [evt, rawV, calibV] = pipe.recv()
+                    frame = pipe.recv()
+                    [evt, rawV, calibV] = frame
+                    calibrator.minMax(frame)
                     # Steering
                     if evt == (3, 0):
                         calibWindow.setSteeringPos(calibV)
@@ -198,22 +183,37 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
         return None
 
 
-if __name__ == "__main__":
-    args = parser.parse_args()
-
-    # Socket-lock method to prevent duplicate driver instances
-    lockPort = 1962  # 🥚 📻🎮
+def getProcessLock() -> socket.socket:
+    """Get a lock so that multiple drivers can't run at once."""
+    # Socket-lock method
+    lockPort = 1962  # 🥚
     try:
         LOCK_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         LOCK_SOCKET.bind(("127.0.0.1", lockPort))
-
-        # Ensure socket is cleaned up on exit
-        atexit.register(lambda: LOCK_SOCKET.close() if LOCK_SOCKET else None)
+        atexit.register(lambda: LOCK_SOCKET.close() if LOCK_SOCKET else None)  # cleanup
     except OSError:
         print("🏁 Driver already running. Have Fun!")
         sys.exit(1)
 
+
+async def main(mgr: Futaba.DeviceManager) -> None:
+    """Main entrypoint of the driver."""
+    args = parser.parse_args()
     if args.ui:
         curses.wrapper(uiMode, args)
     else:
-        cliMode(args)
+        cliMode(args, mgr)
+
+
+if __name__ == "__main__":
+    mgr = Futaba.DeviceManager()
+    atexit.register(mgr.stopAll)  # Safety first!
+
+    processLock = getProcessLock()
+
+    with contextlib.suppress(KeyboardInterrupt):
+        loop = asyncio.new_event_loop()
+        loop.create_task(main(mgr))
+        loop.run_forever()
+
+    print("Goodbye!")
