@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """The main program - run with `sudo python3 main.py`.
 
-Futaba RC Driver  Copyright (C) 2025  Ty Meador (gitlab="Native-Coder")
+Futaba RC Driver  Copyright (C) 2025  Tyler Meador (gitlab="Native-Coder")
 This program comes with ABSOLUTELY NO WARRANTY;.
 This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
