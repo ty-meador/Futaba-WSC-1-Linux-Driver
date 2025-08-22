@@ -9,11 +9,8 @@ under certain conditions; See GNU GPL V3 for more info.
 
 import asyncio
 import atexit
-import contextlib
 import curses
-import socket
 import subprocess
-import sys
 import tomllib
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -43,7 +40,7 @@ LOCK_SOCKET = None
 parser = ArgumentParser()
 parser.add_argument("--autostart", action="store_true", help="Start the first device found")
 parser.add_argument("--bus", help="The bus of the device you want to start a driver for")
-parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
+# parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
 parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
 parser.add_argument("--port", help="The port of the device you want start a driver for")
 parser.add_argument("--ui", action="store_true", help="Launch the terminal based UI")
@@ -168,10 +165,10 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
             result = subprocess.run(
                 cmd,
                 shell=True,
-                check=True,
+                check=True,  # Raise exception if non-zero exit
                 cwd=cwd,
                 capture_output=True,
-                text=True,
+                text=True,  # str instead of raw bytes
             )
             return result.stdout.strip()
         else:
@@ -181,19 +178,6 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
         if capture and e.stderr:
             print(f"Error: {e.stderr}")
         return None
-
-
-def getProcessLock() -> socket.socket:
-    """Get a lock so that multiple drivers can't run at once."""
-    # Socket-lock method
-    lockPort = 1962  # 🥚
-    try:
-        LOCK_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        LOCK_SOCKET.bind(("127.0.0.1", lockPort))
-        atexit.register(lambda: LOCK_SOCKET.close() if LOCK_SOCKET else None)  # cleanup
-    except OSError:
-        print("🏁 Driver already running. Have Fun!")
-        sys.exit(1)
 
 
 async def main(mgr: Futaba.DeviceManager) -> None:
@@ -209,11 +193,14 @@ if __name__ == "__main__":
     mgr = Futaba.DeviceManager()
     atexit.register(mgr.stopAll)  # Safety first!
 
-    processLock = getProcessLock()
-
-    with contextlib.suppress(KeyboardInterrupt):
-        loop = asyncio.new_event_loop()
-        loop.create_task(main(mgr))
-        loop.run_forever()
+    try:
+        with Futaba.IPC.ProcessLock():
+            loop = asyncio.new_event_loop()
+            loop.create_task(main(mgr))
+            loop.run_forever()
+    except OSError:
+        print("🏁 Driver already running. Have Fun!")
+    except KeyboardInterrupt:
+        pass
 
     print("Goodbye!")
