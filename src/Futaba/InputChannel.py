@@ -1,7 +1,6 @@
 """Classes for handling input channels."""
 
 import array
-import bisect
 import json
 import logging
 import sys
@@ -166,7 +165,7 @@ class ChannelCalibration:
 
         return array.array(
             "i",
-            cls.interpolate(
+            utils.interpolate(
                 allPossibleInputValues,
                 inputRange,
                 outputRange,
@@ -174,54 +173,6 @@ class ChannelCalibration:
                 right=outputMax,
             ),
         )
-
-    @classmethod
-    def interpolate(
-        cls,
-        xVals: typing.Iterable[int],
-        xPoints: typing.Iterable[int],
-        yPoints: typing.Iterable[int],
-        left: int | None = None,
-        right: int | None = None,
-    ) -> list[int]:
-        """Perform a 1-d interpolation.
-
-        Args:
-            xVals: Values to interpolate at
-            xPoints: X coordinates of known points
-            yPoints: Y coordinates of known points
-            left: Value for x < xPoints[0]
-            right: Value for x > xPoints[-1]
-
-        Returns:
-            List of interpolated integer values
-        """
-        result = []
-
-        for x in xVals:
-            # Handle boundary conditions
-            if x <= xPoints[0]:
-                result.append(left if left is not None else yPoints[0])
-                continue
-            if x >= xPoints[-1]:
-                result.append(right if right is not None else yPoints[-1])
-                continue
-
-            # Find the right interval for interpolation
-            i = bisect.bisect_right(xPoints, x) - 1
-
-            # Linear interpolation
-            x1, x2 = xPoints[i], xPoints[i + 1]
-            y1, y2 = yPoints[i], yPoints[i + 1]
-
-            interpolated = (
-                y1
-                if x2 == x1  # Avoid division by zero
-                else y1 + (y2 - y1) * (x - x1) / (x2 - x1)
-            )
-
-            result.append(int(round(interpolated)))
-        return result
 
 
 @dataclass(frozen=True, slots=True)

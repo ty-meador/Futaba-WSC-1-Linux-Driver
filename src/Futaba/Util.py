@@ -1,9 +1,11 @@
 """Contains atomic utility functions for the project."""
 
+import bisect
 import json
 import logging
 import os
 import re
+import typing
 from dataclasses import dataclass, field
 from logging import handlers
 from pathlib import Path
@@ -209,3 +211,50 @@ def parseJsonFile(filePath: Path | str) -> dict:
     with open(filePath, encoding="utf-8") as jsonFile:
         parsedJson = json.load(jsonFile)
     return parsedJson
+
+
+def interpolate(
+    xVals: typing.Iterable[int],
+    xPoints: typing.Iterable[int],
+    yPoints: typing.Iterable[int],
+    left: int | None = None,
+    right: int | None = None,
+) -> list[int]:
+    """Perform a 1-d interpolation.
+
+    Args:
+        xVals: Values to interpolate at
+        xPoints: X coordinates of known points
+        yPoints: Y coordinates of known points
+        left: Value for x < xPoints[0]
+        right: Value for x > xPoints[-1]
+
+    Returns:
+        List of interpolated integer values
+    """
+    result = []
+
+    for x in xVals:
+        # Handle boundary conditions
+        if x <= xPoints[0]:
+            result.append(left if left is not None else yPoints[0])
+            continue
+        if x >= xPoints[-1]:
+            result.append(right if right is not None else yPoints[-1])
+            continue
+
+        # Find the right interval for interpolation
+        i = bisect.bisect_right(xPoints, x) - 1
+
+        # Linear interpolation
+        x1, x2 = xPoints[i], xPoints[i + 1]
+        y1, y2 = yPoints[i], yPoints[i + 1]
+
+        interpolated = (
+            y1
+            if x2 == x1  # Avoid division by zero
+            else y1 + (y2 - y1) * (x - x1) / (x2 - x1)
+        )
+
+        result.append(int(round(interpolated)))
+    return result
