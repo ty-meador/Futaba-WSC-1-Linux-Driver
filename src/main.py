@@ -58,7 +58,6 @@ def cliMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
 
     """
     device = None
-
     if args.endpoint is not None:
         device = mgr.findDevice(endpoint=args.endpoint)
     else:
@@ -190,11 +189,9 @@ async def main(mgr: Futaba.DeviceManager) -> None:
 
 
 if __name__ == "__main__":
-    mgr = Futaba.DeviceManager()
-    atexit.register(mgr.stopAll)  # Safety first!
-
     try:
-        with Futaba.IPC.ProcessLock():
+        with Futaba.IPC.ProcessLock(), Futaba.DeviceManager() as mgr:
+            atexit.register(mgr.stopAll)  # Safety first!
             loop = asyncio.new_event_loop()
             loop.create_task(main(mgr))
             loop.run_forever()

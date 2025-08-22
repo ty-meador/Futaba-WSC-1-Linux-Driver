@@ -34,6 +34,15 @@ class FutabaDeviceManager:
         self.logger = utils.newLogger("FutabaDeviceManager")
         atexit.register(self.stopAll)
 
+    def __enter__(self):
+        """Enter."""
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Exit."""
+        self.stopAll()
+        return self
+
     @property
     def futabaDevices(self) -> tuple[FutabaDeviceDriver, ...]:
         """A tuple of supported Futaba devices."""

@@ -30,10 +30,12 @@ class ProcessLock:
     def __enter__(self):
         """Enter."""
         self.lock()
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Exit."""
         self.unlock()
+        return self
 
 
 ##
@@ -48,6 +50,7 @@ class DataFrame:
     calibratedValue: int
 
     def __iter__(self):
+        """Iter."""
         return iter((self.event, self.rawValue, self.calibratedValue))
 
 
