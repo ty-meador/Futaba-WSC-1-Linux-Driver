@@ -77,7 +77,9 @@ def renderTemplate(
     return True
 
 
-def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
+def runCommand(
+    cmd: str, cwd: str | None = None, capture: bool = True, shell: bool = True
+) -> str | None:
     """Run a command and handle errors.
 
     Args:
@@ -90,21 +92,16 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
         None if command failed
 
     """
-    try:
-        if capture:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                check=True,  # Raise exception if non-zero exit
-                cwd=cwd,
-                capture_output=True,
-                text=True,  # str instead of raw bytes
-            )
-            return result.stdout.strip()
-        else:
-            subprocess.run(cmd, shell=True, check=True, cwd=cwd)
-            return ""
-    except subprocess.CalledProcessError as e:
-        if capture and e.stderr:
-            print(f"Error: {e.stderr}")
-        return None
+    if capture:
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            check=True,  # Raise exception if non-zero exit
+            cwd=cwd,
+            capture_output=True,
+            text=True,  # str instead of raw bytes
+        )
+        return result.stdout.strip()
+    else:
+        subprocess.run(cmd, shell=True, check=True, cwd=cwd)
+        return ""

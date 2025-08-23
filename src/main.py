@@ -43,6 +43,7 @@ parser.add_argument("--bus", help="The bus of the device you want to start a dri
 parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
 parser.add_argument("--port", help="The port of the device you want start a driver for")
 parser.add_argument("--ui", action="store_true", help="Launch the terminal based UI")
+parser.add_argument("--version", action="store_true", help="Get driver version")
 
 
 def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
@@ -171,7 +172,9 @@ async def main(mgr: Futaba.DeviceManager) -> None:
 if __name__ == "__main__":
     args = parser.parse_args()
     try:
-        if args.ui:
+        if args.version:
+            print(PYPROJECT["project"]["version"])
+        elif args.ui:
             with Futaba.IPC.ProcessLock(), Futaba.DeviceManager() as mgr:
                 curses.wrapper(uiMode, *(args, mgr))
         else:
@@ -179,10 +182,7 @@ if __name__ == "__main__":
                 loop = asyncio.new_event_loop()
                 loop.create_task(daemonMode(args, mgr))
                 loop.run_forever()
-
     except OSError:
         print("🏁 Driver already running. Have Fun!")
     except KeyboardInterrupt:
         pass
-
-    print("Goodbye!")
