@@ -1,5 +1,6 @@
 """Utilities and constants for the build system."""
 
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -74,3 +75,36 @@ def renderTemplate(
     except Exception as e:
         raise RuntimeError("Failed to render template file.") from e
     return True
+
+
+def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
+    """Run a command and handle errors.
+
+    Args:
+        cmd: Command to run as shell string
+        cwd: Working directory for command execution
+        capture: Whether to capture and return output
+
+    Returns:
+        Command output if capture=True and successful, empty string if capture=False and successful,
+        None if command failed
+
+    """
+    try:
+        if capture:
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                check=True,  # Raise exception if non-zero exit
+                cwd=cwd,
+                capture_output=True,
+                text=True,  # str instead of raw bytes
+            )
+            return result.stdout.strip()
+        else:
+            subprocess.run(cmd, shell=True, check=True, cwd=cwd)
+            return ""
+    except subprocess.CalledProcessError as e:
+        if capture and e.stderr:
+            print(f"Error: {e.stderr}")
+        return None

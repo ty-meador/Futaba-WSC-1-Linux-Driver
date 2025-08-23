@@ -2,7 +2,6 @@
 """Package Futaba RC Driver into a standalone distribution."""
 
 import shutil
-import subprocess
 import tarfile
 from argparse import ArgumentParser
 from datetime import datetime
@@ -24,44 +23,11 @@ from util import (
     VERSION,
     WEB_INSTALL_SCRIPT_NAME,
     renderTemplate,
+    runCommand,
 )
 
 parser = ArgumentParser()
 parser.add_argument("--clean", action="store_true")
-
-
-def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
-    """Run a command and handle errors.
-
-    Args:
-        cmd: Command to run as shell string
-        cwd: Working directory for command execution
-        capture: Whether to capture and return output
-
-    Returns:
-        Command output if capture=True and successful, empty string if capture=False and successful,
-        None if command failed
-
-    """
-    try:
-        if capture:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                check=True,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-            )
-            return result.stdout.strip()
-        else:
-            subprocess.run(cmd, shell=True, check=True, cwd=cwd)
-            return ""
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Command failed: {cmd}")
-        if capture and e.stderr:
-            print(f"Error: {e.stderr}")
-        return None
 
 
 def getVersionInfo() -> tuple[str, str]:

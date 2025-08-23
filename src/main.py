@@ -9,7 +9,6 @@ under certain conditions; See GNU GPL V3 for more info.
 
 import asyncio
 import curses
-import subprocess
 import sys
 import time
 import tomllib
@@ -163,39 +162,6 @@ def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManag
     calibrator.generateFile("WSC-1")
     mgr.stopAll()
     sys.exit(0)
-
-
-def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
-    """Run a command and handle errors.
-
-    Args:
-        cmd: Command to run as shell string
-        cwd: Working directory for command execution
-        capture: Whether to capture and return output
-
-    Returns:
-        Command output if capture=True and successful, empty string if capture=False and successful,
-        None if command failed
-
-    """
-    try:
-        if capture:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                check=True,  # Raise exception if non-zero exit
-                cwd=cwd,
-                capture_output=True,
-                text=True,  # str instead of raw bytes
-            )
-            return result.stdout.strip()
-        else:
-            subprocess.run(cmd, shell=True, check=True, cwd=cwd)
-            return ""
-    except subprocess.CalledProcessError as e:
-        if capture and e.stderr:
-            print(f"Error: {e.stderr}")
-        return None
 
 
 async def main(mgr: Futaba.DeviceManager) -> None:

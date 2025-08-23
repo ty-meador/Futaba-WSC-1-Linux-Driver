@@ -18,6 +18,7 @@ from util import (
     SOURCE_MAIN,
     WRAPPER_SCRIPT,
     renderTemplate,
+    runCommand,
 )
 
 parser = ArgumentParser()
@@ -150,33 +151,6 @@ def installDependencies():
         "pip3 install -r requirements.txt"
     ):
         sys.exit(1)
-
-
-def runCommand(
-    cmd: str,
-    cwd: str | None = None,
-    capture: bool = True,
-) -> str | None:
-    """Run a command and handle errors."""
-    try:
-        if capture:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                check=True,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-            )
-            return result.stdout.strip()
-        else:
-            subprocess.run(cmd, shell=True, check=True, cwd=cwd)
-            return ""
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Command failed: {cmd}")
-        if capture and e.stderr:
-            print(f"Error: {e.stderr}")
-        return None
 
 
 def setupExecutable(execPath):
