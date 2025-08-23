@@ -8,9 +8,9 @@ under certain conditions; See GNU GPL V3 for more info.
 """
 
 import asyncio
-import atexit
 import curses
 import subprocess
+import sys
 import time
 import tomllib
 from argparse import ArgumentParser, Namespace
@@ -46,7 +46,7 @@ parser.add_argument("--port", help="The port of the device you want start a driv
 parser.add_argument("--ui", action="store_true", help="Launch the terminal based UI")
 
 
-def cliMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
+def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
     """Run the driver in cli-mode.
 
     Args:
@@ -133,20 +133,36 @@ def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManag
     pipe = deviceManager.getPipe(selectedDevice["key"])
     calibrator = Futaba.Util.CalibrationWidget()
     calibScr = CalibrationUI(WindowCoords(x=xMid, y=yMid, width=width, height=height))
-    calibScr.title = "( Slowly move all inputs to their extremes )"
+    calibScr.nodelay(True)
+    calibScr.title = "( Center all inputs, then press enter )"
     calibScr.render()
     try:
-        while True:
+        mode = "center"
+        done = False
+        while not done:
             while pipe.poll():
                 [channel, rawV, calibV] = pipe.recv()
-                calibrator.minMax(channel, rawV)
+                if calibScr.getch() == ENTER:
+                    # If we've already min/maxd, we're done. generate the file.
+                    if mode == "minmax":
+                        done = True
+                    mode = "minmax"
+                    calibScr.title = (
+                        "( Slowly move each channel to each of their extremes, then press enter )"
+                    )
+                if mode == "center":
+                    calibrator.mid(channel, rawV)
+                elif mode == "minmax":
+                    calibrator.minMax(channel, rawV)
                 calibScr.updateChannel(channel, calibV)
                 calibScr.render()
             time.sleep(0.01)
     except KeyboardInterrupt:
         pass
 
-    calibrator.generateFile("TY_TY_TY_TY_TY_TY_TY")
+    calibrator.generateFile("WSC-1")
+    mgr.stopAll()
+    sys.exit(0)
 
 
 def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
@@ -184,20 +200,20 @@ def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | 
 
 async def main(mgr: Futaba.DeviceManager) -> None:
     """Main entrypoint of the driver."""
-    args = parser.parse_args()
-    if args.ui:
-        curses.wrapper(uiMode, *(args, mgr))
-    else:
-        cliMode(args, mgr)
 
 
 if __name__ == "__main__":
+    args = parser.parse_args()
     try:
-        with Futaba.IPC.ProcessLock(), Futaba.DeviceManager() as mgr:
-            atexit.register(mgr.stopAll)  # Safety first!
-            loop = asyncio.new_event_loop()
-            loop.create_task(main(mgr))
-            loop.run_forever()
+        if args.ui:
+            with Futaba.IPC.ProcessLock(), Futaba.DeviceManager() as mgr:
+                curses.wrapper(uiMode, *(args, mgr))
+        else:
+            with Futaba.IPC.ProcessLock(), Futaba.DeviceManager() as mgr:
+                loop = asyncio.new_event_loop()
+                loop.create_task(daemonMode(args, mgr))
+                loop.run_forever()
+
     except OSError:
         print("🏁 Driver already running. Have Fun!")
     except KeyboardInterrupt:

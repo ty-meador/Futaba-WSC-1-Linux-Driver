@@ -40,6 +40,7 @@ class Window:
         self.touchwin = self.window.touchwin
         self.clear = self.window.clear
         self.border = self.window.border
+        self.nodelay = self.window.nodelay
 
     def getch(self):
         """Block waiting for an input from the user."""
