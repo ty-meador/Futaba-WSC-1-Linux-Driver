@@ -78,7 +78,11 @@ def renderTemplate(
 
 
 def runCommand(
-    cmd: str, cwd: str | None = None, capture: bool = True, shell: bool = True
+    cmd: str,
+    cwd: str | None = None,
+    capture: bool = True,
+    shell: bool = True,
+    check: bool = True,
 ) -> str | None:
     """Run a command and handle errors.
 
@@ -88,20 +92,19 @@ def runCommand(
         capture: Whether to capture and return output
 
     Returns:
-        Command output if capture=True and successful, empty string if capture=False and successful,
-        None if command failed
+        Command output if capture=True and successful, empty string if capture=False and successful
 
     """
     if capture:
         result = subprocess.run(
             cmd,
-            shell=True,
-            check=True,  # Raise exception if non-zero exit
+            shell=shell,
+            check=check,  # Raise exception if non-zero exit
             cwd=cwd,
             capture_output=True,
             text=True,  # str instead of raw bytes
         )
         return result.stdout.strip()
     else:
-        subprocess.run(cmd, shell=True, check=True, cwd=cwd)
+        subprocess.run(cmd, shell=shell, check=check, cwd=cwd)
         return ""

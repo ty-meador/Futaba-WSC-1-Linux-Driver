@@ -92,7 +92,7 @@ def buildExecutable():
     cmd.extend(nativeLibArgs)
 
     try:
-        subprocess.run(cmd, check=True)
+        runCommand(cmd, capture=False, shell=False)
     except subprocess.CalledProcessError:
         print("❌ Nuitka build failed")
         return None
@@ -198,7 +198,7 @@ def validateEnvironment():
 
     # Check Nuitka
     try:
-        subprocess.run(["python3", "-m", "nuitka", "--version"], capture_output=True, check=True)
+        runCommand("python3 -m nuitka --version", capture=False)
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("❌ Nuitka not found. Install with: pip3 install nuitka")
         sys.exit(1)
@@ -206,7 +206,7 @@ def validateEnvironment():
     # Check C compiler
     for compiler in ["gcc", "clang", "cc"]:
         try:
-            subprocess.run([compiler, "--version"], capture_output=True, check=True)
+            runCommand(f"{compiler} --version", capture=False)
             print(f"✅ Found C compiler: {compiler}")
             break
         except (subprocess.CalledProcessError, FileNotFoundError):
