@@ -246,15 +246,78 @@ def interpolate(
         # Find the right interval for interpolation
         i = bisect.bisect_right(xPoints, x) - 1
 
-        # Linear interpolation
         x1, x2 = xPoints[i], xPoints[i + 1]
         y1, y2 = yPoints[i], yPoints[i + 1]
 
         interpolated = (
             y1
             if x2 == x1  # Avoid division by zero
-            else y1 + (y2 - y1) * (x - x1) / (x2 - x1)
+            else y1 + (y2 - y1) * (x - x1) / (x2 - x1)  # Linear interpolation
         )
 
         result.append(int(round(interpolated)))
     return result
+
+
+class CalibrationWidget:
+    """Generates a channel calibration for the running device."""
+
+    def minMax(self, channel, rawV) -> None:
+        """Process value as min/max.
+
+        If the provided value is a new high or low value for the given channel then the min or max
+        value for that channel will be updated respectively
+
+        Args:
+            channel (any): a unique channel identifier
+            rawV (int): the raw value from the device
+        """
+        # Detect new channels
+        if channel not in self.knownChannels:
+            self.knownChannels[channel] = self._defaultBounds(rawV)
+        # Update boundaries
+        elif rawV < self.knownChannels[channel]["min"]:
+            self.knownChannels[channel]["min"] = rawV
+        elif rawV > self.knownChannels[channel]["max"]:
+            self.knownChannels[channel]["max"] = rawV
+
+    def mid(self, channel, rawV) -> None:
+        """Set the mid point for the given channel.
+
+        Args:
+            channel (any): a unique channel identifier
+            rawV (int): the raw value from the device
+        """
+        # Detect new channels
+        if channel not in self.knownChannels:
+            self.knownChannels[channel] = self._defaultBounds(rawV)
+
+        # Update midpoint
+        self.knownChannels[channel]["mid"] = rawV
+
+    def generateFile(self, fileName: str) -> None:
+        """Generate a calibration file."""
+        calibration = self._generateCalibration()
+        with open(fileName, "w") as calibrationFile:
+            json.dump(calibration, calibrationFile, indent=4)
+
+    def __init__(self) -> None:
+        """Create a Channel calibrator."""
+        self.knownChannels = {}
+
+    def _defaultBounds(self, default=None) -> dict[str, int]:
+        return {"min": default, "mid": default, "max": default}
+
+    def _generateCalibration(self) -> list[list]:
+        """Generate the devices calibration object."""
+        container = []
+        for channelData in self.knownChannels.values():
+            # Account for channels that might not be used by the transmitter
+            # FIXME - We have to do this because the interpolation function used to generate the
+            # calibrated value map requires an ascending input range to be considered "sane".
+            # TODO - Think of a better way
+            if channelData["min"] == channelData["mid"] == channelData["max"]:
+                channelData["min"] = channelData["mid"] - 1
+                channelData["max"] = channelData["mid"] + 1
+            container.append([channelData["min"], channelData["mid"], channelData["max"]])
+        return container

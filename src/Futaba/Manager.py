@@ -84,6 +84,21 @@ class FutabaDeviceManager:
             self.logger.warning(e)
             return None
 
+    def deviceInfo(self, deviceIndex: int, prop: str) -> str | int:
+        """Get a property value of the specified device.
+
+        Args:
+            deviceIndex (int): The device you want info for.
+            prop (str): The property name of the value you want.
+
+        Returns:
+            str|int: The specified attributes value from the specified device.
+        """
+        try:
+            return getattr(self._futabaDevices[deviceIndex], prop)
+        except Exception:
+            return None
+
     def getPipe(self, deviceIndex: int) -> multiprocessing.Pipe:
         """Get a duplex pipe for real-time driver communication.
 

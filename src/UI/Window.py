@@ -36,6 +36,10 @@ class Window:
         self.height = windowCoords.height
         self.window.clear()
         self.window.border()
+        self.touchline = self.window.touchline
+        self.touchwin = self.window.touchwin
+        self.clear = self.window.clear
+        self.border = self.window.border
 
     def getch(self):
         """Block waiting for an input from the user."""
@@ -43,7 +47,6 @@ class Window:
 
     def render(self):
         """Clear the window and redraw it."""
-        self.window.clear()
         self._render()
         self.window.border()
         if self.title:

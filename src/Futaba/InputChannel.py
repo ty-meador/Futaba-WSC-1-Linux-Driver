@@ -1,7 +1,6 @@
 """Classes for handling input channels."""
 
 import array
-import json
 import logging
 import sys
 import typing
@@ -9,7 +8,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import Util as utils
-from .IPC import DataFrame
 
 
 class ChannelDict(typing.TypedDict):
@@ -221,58 +219,3 @@ class InputChannel:
     def toDict(self) -> dict[str, Any]:
         """Generate a dictionary representation of this input channel."""
         return ChannelDict(eventName=self.eventName, valueMap=self.valueMap)
-
-
-class ChannelCalibrator:
-    """Generates a channel calibration for the running device."""
-
-    def minMax(self, dataFrame: DataFrame) -> None:
-        """Update min and max values."""
-        channel, rawV, calV = dataFrame
-
-        # Detect new channels
-        if channel not in self.knownChannels:
-            self.knownChannels[channel] = self._defaultBounds(rawV)
-        # Update boundaries
-        elif rawV < self.knownChannels[channel]["min"]:
-            self.knownChannels[channel]["min"] = rawV
-        elif rawV > self.knownChannels[channel]["max"]:
-            self.knownChannels[channel]["max"] = rawV
-
-    def mid(self, dataFrame: DataFrame) -> None:
-        """Update mid value."""
-        channel, rawV, calV = dataFrame
-
-        # Detect new channels
-        if channel not in self.knownChannels:
-            self.knownChannels[channel] = self._defaultBounds(rawV)
-
-        # Update midpoint
-        self.knownChannels[channel]["mid"] = rawV
-
-    def generateFile(self, fileName: str) -> None:
-        """Generate a calibration file."""
-        calibration = self._generateCalibration()
-        with open(fileName, "w") as calibrationFile:
-            json.dump(calibration, calibrationFile, indent=4)
-
-    def __init__(self) -> None:
-        """Create a Channel calibrator."""
-        self.knownChannels = {}
-
-    def _defaultBounds(self, default=None) -> dict[str, int]:
-        return {"min": default, "mid": default, "max": default}
-
-    def _generateCalibration(self) -> list[list]:
-        """Generate the devices calibration object."""
-        container = []
-        for channelData in self.knownChannels.values():
-            # Account for channels that might not be used by the transmitter
-            # FIXME - We have to do this because the interpolation function used to generate the
-            # calibrated value map requires an ascending input range to be considered "sane".
-            # TODO - Think of a better way
-            if channelData["min"] == channelData["mid"] == channelData["max"]:
-                channelData["min"] = channelData["mid"] - 1
-                channelData["max"] = channelData["mid"] + 1
-            container.append([channelData["min"], channelData["mid"], channelData["max"]])
-        return container

@@ -11,13 +11,13 @@ import asyncio
 import atexit
 import curses
 import subprocess
+import time
 import tomllib
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 import Futaba
-from UI import MainMenu, WindowCoords
-from UI.Calibration import CalibrationWidget
+from UI import CalibrationUI, MainMenu, WindowCoords
 
 # Project structure
 PWD = Path(__file__).parent.resolve()
@@ -88,8 +88,8 @@ def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManag
     ##
     # Keycodes
     ##
-    SPACE = 10
-    ENTER = 32
+    ENTER = 10
+    SPACE = 32
     # LEFT_ARROW = 68
     UP_ARROW = 65
     # RIGHT_ARROW = 67
@@ -97,53 +97,56 @@ def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManag
 
     yMax, xMax = parentScreen.getmaxyx()
     xMaxOverTwo = xMax // 2
+    yMaxOverTwo = yMax // 2
+    height = 20
+    width = 80
+    xMid = xMaxOverTwo - width // 2
+    yMid = yMaxOverTwo - height // 2
 
     deviceManager = Futaba.DeviceManager()
 
     menu = MainMenu(
-        WindowCoords(x=0, y=0, width=xMaxOverTwo, height=yMax),
+        WindowCoords(
+            x=xMid,
+            y=yMid,
+            width=width,
+            height=height,
+        ),
         [device for device in deviceManager.listDevices()],
     )
 
     menu.render()
 
-    selectedDevice = None
     pipe = None
-
-    while True:
+    selectedDevice = None
+    inpt = None
+    while inpt != ENTER:
         inpt = menu.getch()
         if inpt == UP_ARROW:
             menu.up()
         elif inpt == DOWN_ARROW:
             menu.down()
-        elif inpt in (SPACE, ENTER):
-            selectedDevice = menu.getItem()
-            deviceManager.start(selectedDevice["key"])
-            calibWindow = CalibrationWidget(
-                WindowCoords(
-                    y=0,
-                    x=xMaxOverTwo,
-                    width=xMaxOverTwo,
-                    height=yMax,
-                )
-            )
-            pipe = deviceManager.getPipe(selectedDevice["key"])
 
-        if pipe:
-            calibrator = Futaba.InputChannel.ChannelCalibrator()
-            while True:
-                while pipe.poll():
-                    frame = pipe.recv()
-                    [evt, rawV, calibV] = frame
-                    calibrator.minMax(frame)
-                    # Steering
-                    if evt == (3, 0):
-                        calibWindow.setSteeringPos(calibV)
-                    # Throttle
-                    elif evt == (3, 1):
-                        calibWindow.setThrottlePos(calibV)
+    selectedDevice = menu.getItem()
 
-        calibWindow.render()
+    deviceManager.start(selectedDevice["key"])
+    pipe = deviceManager.getPipe(selectedDevice["key"])
+    calibrator = Futaba.Util.CalibrationWidget()
+    calibScr = CalibrationUI(WindowCoords(x=xMid, y=yMid, width=width, height=height))
+    calibScr.title = "( Slowly move all inputs to their extremes )"
+    calibScr.render()
+    try:
+        while True:
+            while pipe.poll():
+                [channel, rawV, calibV] = pipe.recv()
+                calibrator.minMax(channel, rawV)
+                calibScr.updateChannel(channel, calibV)
+                calibScr.render()
+            time.sleep(0.01)
+    except KeyboardInterrupt:
+        pass
+
+    calibrator.generateFile("TY_TY_TY_TY_TY_TY_TY")
 
 
 def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
@@ -183,7 +186,7 @@ async def main(mgr: Futaba.DeviceManager) -> None:
     """Main entrypoint of the driver."""
     args = parser.parse_args()
     if args.ui:
-        curses.wrapper(uiMode, args)
+        curses.wrapper(uiMode, *(args, mgr))
     else:
         cliMode(args, mgr)
 

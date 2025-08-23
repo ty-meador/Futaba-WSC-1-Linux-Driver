@@ -1,15 +1,4 @@
 """Module for cralibation UI components."""
-## UI basic concept
-# ST Left | ST Right
-#
-#       TURN
-#       制██▋
-# ──────人──────
-#     ██速
-#     BURN
-#
-# Brake | Throttle
-##
 
 from .Window import Window
 
@@ -17,9 +6,16 @@ MIN = -32768
 MAX = 32767
 
 
-class CalibrationWidget(
-    Window,
-):
+## basic UI concept
+# ST Left | ST Right
+#
+#       制 ███▌
+# ──────人──────
+#   ██ 速
+#
+# Brake | Throttle
+##
+class CalibrationUI(Window):
     """Draw the status UI element."""
 
     def __init__(self, windowCoords):
@@ -27,8 +23,8 @@ class CalibrationWidget(
         super().__init__(windowCoords)
         self.barSegmentsRight = tuple(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"])
         self.barSegmentsLeft = tuple(["▕", "🮇", "🮈", "▐", "🮉", "🮊", "🮋", "█"])
-        self.throttlePos = 0
-        self.steeringPos = 0
+        self.knownChannels = {}
+        self.throttleChannel = (3, 1)
         self.length = 80
         ##
         # WOAH! You found an easter egg!
@@ -64,59 +60,60 @@ class CalibrationWidget(
         self.throttlePos = throttlePos
         self.render()
 
-    def setThrottlePos(self, value):
-        """Set the throttle position.
+    def setInfoMessage(self, msg):
+        """Set the info message."""
+        self.infoMsg = msg
+
+    def updateChannel(self, channel, calibV):
+        """Update the UI display for the given channel.
 
         Args:
-            value (int): The current steering position
-
+            channel (any): the channel to update
+            calibV (int): the new value to use for the update
         """
-        # Negative = throttle
-        # positive = brake
-        perc = value / MAX * -1
-        self.throttlePos = int(perc * self.length)
-        self.render()
+        perc = calibV / MAX
+        barLen = int(perc * self.length)
 
-    def setSteeringPos(self, value):
-        """Set the steering position.
+        if channel not in self.knownChannels:
+            self.clear()
 
-        Args:
-            value (int): The current steering position
-
-        """
-        # Negative = left
-        # positive = right
-        perc = value / MAX
-        self.steeringPos = int(perc * self.length)
-        self.render()
+        self.knownChannels[channel] = self._generateAxisBar(
+            self.haya if channel == self.throttleChannel else self.chi,
+            self.length,
+            -barLen if channel == self.throttleChannel else barLen,
+        )
 
     def _render(self):
-        self.window.addstr(
-            self.contentY,
-            self.contentX,
-            self._generateAxisBar(
-                self.chi,  # control/precision
-                self.length,
-                self.steeringPos,
-            ),
+        vOffset = (self.height // 2) - (
+            len(self.knownChannels) - 1  # Account for added hito decoration
         )
+        controlChannels = filter(
+            lambda channel: channel != self.throttleChannel, self.knownChannels
+        )
+
+        for channel in controlChannels:
+            vOffset += 1
+            self.window.addstr(
+                self.contentY + vOffset,
+                self.contentX,
+                self.knownChannels[channel],
+            )
+        vOffset += 1
         self.window.addstr(
-            self.contentY + 1,
+            self.contentY + vOffset,
             self.contentX,
             self._generateCenterLine(
                 self.hito,  # The human operator
-                80,
-            ),
-        )
-        self.window.addstr(
-            self.contentY + 2,
-            self.contentX,
-            self._generateAxisBar(
-                self.haya,  # speed/velocity
                 self.length,
-                self.throttlePos,
             ),
         )
+        vOffset += 1
+        if self.throttleChannel in self.knownChannels:
+            self.window.addstr(
+                self.contentY + vOffset,
+                self.contentX,
+                self.knownChannels[self.throttleChannel],
+            )
 
     def _generateCenterLine(self, centerPiece, totalLength):
         """Generate the center line that aligns with other bars' centers.
@@ -147,7 +144,7 @@ class CalibrationWidget(
         The center segment stays fixed at the center, and progress bars grow
         outward from it (left for negative progress, right for positive).
         """
-        # Determine direction and absolute progress
+        # Determine direction and progress
         isLeftSide = progress < 0
         absProgress = abs(progress)
 
@@ -160,7 +157,7 @@ class CalibrationWidget(
         remainder = absProgress % stepsPerChar
 
         # Build the bar
-        fullBarChar = segments[-1]  # "█"
+        fullBarChar = segments[-1]
         fullBars = fullBarChar * fullChars
 
         partialBar = "" if remainder == 0 else segments[remainder - 1]
