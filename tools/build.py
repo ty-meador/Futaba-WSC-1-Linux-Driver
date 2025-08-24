@@ -1,6 +1,7 @@
 #!./.venv/bin/python
 """Build script to create standalone executable for Futaba RC Driver."""
 
+import os
 import shutil
 import subprocess
 import sys
@@ -56,12 +57,6 @@ def buildExecutable():
         print(f"❌ Source file not found: {SOURCE_MAIN}")
         sys.exit(1)
 
-    # Get native library args
-    nativeLibArgs = findNativeLibraries()
-
-    # Build Nuitka command
-    import os
-
     jobs = min(os.cpu_count() or 4, 12)
 
     cmd = [
@@ -88,8 +83,8 @@ def buildExecutable():
         "--include-package-data=usb",
         "--include-data-files=pyproject.toml=pyproject.toml",
         str(SOURCE_MAIN),
+        *findNativeLibraries(),
     ]
-    cmd.extend(nativeLibArgs)
 
     try:
         runCommand(cmd, capture=False, shell=False)
@@ -110,7 +105,6 @@ def buildExecutable():
 def findNativeLibraries():
     """Find native libraries to include."""
     print("🔍 Locating native libraries...")
-
     nuitkaArgs = ["--include-package-data=uinput"]
     # Find .so files in package paths
     for pathStr in sys.path:
@@ -121,7 +115,6 @@ def findNativeLibraries():
                     if libPath.is_file():
                         nuitkaArgs.append(f"--include-data-files={libPath}={libPath.name}")
                         print(f"📚 Found library: {libPath.name}")
-
     return nuitkaArgs
 
 
@@ -140,7 +133,7 @@ def installDependencies():
     # Install project requirements if they exist
     if (PROJECT_ROOT / "requirements.txt").exists() and runCommand(
         "pip3 install -r requirements.txt"
-    ):
+    ) is None:
         sys.exit(1)
 
 
@@ -158,7 +151,7 @@ def setupExecutable(execPath):
 
     renderTemplate(
         SCRIPTS_TEMPLATES_DIR / "wrapper-script.sh",
-        {"build_dir": BUILD_DIR, "executable_name": EXECUTABLE_NAME},
+        {"build_dir": os.path.basename(BUILD_DIR), "executable_name": EXECUTABLE_NAME},
         WRAPPER_SCRIPT,
     )
 
@@ -171,14 +164,9 @@ def setupExecutable(execPath):
 def testExecutable():
     """Test the built executable."""
     print("🧪 Testing executable...")
-    execPath = BUILD_DIR / EXECUTABLE_NAME
-
-    # Try --version first, then --help
-    for arg in ["--version", "--help"]:
-        if runCommand(f"{execPath} {arg}") is not None:
-            print("✅ Executable test successful")
-            return True
-
+    if runCommand(f"{BUILD_DIR / EXECUTABLE_NAME} --version") is not None:
+        print("✅ Executable test successful")
+        return True
     print("⚠️  Executable may have issues")
     return False
 
