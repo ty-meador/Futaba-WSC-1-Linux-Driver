@@ -112,15 +112,6 @@ def findNativeLibraries():
     print("🔍 Locating native libraries...")
 
     nuitkaArgs = ["--include-package-data=uinput"]
-
-    try:
-        import uinput
-
-        print(f"📍 uinput found at: {Path(uinput.__file__).parent}")
-    except ImportError:
-        print("❌ uinput not found")
-        return nuitkaArgs
-
     # Find .so files in package paths
     for pathStr in sys.path:
         path = Path(pathStr)
@@ -184,7 +175,7 @@ def testExecutable():
 
     # Try --version first, then --help
     for arg in ["--version", "--help"]:
-        if runCommand(f"{execPath} {arg}", capture=True) is not None:
+        if runCommand(f"{execPath} {arg}") is not None:
             print("✅ Executable test successful")
             return True
 
