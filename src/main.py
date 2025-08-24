@@ -175,10 +175,10 @@ if __name__ == "__main__":
         if args.version:
             print(PYPROJECT["project"]["version"])
         elif args.ui:
-            with Futaba.IPC.ProcessLock(), Futaba.DeviceManager() as mgr:
+            with Futaba.Util.ProcessLock(), Futaba.DeviceManager() as mgr:
                 curses.wrapper(uiMode, *(args, mgr))
         else:
-            with Futaba.IPC.ProcessLock(), Futaba.DeviceManager() as mgr:
+            with Futaba.Util.ProcessLock(), Futaba.DeviceManager() as mgr:
                 loop = asyncio.new_event_loop()
                 loop.create_task(daemonMode(args, mgr))
                 loop.run_forever()
