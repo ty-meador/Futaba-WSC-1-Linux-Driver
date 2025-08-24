@@ -2,9 +2,24 @@
 """Cleans up build and packaging artifacts."""
 
 import shutil
+import sys
 from argparse import ArgumentParser
 
-from util import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT
+from util import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, PROJECT_ROOT, PYPROJECT, WRAPPER_SCRIPT
+
+# Refuse to run if we aren't operating in a venv
+if sys.prefix == sys.base_prefix:
+    if not (PROJECT_ROOT / ".venv").exists():
+        print("Script must be run from a venv. Try the following first.")
+        print(f"NOTE: Python version requirement -> {PYPROJECT['project']['requires-python']}")
+        print("python3 -m venv venv")
+    else:
+        print(
+            f"You appear to have a virtual environment setup in {PROJECT_ROOT / '.venv'} "
+            "but it is not active. Try: source .venv/bin/activate"
+        )
+    sys.exit(1)
+
 
 parser = ArgumentParser()
 

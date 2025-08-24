@@ -4,7 +4,7 @@
 import shutil
 import tarfile
 from argparse import ArgumentParser
-from datetime import datetime
+from datetime import datetime, sys
 
 from clean import cleanPackageArtifacts
 from util import (
@@ -16,6 +16,7 @@ from util import (
     INSTALL_SCRIPT_NAME,
     PACKAGE_DIR,
     PROJECT_ROOT,
+    PYPROJECT,
     REPOSITORY,
     SCRIPTS_TEMPLATES_DIR,
     TEMPLATES_DIR,
@@ -25,6 +26,20 @@ from util import (
     renderTemplate,
     runCommand,
 )
+
+# Refuse to run if we aren't operating in a venv
+if sys.prefix == sys.base_prefix:
+    if not (PROJECT_ROOT / ".venv").exists():
+        print("Script must be run from a venv. Try the following first.")
+        print(f"NOTE: Python version requirement -> {PYPROJECT['project']['requires-python']}")
+        print("python3 -m venv venv")
+    else:
+        print(
+            f"You appear to have a virtual environment setup in {PROJECT_ROOT / '.venv'} "
+            "but it is not active. Try:"
+        )
+        print("`source .venv/bin/activate`")
+    sys.exit(1)
 
 parser = ArgumentParser()
 parser.add_argument("--clean", action="store_true")

@@ -1,8 +1,16 @@
 """Utilities and constants for the build system."""
 
 import subprocess
-import tomllib
+import sys
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    print("Minimum python version is 3.11.0")
+    print("Please create a venv with python version >= 3.11.0")
+    print("Try: python3 --version")
+    sys.exit(1)
 
 # Project structure
 PWD = Path(__file__).parent.resolve()

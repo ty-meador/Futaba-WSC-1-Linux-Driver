@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """The main program - run with `sudo python3 main.py`.
 
 Futaba RC Driver  Copyright (C) 2025  Tyler Meador (gitlab="Native-Coder")
