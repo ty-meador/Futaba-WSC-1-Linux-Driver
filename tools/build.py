@@ -2,11 +2,11 @@
 """Build script to create standalone executable for Futaba RC Driver."""
 
 import os
+import re
 import shutil
 import subprocess
 import sys
 from argparse import ArgumentParser
-from pathlib import Path
 
 from clean import cleanBuildArtifacts
 from util import (
@@ -106,15 +106,28 @@ def findNativeLibraries():
     """Find native libraries to include."""
     print("🔍 Locating native libraries...")
     nuitkaArgs = ["--include-package-data=uinput"]
-    # Find .so files in package paths
-    for pathStr in sys.path:
-        path = Path(pathStr)
-        if "site-packages" in path.name or "dist-packages" in path.name:
-            for pattern in ["*uinput*.so", "*usb*.so"]:
-                for libPath in path.rglob(pattern):
-                    if libPath.is_file():
-                        nuitkaArgs.append(f"--include-data-files={libPath}={libPath.name}")
-                        print(f"📚 Found library: {libPath.name}")
+
+    # Define the virtual environment path
+    venvPath = PROJECT_ROOT / ".venv"
+
+    if not venvPath.exists():
+        raise OSError(f"❌ Virtual environment not found at: {venvPath}")
+
+    # Find .so files in the virtual environment
+    dependencyPatterns = [
+        "*uinput*.so",
+        *[
+            f"*{re.split(r'(>=|==|~=)', dep)[0]}*.so"
+            for dep in PYPROJECT["project"]["dependencies"]
+        ],
+    ]
+
+    for pattern in dependencyPatterns:
+        for libPath in venvPath.rglob(pattern):
+            if libPath.is_file():
+                nuitkaArgs.append(f"--include-data-files={libPath}={libPath.name}")
+                print(f"📚 Found library: {libPath.name}")
+
     return nuitkaArgs
 
 
