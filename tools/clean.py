@@ -15,9 +15,20 @@ if sys.prefix == sys.base_prefix:
         print("python3 -m venv venv")
     else:
         print(
-            f"You appear to have a virtual environment setup in {PROJECT_ROOT / '.venv'} "
-            "but it is not active. Try: source .venv/bin/activate"
+            "You appear to have a virtual environment setup correctly but the python runtime used "
+            "is not correct for that environment."
         )
+        print("=" * 80)
+        print("Troubleshooting steps:")
+        print("  1: Ensure venv is activated:")
+        print("      'source .venv/bin/activate'")
+        print(
+            "  2: Make sure you are not specifying a python version when you are running this "
+            "script. For example:"
+        )
+        print("      ❌ /bin/usr/python3 ./tools/build.py")
+        print("      ✅ ./tools/build.py")
+        print("=" * 80)
     sys.exit(1)
 
 
