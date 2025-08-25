@@ -177,7 +177,7 @@ if __name__ == "__main__":
             print(PYPROJECT["project"]["version"])
             sys.exit(0)
 
-        with Futaba.Util.ProcessLock(), Futaba.DeviceManager() as mgr:
+        with Futaba.Driver.ProcessLock(), Futaba.DeviceManager() as mgr:
             if args.ui:
                 curses.wrapper(uiMode, *(args, mgr))
             else:
