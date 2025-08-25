@@ -4,7 +4,7 @@
 import shutil
 from argparse import ArgumentParser
 
-from config import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT
+from __config__ import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT
 
 parser = ArgumentParser()
 

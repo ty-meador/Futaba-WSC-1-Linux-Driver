@@ -172,13 +172,15 @@ async def main(mgr: Futaba.DeviceManager) -> None:
 if __name__ == "__main__":
     args = parser.parse_args()
     try:
+        # No reason to proceed if all they want is the version.
         if args.version:
             print(PYPROJECT["project"]["version"])
-        elif args.ui:
-            with Futaba.Util.ProcessLock(), Futaba.DeviceManager() as mgr:
+            sys.exit(0)
+
+        with Futaba.Util.ProcessLock(), Futaba.DeviceManager() as mgr:
+            if args.ui:
                 curses.wrapper(uiMode, *(args, mgr))
-        else:
-            with Futaba.Util.ProcessLock(), Futaba.DeviceManager() as mgr:
+            else:
                 loop = asyncio.new_event_loop()
                 loop.create_task(daemonMode(args, mgr))
                 loop.run_forever()

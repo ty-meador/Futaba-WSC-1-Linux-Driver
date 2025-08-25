@@ -8,8 +8,7 @@ import subprocess
 import sys
 from argparse import ArgumentParser
 
-from clean import cleanBuildArtifacts
-from config import (
+from __config__ import (
     BUILD_DIR,
     EXECUTABLE_NAME,
     NUITKA_OUTPUT_DIR,
@@ -19,6 +18,7 @@ from config import (
     SOURCE_MAIN,
     WRAPPER_SCRIPT,
 )
+from clean import cleanBuildArtifacts
 from util import renderTemplate, runCommand
 
 parser = ArgumentParser()

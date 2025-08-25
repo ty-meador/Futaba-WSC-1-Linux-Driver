@@ -6,8 +6,7 @@ import tarfile
 from argparse import ArgumentParser
 from datetime import datetime
 
-from clean import cleanPackageArtifacts
-from config import (
+from __config__ import (
     BIN_DIR,
     BUILD_DIR,
     DISTRIBUTABLES_PAGE,
@@ -23,6 +22,7 @@ from config import (
     VERSION,
     WEB_INSTALL_SCRIPT_NAME,
 )
+from clean import cleanPackageArtifacts
 from util import renderTemplate, runCommand
 
 parser = ArgumentParser()
