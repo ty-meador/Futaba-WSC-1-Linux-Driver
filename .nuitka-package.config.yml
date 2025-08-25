@@ -37,14 +37,6 @@ build:
     - anti-bloat
     - implicit-imports
   
-  # Packages to exclude for smaller size
-  nofollow-imports:
-    - numpy.f2py
-    - numpy.distutils
-    - numpy.testing
-    - matplotlib
-    - scipy
-    - pandas
   
   # Build process settings
   show-progress: true
