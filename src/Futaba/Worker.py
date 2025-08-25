@@ -51,6 +51,13 @@ def run(
     import usb
 
     from . import Util as utils
+    from .__config__ import (
+        DEFAULT_DEADZONE,
+        DEFAULT_NOISE_FILTER,
+        EVENT_MAX_VAL,
+        EVENT_MIN_VAL,
+        FUTABA_VENDOR_ID,
+    )
     from .Error import DeviceNotFoundError
 
     logger = utils.newLogger(f"{name}_subproc")
@@ -82,11 +89,11 @@ def run(
         strict=True,
     )
 
-    noiseFilter = utils.DEFAULT_NOISE_FILTER
+    noiseFilter = DEFAULT_NOISE_FILTER
     if deviceConfig.noiseFilter:
         noiseFilter = deviceConfig.noiseFilter
 
-    deadZone = utils.DEFAULT_DEADZONE
+    deadZone = DEFAULT_DEADZONE
     if deviceConfig.deadZone:
         deadZone = deviceConfig.deadZone
 
@@ -95,12 +102,12 @@ def run(
     virtualDevice = uinput.Device(
         tuple(
             [
-                event + (utils.EVENT_MIN_VAL, utils.EVENT_MAX_VAL, deadZone, noiseFilter)
+                event + (EVENT_MIN_VAL, EVENT_MAX_VAL, deadZone, noiseFilter)
                 for event in channelEventsMap
             ]
         ),
         name,
-        vendor=utils.FUTABA_VENDOR_ID,
+        vendor=FUTABA_VENDOR_ID,
     )
 
     ##

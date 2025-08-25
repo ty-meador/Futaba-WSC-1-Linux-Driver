@@ -39,14 +39,14 @@ LOCK_SOCKET = None
 parser = ArgumentParser()
 parser.add_argument("--autostart", action="store_true", help="Start the first device found")
 parser.add_argument("--bus", help="The bus of the device you want to start a driver for")
-# parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
+parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
+parser.add_argument("--daemonize", action="store_true", help="Run as a background daemon")
 parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
 parser.add_argument("--port", help="The port of the device you want start a driver for")
-parser.add_argument("--ui", action="store_true", help="Launch the terminal based UI")
 parser.add_argument("--version", action="store_true", help="Get driver version")
 
 
-def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
+async def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
     """Run the driver in cli-mode.
 
     Args:
@@ -60,27 +60,12 @@ def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
     device = None
     if args.endpoint is not None:
         device = mgr.findDevice(endpoint=args.endpoint)
+        if device is None:
+            raise OSError(f"No Futaba device found at endpoint {args.endpoint}")
     else:
-        selection = None
-        deviceList = mgr.listDevices()
-        deviceCount = len(deviceList)
-
-        if deviceCount == 1 or args.autostart:
-            print(f"Found {deviceCount} Futaba devices, autostarting {deviceList[0]['name']}")
-            device = deviceList[0]
-        elif deviceCount > 1:
-            print("Which device would you like to start?")
-            for device in deviceList:
-                print(f"[ {device['key']} ] : {device['name']}")
-            selection = int(input())
-            device = deviceList[selection]
-
-    if device is None:
-        raise RuntimeError("Could not find a Futaba device at the specified endpoint")
-
-    mgr.start(device["key"])
-    print(f"Started {device['name']}")
-    print("CTRL + C to stop driver")
+        print(f"Found {len(mgr.listDevices())} Futaba devices, autostarting all...")
+        mgr.startAll()
+        # TODO - Implement loop to detect new devices etc
 
 
 def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManager) -> None:
@@ -165,10 +150,6 @@ def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManag
     sys.exit(0)
 
 
-async def main(mgr: Futaba.DeviceManager) -> None:
-    """Main entrypoint of the driver."""
-
-
 if __name__ == "__main__":
     args = parser.parse_args()
     try:
@@ -177,13 +158,18 @@ if __name__ == "__main__":
             print(PYPROJECT["project"]["version"])
             sys.exit(0)
 
+        # Futaba.Driver.ProcessLock: Prevents multiple driver instances from running.
+        # Futaba.DeviceManager: It's a futaba device manager...
         with Futaba.Driver.ProcessLock(), Futaba.DeviceManager() as mgr:
-            if args.ui:
+            if args.calibrate:
                 curses.wrapper(uiMode, *(args, mgr))
-            else:
+            elif args.daemonize:
                 loop = asyncio.new_event_loop()
                 loop.create_task(daemonMode(args, mgr))
                 loop.run_forever()
+            else:
+                # TODO - Re-implement menu
+                pass
     except OSError:
         print("🏁 Driver already running. Have Fun!")
     except KeyboardInterrupt:

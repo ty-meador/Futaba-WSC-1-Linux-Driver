@@ -11,6 +11,13 @@ import usb
 
 from . import Util as utils
 from . import Worker
+from .__config__ import (
+    CALIBRATION_PATH,
+    CONFIG_PATH,
+    DEFAULT_CALIBRATION,
+    DEFAULT_CONFIG,
+    FUTABA_VENDOR_ID,
+)
 from .InputChannel import InputChannel
 from .IPC import WorkerControl
 
@@ -116,8 +123,8 @@ class FutabaDeviceDriver:
         """
         config = None
 
-        filePath = os.path.join(utils.CONFIG_PATH, f"{productName}.json")
-        defaultPath = os.path.join(utils.CONFIG_PATH, "default.json")
+        filePath = os.path.join(CONFIG_PATH, f"{productName}.json")
+        defaultPath = os.path.join(CONFIG_PATH, "default.json")
 
         self.logger.debug(f"loading {filePath}")
         config = utils.parseJsonFile(filePath)
@@ -127,7 +134,7 @@ class FutabaDeviceDriver:
             config = utils.parseJsonFile(defaultPath)
         if config is None:
             self.logger.debug("using hard-coded defaults")
-            config = utils.DEFAULT_CONFIG
+            config = DEFAULT_CONFIG
 
         self.logger.debug(f"config={config}")
         return config
@@ -143,8 +150,8 @@ class FutabaDeviceDriver:
             list of list: Each inner list will contain calibration data for a channel.
 
         """
-        filePath = os.path.join(utils.CALIBRATION_PATH, f"{productName}.json")
-        defaultPath = os.path.join(utils.CALIBRATION_PATH, "default.json")
+        filePath = os.path.join(CALIBRATION_PATH, f"{productName}.json")
+        defaultPath = os.path.join(CALIBRATION_PATH, "default.json")
 
         # Load this products calibration file by default
         self.logger.debug(f"loading {filePath}")
@@ -156,7 +163,7 @@ class FutabaDeviceDriver:
         # If that fails, use the hard-coded values
         if channelCalibrations is None:
             self.logger.debug("using hard-coded defaults")
-            channelCalibrations = utils.DEFAULT_CALIBRATION
+            channelCalibrations = DEFAULT_CALIBRATION
 
         self.logger.debug(f"channelCalibrations={channelCalibrations}")
         return channelCalibrations
@@ -299,7 +306,7 @@ class FutabaDeviceDriver:
             bool: True if all conditions are met, false otherwise
 
         """
-        if coreDevice.idVendor != utils.FUTABA_VENDOR_ID:
+        if coreDevice.idVendor != FUTABA_VENDOR_ID:
             return False
 
         endpoint = utils.findInterruptEndpoint(coreDevice)

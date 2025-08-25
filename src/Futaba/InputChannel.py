@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import Util as utils
+from .__config__ import DEFAULT_INPUT_RANGE, DEFAULT_OUTPUT_RANGE
 
 
 class ChannelDict(typing.TypedDict):
@@ -25,10 +26,10 @@ class ChannelCalibration:
         logger (logging.Logger): The logger you want this class to use
         inputRange (typing.Iterable, optional): An iterable of length 3 where each item represents
         the low, middle, and high point respectively in increasing order.
-        defaults to utils.DEFAULT_INPUT_RANGE
+        defaults to DEFAULT_INPUT_RANGE
         outputRange (typing.Iterable, optional): An iterable of length 3 where each item represents
         the low, middle, and high point respectively in increasing order.
-        defaults to utils.DEFAULT_OUTPUT_RANGE
+        defaults to DEFAULT_OUTPUT_RANGE
         reverse (bool, optional): If reverse the calibrated values will be
         inserted into the resulting array backwards. This will reverse the
         direction of the input. Defaults to False.
@@ -71,8 +72,8 @@ class ChannelCalibration:
 
     """
 
-    inputRange: typing.Iterable = field(default_factory=lambda: utils.DEFAULT_INPUT_RANGE)
-    outputRange: typing.Iterable = field(default_factory=lambda: utils.DEFAULT_OUTPUT_RANGE)
+    inputRange: typing.Iterable = field(default_factory=lambda: DEFAULT_INPUT_RANGE)
+    outputRange: typing.Iterable = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
 
     logger: logging.Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False

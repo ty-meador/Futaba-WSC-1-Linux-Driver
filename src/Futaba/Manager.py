@@ -153,28 +153,28 @@ class FutabaDeviceManager:
 
         return self.listDevices()
 
-    def stop(self, deviceIndex: int | typing.Iterable[int]) -> list[dict]:
+    def startAll(self):
+        """Start a driver for each Futaba device."""
+        for device in self.listDevices():
+            self.start(device["key"])
+
+    def stop(self, deviceIndex: int) -> list[dict]:
         """Stop the devices at the given indexes.
 
         Args:
-            deviceIndex (int or list of int, optional): The devices you want to
-            stop. Defaults to [].
+            deviceIndex (int): The key of the device to stop.
 
         Returns:
             list[dict]: A list of available devices.
 
         """
         try:
-            if isinstance(deviceIndex, int):
-                self.futabaDevices[deviceIndex].stop()
-            elif hasattr(deviceIndex, "__iter__"):
-                for idx in deviceIndex:
-                    self.futabaDevices[idx].stop()
+            self.futabaDevices[deviceIndex].stop()
         except Exception as e:
             self.logger.warning(e)
         return self.listDevices()
 
-    def stopAll(self) -> list[dict]:
+    def stopAll(self, deviceList: list[futabaDevices] = None) -> list[dict]:
         """Stop all running drivers.
 
         Returns:
@@ -182,7 +182,9 @@ class FutabaDeviceManager:
 
         """
         try:
-            for device in self.futabaDevices:
+            if not deviceList:
+                deviceList = self.futabaDevices
+            for device in deviceList:
                 device.stop()
         except Exception as e:
             self.logger.warning(e)
