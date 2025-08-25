@@ -9,7 +9,7 @@ import sys
 from argparse import ArgumentParser
 
 from clean import cleanBuildArtifacts
-from util import (
+from config import (
     BUILD_DIR,
     EXECUTABLE_NAME,
     NUITKA_OUTPUT_DIR,
@@ -18,34 +18,8 @@ from util import (
     SCRIPTS_TEMPLATES_DIR,
     SOURCE_MAIN,
     WRAPPER_SCRIPT,
-    renderTemplate,
-    runCommand,
 )
-
-# Refuse to run if we aren't operating in a venv
-if sys.prefix == sys.base_prefix:
-    if not (PROJECT_ROOT / ".venv").exists():
-        print("Script must be run from a venv. Try the following first.")
-        print(f"NOTE: Python version requirement -> {PYPROJECT['project']['requires-python']}")
-        print("python3 -m venv venv")
-    else:
-        print(
-            "You appear to have a virtual environment setup correctly but the python runtime used "
-            "is not correct for that environment."
-        )
-        print("=" * 80)
-        print("Troubleshooting steps:")
-        print("  1: Ensure venv is activated:")
-        print("      'source .venv/bin/activate'")
-        print(
-            "  2: Make sure you are not specifying a python version when you are running this "
-            "script. For example:"
-        )
-        print("      ❌ /bin/usr/python3 ./tools/build.py")
-        print("      ✅ ./tools/build.py")
-        print("=" * 80)
-    sys.exit(1)
-
+from util import renderTemplate, runCommand
 
 parser = ArgumentParser()
 parser.add_argument("--clean", action="store_true")

@@ -1,11 +1,14 @@
 #!/bin/bash
 
 ##
-# The "tools" scripts are run only in a build environment and thus have checks preventing them from
-# running outside of a properly configured venv; The Main entry point to the driver (main.py)
-# DOES NOT HAVE SUCH CHECKS. This is because once it is built into a stand-alone executable the check
-# is guaranteed to fail. So when developing always test using "sudo ./run.sh" (this script) to guarantee
-# mitigate against inconsistencies between the production driver and your dev environment.
+# Why this script exists and WHY YOU NEED TO USE IT
+#
+# - The "tools" scripts have checks preventing them from running outside of a properly configured venv
+# - The Main entry point to the driver (main.py) DOES NOT HAVE SUCH CHECKS.
+# - This is because once the driver is built into a stand-alone executable that check is guaranteed to fail.
+# - The check is guaranteed to fail because the stand-alone executable does not rely on an external python interpreter.
+# - So when developing always test using "sudo ./run.sh" (this script) to mitigate against inconsistencies between the production driver and your dev environment.
+# (if one is complaining about dependencies and the other isn't then congratulations, you've likely found your issue.)
 ##
 
 # Get the directory where the script is located
