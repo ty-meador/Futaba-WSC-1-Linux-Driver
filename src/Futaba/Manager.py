@@ -2,7 +2,6 @@
 
 import atexit
 import multiprocessing
-import typing
 
 import usb
 
@@ -119,7 +118,7 @@ class FutabaDeviceManager:
         """
         return [{"key": i, **device.toDict()} for i, device in enumerate(self.futabaDevices)]
 
-    def start(self, deviceIndex: int | typing.Iterable[int]) -> list[dict]:
+    def start(self, deviceIndex: int) -> list[dict]:
         """Start the devices at the given indexes.
 
         Args:
@@ -130,26 +129,15 @@ class FutabaDeviceManager:
             list[dict]: A list of available devices.
 
         """
-        self.logger.debug(f"Attempting to start device at index[s] {deviceIndex}")
-        if isinstance(deviceIndex, int):
-            result = self.futabaDevices[deviceIndex].start()
+        self.logger.debug(f"Attempting to start device at index {deviceIndex}")
+        result = self.futabaDevices[deviceIndex].start()
 
-            if result:
-                self.logger.debug(f"-> {self.futabaDevices[deviceIndex]} started")
-            else:
-                raise RuntimeError(
-                    f"Start requested failed for item at index {deviceIndex}",
-                )
-        elif hasattr(deviceIndex, "__iter__"):
-            self.logger.debug("-> Iterable detected, attempting to start multiple...")
-            for idx in deviceIndex:
-                result = self.futabaDevices[idx].start()
-                if result:
-                    self.logger.debug(f"--> {self.futabaDevices[idx]} started")
-                else:
-                    raise RuntimeError(
-                        f"Start requested failed for item at index {idx}",
-                    )
+        if result:
+            self.logger.debug(f"-> {self.futabaDevices[deviceIndex]} started")
+        else:
+            raise RuntimeError(
+                f"Start requested failed for item at index {deviceIndex}",
+            )
 
         return self.listDevices()
 
