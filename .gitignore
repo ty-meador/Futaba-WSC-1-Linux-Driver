@@ -11,3 +11,4 @@ build/*
 futaba-rc-driver
 *logs/*
 *.egg*
+GENERATED_CALIBRATION_FILE
