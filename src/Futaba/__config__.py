@@ -68,18 +68,7 @@ DEFAULT_CONFIG: dict = {
         "ABS_TILT_Y",
     ],
 }
-
 DEFAULT_CALIBRATION: list = [DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])]
-
-PRODUCTS: dict = {
-    "default": 1948,  # 🥚
-    "WSC-1": 10,
-    "T16IZ": 11,
-    10: "WSC-1",
-    11: "T16IZ",
-    1948: "default",
-}
-
 
 LOGLEVEL: int = logging.DEBUG
 DEFAULT_LOG_HANDLER.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))

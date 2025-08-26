@@ -34,6 +34,16 @@ class DriverState(Enum):
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device."""
 
+    def disableEcho(self):
+        """Disable input echoing."""
+        if self.workerCtl.echoFlag.is_set():
+            self.workerCtl.echoFlag.clear()
+
+    def enableEcho(self):
+        """Enable input echoing."""
+        if not self.workerCtl.echoFlag.is_set():
+            self.workerCtl.echoFlag.set()
+
     def getState(self) -> DriverState:
         """Get the current state of the driver.
 
@@ -105,6 +115,15 @@ class FutabaDeviceDriver:
                 "speed": self.speed,
             }
         )
+
+    def toggleEcho(
+        self,
+    ):
+        """Toggle echo on or off."""
+        if self.workerCtl.echoFlag.is_set():
+            self.workerCtl.echoFlag.clear()
+        else:
+            self.workerCtl.echoFlag.set()
 
     ##
     # Private Methods

@@ -37,7 +37,6 @@ EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
 LOCK_SOCKET = None
 
 parser = ArgumentParser()
-parser.add_argument("--autostart", action="store_true", help="Start the first device found")
 parser.add_argument("--bus", help="The bus of the device you want to start a driver for")
 parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
 parser.add_argument("--daemonize", action="store_true", help="Run as a background daemon")
@@ -68,7 +67,11 @@ async def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
         # TODO - Implement loop to detect new devices etc
 
 
-def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManager) -> None:
+def calibrationMode(
+    parentScreen: curses.window,
+    args: Namespace,
+    mgr: Futaba.DeviceManager,
+) -> None:
     """Run the driver with a text mode ui."""
     ##
     # Keycodes
@@ -125,12 +128,14 @@ def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManag
         mode = "center"
         done = False
         while not done:
+            time.sleep(0.01)
             while pipe.poll():
                 [channel, rawV, calibV] = pipe.recv()
                 if calibScr.getch() == ENTER:
                     # If we've already min/maxd, we're done. generate the file.
                     if mode == "minmax":
                         done = True
+                        break
                     mode = "minmax"
                     calibScr.title = (
                         "( Slowly move each channel to each of their extremes, then press enter )"
@@ -141,11 +146,11 @@ def uiMode(parentScreen: curses.window, args: Namespace, mgr: Futaba.DeviceManag
                     calibrator.minMax(channel, rawV)
                 calibScr.updateChannel(channel, calibV)
                 calibScr.render()
-            time.sleep(0.01)
     except KeyboardInterrupt:
         pass
 
-    calibrator.generateFile("WSC-1")
+    print("Calibration complete!")
+    calibrator.generateFile("GENERATED_CALIBRATION_FILE")
     mgr.stopAll()
     sys.exit(0)
 
@@ -162,15 +167,25 @@ if __name__ == "__main__":
         # Futaba.DeviceManager: It's a futaba device manager...
         with Futaba.Driver.ProcessLock(), Futaba.DeviceManager() as mgr:
             if args.calibrate:
-                curses.wrapper(uiMode, *(args, mgr))
+                curses.wrapper(calibrationMode, *(args, mgr))
             elif args.daemonize:
                 loop = asyncio.new_event_loop()
                 loop.create_task(daemonMode(args, mgr))
                 loop.run_forever()
             else:
-                # TODO - Re-implement menu
-                pass
+                devList = mgr.listDevices()
+                print(f"Found {len(devList)} Futaba devices")
+                print("Which one would you like to test?")
+                for device in devList:
+                    print(f"{device['key']}: {device['name']}")
+                choice = input("Choice: ")
+                mgr.start(device["key"])
+                print("🟢 Driver Running, ctrl+c to quit")
+
+                while True:
+                    time.sleep(0.1)  # Prevent busy waiting, hopefully
     except OSError:
         print("🏁 Driver already running. Have Fun!")
     except KeyboardInterrupt:
+        print("🔴 Driver stopped")
         pass

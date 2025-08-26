@@ -107,6 +107,7 @@ class FutabaDeviceManager:
         Returns:
             multiprocessing.Pipe: Front-end of a duplex pipe
         """
+        self.futabaDevices[deviceIndex].enableEcho()
         return self.futabaDevices[deviceIndex].pipe
 
     def listDevices(self) -> list[dict]:
