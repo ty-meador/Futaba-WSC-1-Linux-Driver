@@ -106,6 +106,7 @@ class FutabaDeviceDriver:
             {
                 "config": self.config,
                 "deviceChannels": len(self.deviceChannels),
+                "deviceUUID": self.deviceUUID,
                 "interruptEndpoint": self.interruptEndpoint,
                 "product": self.productName,
                 "productID": self.productID,
@@ -233,8 +234,11 @@ class FutabaDeviceDriver:
         ##
         # meta-stuff
         ##
+
         self.state = DriverState.INITIALIZING
+
         self.endpoint = utils.findInterruptEndpoint(device)
+
         self.deviceInfo = (
             {
                 "productID": device.idProduct,
@@ -242,7 +246,7 @@ class FutabaDeviceDriver:
                 "product": device.product,
                 "manufacturer": device.manufacturer,
                 "speed": device.speed,
-                "interruptEndpoint": utils.findInterruptEndpoint(device),
+                "interruptEndpoint": self.endpoint,
             }
             if device
             else None
@@ -252,15 +256,12 @@ class FutabaDeviceDriver:
             raise TypeError("Unable to find interrupt endpoint for device")
 
         self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
-
         ##
         # Worker subproc stuff
         ##
         self.subProc = None
         self.frontPipe, self.backPipe = multiprocessing.Pipe()
         self.workerCtl = WorkerControl(pipe=self.backPipe)
-
-        # self.workerCtl.echoFlag.set()
 
         ##
         # Device stuff
@@ -278,7 +279,7 @@ class FutabaDeviceDriver:
         atexit.register(self.stop)
 
     def __eq__(self, other: object) -> bool:
-        """Compare one drivers interrupt endpoint address with the other.
+        """Compare instances based on what USB endpoint they are using.
 
         Args:
             other (object): The device to compare to
@@ -300,7 +301,7 @@ class FutabaDeviceDriver:
 
     def __str__(self) -> str:
         """Generate a string representation of this device driver."""
-        return f"{self.name} Driver"
+        return f"{self.name} Driver({self.deviceUUID})"
 
     def __del__(self) -> None:
         """Destructor."""
@@ -325,12 +326,10 @@ class FutabaDeviceDriver:
             bool: True if all conditions are met, false otherwise
 
         """
-        if coreDevice.idVendor != FUTABA_VENDOR_ID:
-            return False
-
-        endpoint = utils.findInterruptEndpoint(coreDevice)
-
-        return endpoint is not None
+        return (
+            coreDevice.idVendor == FUTABA_VENDOR_ID
+            and utils.findInterruptEndpoint(coreDevice) is not None
+        )
 
     ##
     # Class Properties
@@ -343,6 +342,11 @@ class FutabaDeviceDriver:
             int: The size of the dead zone for the device
         """
         return self.config["dead_zone"]
+
+    @property
+    def deviceUUID(self) -> str:
+        """Get a deterministic UUID for this device."""
+        return f"{self.productID:04X}-{self.serialNumber}"
 
     @property
     def frameSize(self) -> int:

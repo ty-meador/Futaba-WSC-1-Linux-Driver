@@ -27,7 +27,8 @@ class FutabaDeviceManager:
                 if FutabaDeviceDriver.deviceIsSupported(device)
             ]
         )
-        if len(self.futabaDevices) == 0:
+
+        if len(self._futabaDevices) == 0:
             raise DeviceNotFoundError
 
         self.logger = utils.newLogger("FutabaDeviceManager")
@@ -41,11 +42,6 @@ class FutabaDeviceManager:
         """Exit."""
         self.stopAll()
         return self
-
-    @property
-    def futabaDevices(self) -> tuple[FutabaDeviceDriver, ...]:
-        """A tuple of supported Futaba devices."""
-        return self._futabaDevices
 
     def findDevice(self, endpoint: int | None = None) -> usb.core.Device | None:
         """Find the Futaba device that has the provided endpoint.
@@ -78,7 +74,7 @@ class FutabaDeviceManager:
 
         """
         try:
-            return self.futabaDevices[deviceIndex].getState()
+            return self._futabaDevices[deviceIndex].getState()
         except Exception as e:
             self.logger.warning(e)
             return None
@@ -107,8 +103,8 @@ class FutabaDeviceManager:
         Returns:
             multiprocessing.Pipe: Front-end of a duplex pipe
         """
-        self.futabaDevices[deviceIndex].enableEcho()
-        return self.futabaDevices[deviceIndex].pipe
+        self._futabaDevices[deviceIndex].enableEcho()
+        return self._futabaDevices[deviceIndex].pipe
 
     def listDevices(self) -> list[dict]:
         """Get an ordered list of available devices.
@@ -117,7 +113,7 @@ class FutabaDeviceManager:
             list[dict]: A list of available devices.
 
         """
-        return [{"key": i, **device.toDict()} for i, device in enumerate(self.futabaDevices)]
+        return [{"key": i, **device.toDict()} for i, device in enumerate(self._futabaDevices)]
 
     def start(self, deviceIndex: int) -> list[dict]:
         """Start the devices at the given indexes.
@@ -131,10 +127,10 @@ class FutabaDeviceManager:
 
         """
         self.logger.debug(f"Attempting to start device at index {deviceIndex}")
-        result = self.futabaDevices[deviceIndex].start()
+        result = self._futabaDevices[deviceIndex].start()
 
         if result:
-            self.logger.debug(f"-> {self.futabaDevices[deviceIndex]} started")
+            self.logger.debug(f"-> {self._futabaDevices[deviceIndex]} started")
         else:
             raise RuntimeError(
                 f"Start requested failed for item at index {deviceIndex}",
@@ -158,12 +154,12 @@ class FutabaDeviceManager:
 
         """
         try:
-            self.futabaDevices[deviceIndex].stop()
+            self._futabaDevices[deviceIndex].stop()
         except Exception as e:
             self.logger.warning(e)
         return self.listDevices()
 
-    def stopAll(self, deviceList: list[futabaDevices] = None) -> list[dict]:
+    def stopAll(self, deviceList: list = None) -> list[dict]:
         """Stop all running drivers.
 
         Returns:
@@ -172,7 +168,7 @@ class FutabaDeviceManager:
         """
         try:
             if not deviceList:
-                deviceList = self.futabaDevices
+                deviceList = self._futabaDevices
             for device in deviceList:
                 device.stop()
         except Exception as e:

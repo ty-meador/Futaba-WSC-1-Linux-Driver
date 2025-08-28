@@ -24,8 +24,6 @@ PARENT = PWD.parent
 
 PYPROJECT_PATH = PARENT / "pyproject.toml"
 if not PYPROJECT_PATH.exists():
-    PYPROJECT_PATH = PWD / "pyproject.toml"
-if not PYPROJECT_PATH.exists():
     raise FileNotFoundError("Unable to locate pyproject.toml")
 
 # Load project configuration
@@ -149,10 +147,9 @@ def calibrationMode(
     except KeyboardInterrupt:
         pass
 
-    print("Calibration complete!")
-    calibrator.generateFile("GENERATED_CALIBRATION_FILE")
+    name = input("Enter a name for this calibration.")
+    # calibrator.generateFile(f"{device.deviceUUID}_{name}")
     mgr.stopAll()
-    sys.exit(0)
 
 
 if __name__ == "__main__":
@@ -168,6 +165,8 @@ if __name__ == "__main__":
         with Futaba.Driver.ProcessLock(), Futaba.DeviceManager() as mgr:
             if args.calibrate:
                 curses.wrapper(calibrationMode, *(args, mgr))
+                print("Calibration complete!")
+                sys.exit(0)
             elif args.daemonize:
                 loop = asyncio.new_event_loop()
                 loop.create_task(daemonMode(args, mgr))
@@ -180,12 +179,13 @@ if __name__ == "__main__":
                     print(f"{device['key']}: {device['name']}")
                 choice = input("Choice: ")
                 mgr.start(device["key"])
-                print("🟢 Driver Running, ctrl+c to quit")
+                print("🏳️ Driver Running, ctrl+c to quit")
 
                 while True:
-                    time.sleep(0.1)  # Prevent busy waiting, hopefully
+                    time.sleep(0.1)  # Prevent busy waiting
+
     except OSError:
         print("🏁 Driver already running. Have Fun!")
     except KeyboardInterrupt:
-        print("🔴 Driver stopped")
+        print("🏴 Driver stopped")
         pass

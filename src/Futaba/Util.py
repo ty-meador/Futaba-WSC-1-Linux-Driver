@@ -7,6 +7,7 @@ import os
 import re
 import typing
 from dataclasses import dataclass, field
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import usb
@@ -18,6 +19,7 @@ from .__config__ import (
     FUTABA_VENDOR_ID,
     INTERRUPT_ENDPOINT_ATTRIBUTE,
     LOG_PATH,
+    PWD,
 )
 
 
@@ -81,6 +83,13 @@ def findInterruptEndpoint(device: usb.core.Device) -> int:
     raise RuntimeError("No interrupt endpoint found!")
 
 
+# DEFAULT_LOG_HANDLER: logging.handlers.RotatingFileHandler = handlers.RotatingFileHandler(
+#     "logs.txt",
+#     maxBytes=5 * 1024 * 1024,  # 5 megabytes
+#     backupCount=5,
+# )
+
+
 def newLogger(
     name: str,
     fileName: str | None = None,
@@ -105,7 +114,7 @@ def newLogger(
     if fileName is None:
         fileName = re.sub(r"\W", "_", name) + ".txt"
 
-    handler = logging.handlers.RotatingFileHandler(
+    handler = RotatingFileHandler(
         os.path.join(LOG_PATH, fileName),
         maxBytes=5 * 1024 * 1024,  # 5 megabytes
         backupCount=5,
@@ -219,7 +228,7 @@ class CalibrationWidget:
         """Generate a calibration file."""
         calibration = self._generateCalibration()
         with open(fileName, "w") as calibrationFile:
-            json.dump(calibration, calibrationFile, indent=4)
+            json.dump(calibration, PWD / calibrationFile, indent=4)
 
     def __init__(self) -> None:
         """Create a Channel calibrator."""
