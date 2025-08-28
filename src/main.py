@@ -179,7 +179,7 @@ if __name__ == "__main__":
                     print(f"{device['key']}: {device['name']}")
                 choice = input("Choice: ")
                 mgr.start(device["key"])
-                print("🏳️ Driver Running, ctrl+c to quit")
+                print("🏳️  Driver running, ctrl+c to quit")
 
                 while True:
                     time.sleep(0.1)  # Prevent busy waiting
