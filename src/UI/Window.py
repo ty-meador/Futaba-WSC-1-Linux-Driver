@@ -17,7 +17,7 @@ class WindowCoords:
 class Window:
     """Represents a single window."""
 
-    def __init__(self, windowCoords, title=None):
+    def __init__(self, windowCoords: WindowCoords, title: str = None):
         """Create and render a window."""
         curses.curs_set(0)
         self.window = curses.newwin(
@@ -36,15 +36,22 @@ class Window:
         self.height = windowCoords.height
         self.window.clear()
         self.window.border()
+        self.erase = self.window.erase
         self.touchline = self.window.touchline
         self.touchwin = self.window.touchwin
         self.clear = self.window.clear
         self.border = self.window.border
         self.nodelay = self.window.nodelay
+        self.getch = self.window.getch
 
-    def getch(self):
-        """Block waiting for an input from the user."""
-        return self.window.getch()
+    def setTitle(self, title: str):
+        """Set the title of the window.
+
+        Args:
+            title (str): The new title for the window
+        """
+        self.title = title
+        self.render()
 
     def render(self):
         """Clear the window and redraw it."""

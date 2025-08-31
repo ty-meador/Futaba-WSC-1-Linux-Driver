@@ -227,8 +227,8 @@ class CalibrationWidget:
     def generateFile(self, fileName: str) -> None:
         """Generate a calibration file."""
         calibration = self._generateCalibration()
-        with open(fileName, "w") as calibrationFile:
-            json.dump(calibration, PWD / calibrationFile, indent=4)
+        calibrationFile = PWD / fileName
+        calibrationFile.write_text(json.dumps(calibration, indent=4))
 
     def __init__(self) -> None:
         """Create a Channel calibrator."""

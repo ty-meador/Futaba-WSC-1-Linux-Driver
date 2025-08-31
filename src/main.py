@@ -12,11 +12,12 @@ import curses
 import sys
 import time
 import tomllib
+import traceback
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 import Futaba
-from UI import CalibrationUI, MainMenu, WindowCoords
+import UI
 
 # Project structure
 PWD = Path(__file__).parent.resolve()
@@ -90,9 +91,15 @@ def calibrationMode(
     yMid = yMaxOverTwo - height // 2
 
     deviceManager = Futaba.DeviceManager()
+    pipe = None
+    selectedDevice = None
+    inpt = None
 
-    menu = MainMenu(
-        WindowCoords(
+    ##
+    # Allow user to select which device they want to calibrate.
+    ##
+    menu = UI.MainMenu(
+        UI.WindowCoords(
             x=xMid,
             y=yMid,
             width=width,
@@ -102,10 +109,6 @@ def calibrationMode(
     )
 
     menu.render()
-
-    pipe = None
-    selectedDevice = None
-    inpt = None
     while inpt != ENTER:
         inpt = menu.getch()
         if inpt == UP_ARROW:
@@ -114,41 +117,62 @@ def calibrationMode(
             menu.down()
 
     selectedDevice = menu.getItem()
+    menu.erase()
+    parentScreen.refresh()
 
+    ##
+    # The name input by the user will be used in part of the calibration file name
+    ##
+    inputWindow = UI.TextInput(UI.WindowCoords(x=xMid, y=yMid, width=width, height=3))
+    inputWindow.setTitle("( Enter a name for the transmitter you are calibrating )")
+    txName = inputWindow.getValue().replace(" ", "-")  # tx = transmitter
+    inputWindow.erase()
+    parentScreen.refresh()
+
+    ##
+    # calibration process:
+    #
+    # - center all inputs
+    # - move all inputs to extremes
+    # - generate calibration file
+    ##
     deviceManager.start(selectedDevice["key"])
     pipe = deviceManager.getPipe(selectedDevice["key"])
-    calibrator = Futaba.Util.CalibrationWidget()
-    calibScr = CalibrationUI(WindowCoords(x=xMid, y=yMid, width=width, height=height))
-    calibScr.nodelay(True)
-    calibScr.title = "( Center all inputs, then press enter )"
-    calibScr.render()
+    # Generates the calibration
+    calibrationWidget = Futaba.Util.CalibrationWidget()
+    # Handles user interaction
+    calibrationUI = UI.CalibrationUI(UI.WindowCoords(x=xMid, y=yMid, width=width, height=height))
+    calibrationUI.nodelay(True)
+    calibrationUI.setTitle("( Center all inputs, then press enter )")
+    calibrationUI.render()
+    fileName = f"{selectedDevice['deviceUUID']}_{txName}.json"
     try:
         mode = "center"
         done = False
         while not done:
-            time.sleep(0.01)
+            time.sleep(0.01)  # Prevent busy-waiting
             while pipe.poll():
                 [channel, rawV, calibV] = pipe.recv()
-                if calibScr.getch() == ENTER:
+                # move to next calibration step every time they press enter
+                if calibrationUI.getch() == ENTER:
                     # If we've already min/maxd, we're done. generate the file.
                     if mode == "minmax":
                         done = True
                         break
                     mode = "minmax"
-                    calibScr.title = (
+                    calibrationUI.setTitle(
                         "( Slowly move each channel to each of their extremes, then press enter )"
                     )
                 if mode == "center":
-                    calibrator.mid(channel, rawV)
+                    calibrationWidget.mid(channel, rawV)
                 elif mode == "minmax":
-                    calibrator.minMax(channel, rawV)
-                calibScr.updateChannel(channel, calibV)
-                calibScr.render()
+                    calibrationWidget.minMax(channel, rawV)
+                calibrationUI.updateChannel(channel, calibV)
+                calibrationUI.render()
     except KeyboardInterrupt:
         pass
 
-    name = input("Enter a name for this calibration.")
-    # calibrator.generateFile(f"{device.deviceUUID}_{name}")
+    calibrationWidget.generateFile(fileName)
     mgr.stopAll()
 
 
@@ -164,7 +188,11 @@ if __name__ == "__main__":
         # Futaba.DeviceManager: It's a futaba device manager...
         with Futaba.Driver.ProcessLock(), Futaba.DeviceManager() as mgr:
             if args.calibrate:
-                curses.wrapper(calibrationMode, *(args, mgr))
+                try:
+                    curses.wrapper(calibrationMode, *(args, mgr))
+                except Exception:
+                    traceback.print_exc()
+                    raise
                 print("Calibration complete!")
                 sys.exit(0)
             elif args.daemonize:
