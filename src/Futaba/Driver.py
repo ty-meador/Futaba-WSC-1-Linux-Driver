@@ -108,7 +108,7 @@ class FutabaDeviceDriver:
                 "deviceChannels": len(self.deviceChannels),
                 "deviceUUID": self.deviceUUID,
                 "interruptEndpoint": self.interruptEndpoint,
-                "product": self.productName,
+                "productName": self.productName,
                 "productID": self.productID,
                 "manufacturer": self.manufacturer,
                 "name": self.name,
@@ -143,8 +143,8 @@ class FutabaDeviceDriver:
         """
         config = None
 
-        filePath = os.path.join(CONFIG_PATH, f"{productName}.json")
-        defaultPath = os.path.join(CONFIG_PATH, "default.json")
+        filePath = os.path.join(CONFIG_PATH, f"_{productName}.json")
+        defaultPath = os.path.join(CONFIG_PATH, "_default.json")
 
         self.logger.debug(f"loading {filePath}")
         config = utils.parseJsonFile(filePath)
@@ -159,7 +159,7 @@ class FutabaDeviceDriver:
         self.logger.debug(f"config={config}")
         return config
 
-    def _loadCalibration(self, productName: str) -> list[list[int]]:
+    def _loadCalibration(self, productName: str, deviceUUID: str) -> list[list[int]]:
         """Load the calibration file for the given product.
 
         Args:
@@ -170,16 +170,24 @@ class FutabaDeviceDriver:
             list of list: Each inner list will contain calibration data for a channel.
 
         """
-        filePath = os.path.join(CALIBRATION_PATH, f"{productName}.json")
-        defaultPath = os.path.join(CALIBRATION_PATH, "default.json")
+        filePath = os.path.join(CALIBRATION_PATH, f"{productName}_{deviceUUID}.json")
+        defaultProductPath = os.path.join(CALIBRATION_PATH, f"_{productName}.json")
+        defaultPath = os.path.join(CALIBRATION_PATH, "_default.json")
 
-        # Load this products calibration file by default
+        # Load custom calibration if it exists
         self.logger.debug(f"loading {filePath}")
         channelCalibrations = utils.parseJsonFile(filePath)
-        # If that fails, load the default config file
+
+        # If that fails, load the default calibration file for this product
         if channelCalibrations is None:
-            self.logger.debug(f"loading{defaultPath}")
+            self.logger.debug(f"loading {defaultProductPath}")
+            channelCalibrations = utils.parseJsonFile(defaultProductPath)
+
+        # If that fails, load the global default config file
+        if channelCalibrations is None:
+            self.logger.debug(f"loading {defaultPath}")
             channelCalibrations = utils.parseJsonFile(defaultPath)
+
         # If that fails, use the hard-coded values
         if channelCalibrations is None:
             self.logger.debug("using hard-coded defaults")
@@ -271,7 +279,7 @@ class FutabaDeviceDriver:
             InputChannel(eventName, calibration, False, logger=self.logger)
             for eventName, calibration in zip(
                 self.config["channel_events"],
-                self._loadCalibration(self.productName),
+                self._loadCalibration(self.productName, self.deviceUUID),
                 strict=True,  # 1 event name and 1 calibration per channel
             )
         ]

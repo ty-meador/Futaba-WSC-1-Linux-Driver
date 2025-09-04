@@ -1,6 +1,6 @@
 """User interface module."""
 
 from .Calibration import CalibrationUI
-from .MainMenu import MainMenu
+from .Menu import MainMenu, Menu
 from .TextInput import TextInput
 from .Window import Window, WindowCoords

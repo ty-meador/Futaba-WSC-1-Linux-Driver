@@ -63,7 +63,7 @@ CONFIG_PATH: Path = DRIVER_PATH / "configs"
 CALIBRATION_PATH: Path = DRIVER_PATH / "calibrations"
 LOG_PATH: Path = DRIVER_PATH / "logs"
 
-with open(CONFIG_PATH / "default.json") as f:
+with open(CONFIG_PATH / "_default.json") as f:
     DEFAULT_CONFIG: dict = json.load(f)
 
 DEFAULT_CALIBRATION: list = [DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])]

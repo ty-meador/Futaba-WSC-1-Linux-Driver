@@ -32,8 +32,8 @@ with open(PYPROJECT_PATH, "rb") as f:
     """Load pyproject.toml file."""
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
+CALIBRATIONS_PATH = PWD / "Futaba/calibrations"
 EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
-LOCK_SOCKET = None
 
 parser = ArgumentParser()
 parser.add_argument("--bus", help="The bus of the device you want to start a driver for")
@@ -94,20 +94,17 @@ def calibrationMode(
     pipe = None
     selectedDevice = None
     inpt = None
-
-    ##
-    # Allow user to select which device they want to calibrate.
-    ##
-    menu = UI.MainMenu(
-        UI.WindowCoords(
-            x=xMid,
-            y=yMid,
-            width=width,
-            height=height,
-        ),
-        [device for device in deviceManager.listDevices()],
+    windowCoords = UI.WindowCoords(
+        x=xMid,
+        y=yMid,
+        width=width,
+        height=height,
     )
 
+    ##
+    # Allow user to select which receiver they want to calibrate
+    ##
+    menu = UI.MainMenu(windowCoords, deviceManager.listDevices())
     menu.render()
     while inpt != ENTER:
         inpt = menu.getch()
@@ -115,27 +112,12 @@ def calibrationMode(
             menu.up()
         elif inpt == DOWN_ARROW:
             menu.down()
+    inpt = None
 
     selectedDevice = menu.getItem()
     menu.erase()
     parentScreen.refresh()
 
-    ##
-    # The name input by the user will be used in part of the calibration file name
-    ##
-    inputWindow = UI.TextInput(UI.WindowCoords(x=xMid, y=yMid, width=width, height=3))
-    inputWindow.setTitle("( Enter a name for the transmitter you are calibrating )")
-    txName = inputWindow.getValue().replace(" ", "-")  # tx = transmitter
-    inputWindow.erase()
-    parentScreen.refresh()
-
-    ##
-    # calibration process:
-    #
-    # - center all inputs
-    # - move all inputs to extremes
-    # - generate calibration file
-    ##
     deviceManager.start(selectedDevice["key"])
     pipe = deviceManager.getPipe(selectedDevice["key"])
     # Generates the calibration
@@ -145,7 +127,7 @@ def calibrationMode(
     calibrationUI.nodelay(True)
     calibrationUI.setTitle("( Center all inputs, then press enter )")
     calibrationUI.render()
-    fileName = f"{selectedDevice['deviceUUID']}_{txName}.json"
+    fileName = f"{selectedDevice['productName']}_{selectedDevice['deviceUUID']}.json"
     try:
         mode = "center"
         done = False

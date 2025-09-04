@@ -9,6 +9,7 @@ build/*
 *main.dist*
 *nuitka*.xml
 futaba-rc-driver
+*\.txt.*
 *logs/*
 *.egg*
 GENERATED_CALIBRATION_FILE

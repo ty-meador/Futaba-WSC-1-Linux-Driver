@@ -12,16 +12,15 @@
 ##
 
 # Get the directory where the script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV="${SCRIPT_DIR}/.venv"
+PROEJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV="${PROEJECT_ROOT}/.venv"
 
-if [ -f "${VENV}/bin/activate" ]; then
-    source "${VENV}/bin/activate"
-else
+if [ ! -f "${VENV}/bin/activate" ]; then
     echo "Error: Virtual environment not found at ${VENV}"
     echo "Please create a virtual environment with minimum python version 3.11.0"
     echo "python3 -m venv venv"
     exit 1
 fi
 
-python3 "${SCRIPT_DIR}/src/main.py" "$@"
+source "${VENV}/bin/activate"
+python3 "${PROEJECT_ROOT}/src/main.py" "$@"
