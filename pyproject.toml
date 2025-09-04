@@ -28,7 +28,7 @@ Documentation = "https://tylermeador.com/futaba-rc-driver/docs"
 Homepage = "https://tylermeador.com/futaba-rc-driver"
 Distributables = "https://tylermeador.com/futaba-rc-driver/dist"
 Issues = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issues"
-Repository = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver"
+Repository = "https://gitlab.com/Native-Coder/futaba-usb-driver/"
 
 [tool.build_tool]
 install_script_name = "install.sh"
