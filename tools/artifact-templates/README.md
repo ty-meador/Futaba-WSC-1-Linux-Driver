@@ -1,10 +1,14 @@
 # Futaba RC USB Driver - Standalone Distribution
+![gif of driver allowing device to show up in VRC-Pro](/screenshots/example.gif)
 
-## Quick Start
-
-1. Extract this archive
-2. Run the installer: `sudo ./{{install_script_name}}`
-3. Or run directly: `sudo ./{{executable_name}}`
+## Quick Install
+```sh
+# The quick install script will automatically
+# download the latest release and install it.
+wget https://example.com/quick-install.sh
+chmod +x quick-install.sh
+./quick-install.sh
+```
 
 ## What's Included
 
@@ -19,34 +23,19 @@
 - Kernel 3.0+ with uinput support
 - USB permissions for your user (or run as sudo)
 
-## Running the Driver
-
-### Option 1: Quick Run (Temporary)
-```bash
-sudo ./{{executable_name}}
-```
-
-### Option 2: System Install (Permanent)
-```bash
-./{{install_script_name}}
-# Then run from anywhere:
-{{executable_name}}
-```
-
 ## Supported Devices
 
 - Futaba WSC-1
+- Futaba T16IZ
 - Other Futaba USB receivers (auto-detected)
 
 ## Usage
 
 The driver automatically detects connected Futaba receivers and creates virtual joystick devices in `/dev/input/`. These can be used by any Linux application that supports joysticks (games, simulators, etc.).
 
-### Basic Usage
-1. Connect your Futaba USB receiver
-2. Run `sudo ./{{executable_name}}`
-3. The driver will auto-detect and configure your receiver
-4. Use CTRL+C to stop
+1. Manual run: `sudo {{executable_name}}`
+2. Calibration mode: `sudo {{executable_name}} --calibrate`
+3. Daemon mode (autostart): `sudo {{executable_name}} --daemonize`
 
 ## Troubleshooting
 
@@ -77,9 +66,8 @@ echo 'uinput' | sudo tee -a /etc/modules
 
 - This driver is optimized for real-time RC applications (frames are processed in O(1))
 - Low latency, high precision input processing
-- Memory usage on a WSC-1 is approx 13 kilobytes per channel
-  - YMMV - every device is different. The theoretical "maximum" memory consumption would be approx 260 kilobytes per channel.
-  - Memory consuption per channel will change after the device is calibrated.
+
+
 
 ## Support
 
