@@ -12,4 +12,13 @@ futaba-rc-driver
 *\.txt.*
 *logs/*
 *.egg*
-GENERATED_CALIBRATION_FILE
+
+# Ignore all files in calibrations directory except those starting with underscore and ending in .json
+# (users custom calibration files)
+src/Futaba/calibrations/*
+!src/Futaba/calibrations/_*.json
+
+# Ignore all files in configs directory except those starting with underscore and ending in .json
+# (users custom calibration files)
+src/Futaba/configs/*
+!src/Futaba/configs/_*.json
