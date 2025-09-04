@@ -84,7 +84,7 @@ echo 'uinput' | sudo tee -a /etc/modules
 ## Support
 
 For issues, updates, and documentation visit:
-https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver
+https://gitlab.com/Native-Coder/futaba-usb-driver/
 
 ---
 Built with ❤️ for the RC community
