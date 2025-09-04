@@ -1,152 +1,201 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """The main program - run with `sudo python3 main.py`.
 
-Futaba RC Driver  Copyright (C) 2025  Ty Meador (gitlab="Native-Coder")
+Futaba RC Driver  Copyright (C) 2025  Tyler Meador (gitlab="Native-Coder")
 This program comes with ABSOLUTELY NO WARRANTY;.
 This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
 
-import os
-import subprocess
+import asyncio
+import curses
+import sys
 import time
-from argparse import ArgumentParser
+import tomllib
+import traceback
+from argparse import ArgumentParser, Namespace
+from pathlib import Path
 
 import Futaba
+import UI
+
+# Project structure
+PWD = Path(__file__).parent.resolve()
+PARENT = PWD.parent
+
+PYPROJECT_PATH = PARENT / "pyproject.toml"
+if not PYPROJECT_PATH.exists():
+    raise FileNotFoundError("Unable to locate pyproject.toml")
+
+# Load project configuration
+with open(PYPROJECT_PATH, "rb") as f:
+    """Load pyproject.toml file."""
+    toml_data = tomllib.load(f)
+PYPROJECT = toml_data
+CALIBRATIONS_PATH = PWD / "Futaba/calibrations"
+EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
 
 parser = ArgumentParser()
+parser.add_argument("--bus", help="The bus of the device you want to start a driver for")
+parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
+parser.add_argument("--daemonize", action="store_true", help="Run as a background daemon")
+parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
+parser.add_argument("--port", help="The port of the device you want start a driver for")
+parser.add_argument("--version", action="store_true", help="Get driver version")
 
 
-parser.add_argument(
-    "--autostart",
-    action="store_true",
-    help="Start the first device found",
-)
-
-parser.add_argument(
-    "--bus",
-    help="The bus of the device you want to start a driver for",
-)
-
-parser.add_argument(
-    "--calibrate",
-    action="store_true",
-    help="Used for calibration",
-)
-
-
-parser.add_argument(
-    "--endpoint",
-    help="Start a driver on the device at this endpoint",
-)
-
-parser.add_argument(
-    "--port",
-    help="The port of the device you want start a driver for",
-)
-
-
-parser.add_argument(
-    "--ui",
-    help="Launch the terminal based UI",
-)
-
-
-def cliMode(args):
+async def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
     """Run the driver in cli-mode.
 
     Args:
         args (argparse.ArgumentParser.arg): Arguments passed to the cli
+        mgr (Futaba.DeviceManager): The global device manager
 
     Raises:
         RuntimeError: Raised if the specified device cannot be found
 
     """
-    manager = Futaba.DeviceManager()
-
     device = None
     if args.endpoint is not None:
-        device = manager.findDevice(endpoint=args.endpoint)
+        device = mgr.findDevice(endpoint=args.endpoint)
+        if device is None:
+            raise OSError(f"No Futaba device found at endpoint {args.endpoint}")
     else:
-        selection = None
-        deviceList = manager.listDevices()
-        deviceCount = len(deviceList)
+        print(f"Found {len(mgr.listDevices())} Futaba devices, autostarting all...")
+        mgr.startAll()
+        # TODO - Implement loop to detect new devices etc
 
-        if deviceCount == 1 or args.autostart:
-            print(f"Found {deviceCount} Futaba devices, autostarting {deviceList[0]['name']}")
-            device = deviceList[0]
-        elif deviceCount > 1:
-            print("Which device would you like to start?")
-            for device in deviceList:
-                print(f"[ {device['key']} ] : {device['name']}")
-            selection = int(input())
-            device = deviceList[selection]
 
-    if device is None:
-        raise RuntimeError("Could not find a Futaba device at the specified endpoint")
+def calibrationMode(
+    parentScreen: curses.window,
+    args: Namespace,
+    mgr: Futaba.DeviceManager,
+) -> None:
+    """Run the driver with a text mode ui."""
+    ##
+    # Keycodes
+    ##
+    ENTER = 10
+    SPACE = 32
+    # LEFT_ARROW = 68
+    UP_ARROW = 65
+    # RIGHT_ARROW = 67
+    DOWN_ARROW = 66
 
-    manager.start(device["key"])
-    print(f"Started {device['name']}")
-    print("CTRL + C to stop driver")
+    yMax, xMax = parentScreen.getmaxyx()
+    xMaxOverTwo = xMax // 2
+    yMaxOverTwo = yMax // 2
+    height = 20
+    width = 80
+    xMid = xMaxOverTwo - width // 2
+    yMid = yMaxOverTwo - height // 2
 
+    deviceManager = Futaba.DeviceManager()
+    pipe = None
+    selectedDevice = None
+    inpt = None
+    windowCoords = UI.WindowCoords(
+        x=xMid,
+        y=yMid,
+        width=width,
+        height=height,
+    )
+
+    ##
+    # Allow user to select which receiver they want to calibrate
+    ##
+    menu = UI.MainMenu(windowCoords, deviceManager.listDevices())
+    menu.render()
+    while inpt != ENTER:
+        inpt = menu.getch()
+        if inpt == UP_ARROW:
+            menu.up()
+        elif inpt == DOWN_ARROW:
+            menu.down()
+    inpt = None
+
+    selectedDevice = menu.getItem()
+    menu.erase()
+    parentScreen.refresh()
+
+    deviceManager.start(selectedDevice["key"])
+    pipe = deviceManager.getPipe(selectedDevice["key"])
+    # Generates the calibration
+    calibrationWidget = Futaba.Util.CalibrationWidget()
+    # Handles user interaction
+    calibrationUI = UI.CalibrationUI(UI.WindowCoords(x=xMid, y=yMid, width=width, height=height))
+    calibrationUI.nodelay(True)
+    calibrationUI.setTitle("( Center all inputs, then press enter )")
+    calibrationUI.render()
+    fileName = f"{selectedDevice['productName']}_{selectedDevice['deviceUUID']}.json"
     try:
-        while True:
-            # Block indefinitely so that background process stays alive
-            time.sleep(1000)
+        mode = "center"
+        done = False
+        while not done:
+            time.sleep(0.01)  # Prevent busy-waiting
+            while pipe.poll():
+                [channel, rawV, calibV] = pipe.recv()
+                # move to next calibration step every time they press enter
+                if calibrationUI.getch() == ENTER:
+                    # If we've already min/maxd, we're done. generate the file.
+                    if mode == "minmax":
+                        done = True
+                        break
+                    mode = "minmax"
+                    calibrationUI.setTitle(
+                        "( Slowly move each channel to each of their extremes, then press enter )"
+                    )
+                if mode == "center":
+                    calibrationWidget.mid(channel, rawV)
+                elif mode == "minmax":
+                    calibrationWidget.minMax(channel, rawV)
+                calibrationUI.updateChannel(channel, calibV)
+                calibrationUI.render()
     except KeyboardInterrupt:
         pass
 
-    print("Goodbye!")
-
-
-def runCommand(cmd: str, cwd: str | None = None, capture: bool = True) -> str | None:
-    """Run a command and handle errors.
-
-    Args:
-        cmd: Command to run as shell string
-        cwd: Working directory for command execution
-        capture: Whether to capture and return output
-
-    Returns:
-        Command output if capture=True and successful, empty string if capture=False and successful,
-        None if command failed
-
-    """
-    try:
-        if capture:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                check=True,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-            )
-            return result.stdout.strip()
-        else:
-            subprocess.run(cmd, shell=True, check=True, cwd=cwd)
-            return ""
-    except subprocess.CalledProcessError as e:
-        if capture and e.stderr:
-            print(f"Error: {e.stderr}")
-        return None
+    calibrationWidget.generateFile(fileName)
+    mgr.stopAll()
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    # Reliably finds the drivers process
-    pids = runCommand("pgrep '^futaba-rc-'")
-    if pids is not None:
-        pids = tuple(
-            filter(
-                lambda pid: int(pid) != int(os.getpid()),
-                pids.split("\n"),
-            )
-        )
+    try:
+        # No reason to proceed if all they want is the version.
+        if args.version:
+            print(PYPROJECT["project"]["version"])
+            sys.exit(0)
 
-    if pids is not None and len(pids) > 0:
-        print("Driver already running. Have Fun!")
-    elif args.ui:
-        raise RuntimeError("Not yet Impelmented")
-    else:
-        cliMode(args)
+        # Futaba.Driver.ProcessLock: Prevents multiple driver instances from running.
+        # Futaba.DeviceManager: It's a futaba device manager...
+        with Futaba.Driver.ProcessLock(), Futaba.DeviceManager() as mgr:
+            if args.calibrate:
+                try:
+                    curses.wrapper(calibrationMode, *(args, mgr))
+                except Exception:
+                    traceback.print_exc()
+                    raise
+                print("Calibration complete!")
+                sys.exit(0)
+            elif args.daemonize:
+                loop = asyncio.new_event_loop()
+                loop.create_task(daemonMode(args, mgr))
+                loop.run_forever()
+            else:
+                devList = mgr.listDevices()
+                print(f"Found {len(devList)} Futaba devices")
+                print("Which one would you like to test?")
+                for device in devList:
+                    print(f"{device['key']}: {device['name']}")
+                choice = input("Choice: ")
+                mgr.start(device["key"])
+                print("🏳️  Driver running, ctrl+c to quit")
+
+                while True:
+                    time.sleep(0.1)  # Prevent busy waiting
+
+    except OSError:
+        print("🏁 Driver already running. Have Fun!")
+    except KeyboardInterrupt:
+        print("🏴 Driver stopped")
+        pass

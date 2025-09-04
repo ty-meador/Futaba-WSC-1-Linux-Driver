@@ -1,0 +1,15 @@
+{
+    "channel_events": [
+       "ABS_TILT_Y",
+       "ABS_TILT_X",
+       "ABS_RUDDER",
+       "ABS_THROTTLE",
+       "ABS_RY",
+       "ABS_RX",
+       "ABS_Y",
+       "ABS_X"
+    ],
+    "dead_zone": 0,
+    "frame_size": 16,
+    "noise_filter": 0
+}

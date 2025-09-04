@@ -9,3 +9,16 @@ build/*
 *main.dist*
 *nuitka*.xml
 futaba-rc-driver
+*\.txt.*
+*logs/*
+*.egg*
+
+# Ignore all files in calibrations directory except those starting with underscore and ending in .json
+# (users custom calibration files)
+src/Futaba/calibrations/*
+!src/Futaba/calibrations/_*.json
+
+# Ignore all files in configs directory except those starting with underscore and ending in .json
+# (users custom calibration files)
+src/Futaba/configs/*
+!src/Futaba/configs/_*.json

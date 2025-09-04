@@ -1,7 +1,6 @@
 """Classes for handling input channels."""
 
 import array
-import bisect
 import logging
 import sys
 import typing
@@ -9,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import Util as utils
+from .__config__ import DEFAULT_INPUT_RANGE, DEFAULT_OUTPUT_RANGE
 
 
 class ChannelDict(typing.TypedDict):
@@ -26,10 +26,10 @@ class ChannelCalibration:
         logger (logging.Logger): The logger you want this class to use
         inputRange (typing.Iterable, optional): An iterable of length 3 where each item represents
         the low, middle, and high point respectively in increasing order.
-        defaults to utils.DEFAULT_INPUT_RANGE
+        defaults to DEFAULT_INPUT_RANGE
         outputRange (typing.Iterable, optional): An iterable of length 3 where each item represents
         the low, middle, and high point respectively in increasing order.
-        defaults to utils.DEFAULT_OUTPUT_RANGE
+        defaults to DEFAULT_OUTPUT_RANGE
         reverse (bool, optional): If reverse the calibrated values will be
         inserted into the resulting array backwards. This will reverse the
         direction of the input. Defaults to False.
@@ -72,8 +72,8 @@ class ChannelCalibration:
 
     """
 
-    inputRange: typing.Iterable = field(default_factory=lambda: utils.DEFAULT_INPUT_RANGE)
-    outputRange: typing.Iterable = field(default_factory=lambda: utils.DEFAULT_OUTPUT_RANGE)
+    inputRange: typing.Iterable = field(default_factory=lambda: DEFAULT_INPUT_RANGE)
+    outputRange: typing.Iterable = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
 
     logger: logging.Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
@@ -141,8 +141,12 @@ class ChannelCalibration:
         inputMin, inputMid, inputMax = inputRange
         outputMin, outputMid, outputMax = outputRange
 
-        assert inputMin < inputMid < inputMax, "Insane input range"
-        assert outputMin < outputMid < outputMax, "Insane output range"
+        assert inputMin < inputMid < inputMax, (
+            f"Insane input range ({inputMin}, {inputMid}, {inputMax})"
+        )
+        assert outputMin < outputMid < outputMax, (
+            f"Insane output range ({inputMin}, {inputMid}, {inputMax})"
+        )
 
         # If the input uses both positive and negative values we need to
         # account for that in the array size
@@ -160,7 +164,7 @@ class ChannelCalibration:
 
         return array.array(
             "i",
-            cls.interpolate(
+            utils.interpolate(
                 allPossibleInputValues,
                 inputRange,
                 outputRange,
@@ -169,54 +173,6 @@ class ChannelCalibration:
             ),
         )
 
-    @classmethod
-    def interpolate(
-        cls,
-        xVals: typing.Iterable[int],
-        xPoints: typing.Iterable[int],
-        yPoints: typing.Iterable[int],
-        left: int | None = None,
-        right: int | None = None,
-    ) -> list[int]:
-        """Pure Python 1D linear interpolation to replace numpy.interp().
-
-        Args:
-            xVals: Values to interpolate at
-            xPoints: X coordinates of known points
-            yPoints: Y coordinates of known points
-            left: Value for x < xPoints[0]
-            right: Value for x > xPoints[-1]
-
-        Returns:
-            List of interpolated integer values
-        """
-        result = []
-
-        for x in xVals:
-            # Handle boundary conditions
-            if x <= xPoints[0]:
-                result.append(left if left is not None else yPoints[0])
-                continue
-            if x >= xPoints[-1]:
-                result.append(right if right is not None else yPoints[-1])
-                continue
-
-            # Find the right interval for interpolation
-            i = bisect.bisect_right(xPoints, x) - 1
-
-            # Linear interpolation
-            x1, x2 = xPoints[i], xPoints[i + 1]
-            y1, y2 = yPoints[i], yPoints[i + 1]
-
-            interpolated = (
-                y1
-                if x2 == x1  # Avoid division by zero
-                else y1 + (y2 - y1) * (x - x1) / (x2 - x1)
-            )
-
-            result.append(int(round(interpolated)))
-        return result
-
 
 @dataclass(frozen=True, slots=True)
 class InputChannel:
@@ -224,7 +180,6 @@ class InputChannel:
 
     eventName: str
     calibrationRange: typing.Iterable[int]
-
     isReversed: bool = False
     logger: object = field(default_factory=lambda: utils.newLogger("InputChannel"))
     valueMap: array.array = field(default_factory=lambda: [])

@@ -28,7 +28,7 @@ sudo ./{{executable_name}}
 
 ### Option 2: System Install (Permanent)
 ```bash
-sudo ./{{install_script_name}}
+./{{install_script_name}}
 # Then run from anywhere:
 {{executable_name}}
 ```
@@ -47,13 +47,6 @@ The driver automatically detects connected Futaba receivers and creates virtual 
 2. Run `sudo ./{{executable_name}}`
 3. The driver will auto-detect and configure your receiver
 4. Use CTRL+C to stop
-
-### Advanced Options
-```bash
-sudo ./{{executable_name}} --help          # Show all options
-sudo ./{{executable_name}} --list-devices  # List detected receivers
-sudo ./{{executable_name}} --calibrate     # Run calibration mode
-```
 
 ## Troubleshooting
 
