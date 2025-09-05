@@ -45,6 +45,7 @@ echo "📋 Copying driver files..."
 [ -f "LICENSE" ] && cp LICENSE "${INSTALL_DIR}/"
 [ -f "VERSION" ] && cp VERSION "${INSTALL_DIR}/"
 [ -f "uninstall.sh" ] && cp uninstall.sh "${INSTALL_DIR}/"
+[ -f "build/pyproject.toml" ] && cp build/pyproject.toml "${INSTALL_DIR}/"
 [ -d "build" ] && cp -r build "${INSTALL_DIR}/"
 cp "${EXECUTABLE}" "${INSTALL_DIR}/"
 chmod +x "${INSTALL_DIR}/${EXECUTABLE}"
@@ -116,7 +117,7 @@ echo ""
 echo "🎯 Usage:"
 echo "  ${EXECUTABLE}  # Run the driver manually"
 
-(${INSTALL_DIR}/${EXECUTABLE} > ${HOME}/.${EXECUTABLE}-logs.txt 2>&1 &)
+(${INSTALL_DIR}/${EXECUTABLE} --daemonize > ${HOME}/.${EXECUTABLE}-logs.txt 2>&1 &)
 
 if [ "${GROUP_CHANGE_NEEDED:-false}" = true ]; then
     echo "⚠️  IMPORTANT: The driver will start automatically when you log in."
