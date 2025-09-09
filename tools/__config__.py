@@ -29,7 +29,7 @@ if sys.prefix == sys.base_prefix:
     if not (PROJECT_ROOT / ".venv").exists():
         print("Script must be run from a venv. Try the following first.")
         print(f"NOTE: Python version requirement -> {PYPROJECT['project']['requires-python']}")
-        print("python3 -m venv venv")
+        print("python3 -m venv .venv")
     else:
         print(
             "You appear to have a virtual environment setup correctly but the python runtime used "
