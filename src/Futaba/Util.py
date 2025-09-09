@@ -136,10 +136,13 @@ def parseJsonFile(filePath: Path | str) -> dict:
         dict: The parsed json
 
     """
-    parsedJson = None
-    with open(filePath, encoding="utf-8") as jsonFile:
-        parsedJson = json.load(jsonFile)
-    return parsedJson
+    try:
+        parsedJson = None
+        with open(filePath, encoding="utf-8") as jsonFile:
+            parsedJson = json.load(jsonFile)
+        return parsedJson
+    except Exception as e:
+        return None
 
 
 def interpolate(
