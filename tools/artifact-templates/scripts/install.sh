@@ -61,7 +61,7 @@ for profile in "${HOME}/.profile" "${HOME}/.bashrc" "${HOME}/.zshrc"; do
         header="Futaba RC Driver"
         if ! grep -q "^# ${header}$" "${profile}" 2>/dev/null; then
             echo "# ${header}" >> "${profile}"
-            echo "(${INSTALL_DIR}/${EXECUTABLE} > ${HOME}/.${EXECUTABLE}-logs.txt 2>&1 &)" >> "${profile}"
+            echo "(${INSTALL_DIR}/${EXECUTABLE} --daemonize > ${HOME}/.${EXECUTABLE}-logs.txt 2>&1 &)" >> "${profile}"
             echo "" >> "${profile}"
             echo "   📝 Added auto-start to $(basename "${profile}")"
         fi

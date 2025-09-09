@@ -168,7 +168,8 @@ if __name__ == "__main__":
 
         # Futaba.Driver.ProcessLock: Prevents multiple driver instances from running.
         # Futaba.DeviceManager: It's a futaba device manager...
-        with Futaba.Driver.ProcessLock(), Futaba.DeviceManager() as mgr:
+        with Futaba.Driver.ProcessLock():
+            mgr = Futaba.DeviceManager()
             if args.calibrate:
                 try:
                     curses.wrapper(calibrationMode, *(args, mgr))
