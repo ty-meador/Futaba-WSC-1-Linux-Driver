@@ -7,7 +7,9 @@ This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
 import asyncio
+import atexit
 import curses
+import socket
 import sys
 import time
 import traceback
@@ -199,6 +201,36 @@ def calibrationMode(
 
     calibrationWidget.generateFile(fileName)
     mgr.stopAll()
+
+
+class ProcessLock:
+    """Create a lock that prevents multiple driver instances."""
+    def lock(self):
+        """Lock the process to prevent multiple instances."""
+        # Socket-lock method
+        self.lockSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.lockSocket.bind(("127.0.0.1", self.lockPort))
+
+    def unlock(self):
+        """Unlock the process and release resources back to OS."""
+        if self.lockSocket:
+            self.lockSocket.close()
+            self.lockSocket = None
+
+    def __init__(self):
+        """Create a process lock."""
+        self.lockPort = 1962  # 🥚
+        self.lockSocket = None
+        atexit.register(self.unlock)
+
+    def __enter__(self):
+        """Enter."""
+        return self
+
+    def __exit__(self, exc_type, exc_value, stacktrace):
+        """Exit."""
+        self.unlock()
+        return self
 
 
 if __name__ == "__main__":
