@@ -49,6 +49,7 @@ class FutabaDeviceDriver:
             DriverState: The current state of the driver.
 
         """
+        # Refresh state before returning it
         if self.subProc is not None and self.subProc.is_alive():
             if self.workerCtl.runFlag.is_set():
                 self.state = DriverState.RUNNING
@@ -416,7 +417,6 @@ class ProcessLock:
 
     def __enter__(self):
         """Enter."""
-        self.lock()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):

@@ -57,8 +57,8 @@ def main():
 
         # Futaba.Driver.ProcessLock: Prevents multiple driver instances from running.
         # Futaba.DeviceManager: It's a futaba device manager...
+        mgr = Futaba.DeviceManager()
         with Futaba.Driver.ProcessLock():
-            mgr = Futaba.DeviceManager()
             if args.calibrate:
                 try:
                     curses.wrapper(calibrationMode, *(args, mgr))
@@ -73,21 +73,22 @@ def main():
                 loop.create_task(daemonMode(args, mgr))
                 loop.run_forever()
             else:
+                print("asdf")
                 choice = None
                 devList = mgr.listDevices()
                 keyList = list(map(lambda device: device["key"], devList))
+                print(keyList)
                 while choice not in keyList:
                     print(f"Found {len(devList)} Futaba devices")
                     print("Which one would you like to test?")
                     for device in devList:
                         print(f"{device['key']}: {device['name']}")
-                    choice = input("Choice: ")
+                    choice = int(input("Choice: "))
                 mgr.start(choice)
                 print("🏳️  Driver running, ctrl+c to quit")
 
                 while True:
                     time.sleep(0.1)  # Prevent busy waiting
-
     except OSError:
         print("🏁 Driver already running. Have Fun!")
     except KeyboardInterrupt:

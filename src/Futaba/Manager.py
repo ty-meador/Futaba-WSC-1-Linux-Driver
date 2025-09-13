@@ -208,7 +208,7 @@ class FutabaDeviceManager:
         return self
 
     @staticmethod
-    def _deviceIsRunning(futabaDeviceDriver: FutabaDeviceDriver) -> bool:
+    def _deviceIsRunning(driver: FutabaDeviceDriver) -> bool:
         """Determine if the provided driver is currently running or not.
 
         Args:
@@ -218,7 +218,7 @@ class FutabaDeviceManager:
             bool: True if the device has a subprocess
 
         """
-        return futabaDeviceDriver.getState() == DriverState.RUNNING
+        return driver.getState() == DriverState.RUNNING
 
     def _addDevice(self, device: usb.core.Device) -> None:
         """Index a new Futaba device

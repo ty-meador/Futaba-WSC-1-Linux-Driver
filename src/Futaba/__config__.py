@@ -3,8 +3,9 @@
 import json
 import logging
 import os
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 # Project structure
 PWD = Path(__file__).parent.resolve()
@@ -13,7 +14,6 @@ PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 
 # Load project configuration
 with open(PYPROJECT_PATH, "rb") as f:
-    """Load pyproject.toml file."""
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
 
@@ -36,26 +36,21 @@ EVENT_MIN_VAL: int = -32768
 EVENT_MID_VAL: int = 0
 EVENT_MAX_VAL: int = 32767
 
-DEFAULT_INPUT_RANGE: tuple[int, int, int] = tuple(
-    [
-        DEFAULT_DEVICE_MIN_VAL,
-        DEFAULT_DEVICE_MID_VAL,
-        DEFAULT_DEVICE_MAX_VAL,
-    ]
-)
+DEFAULT_INPUT_RANGE: tuple[int, int, int] = tuple([
+    DEFAULT_DEVICE_MIN_VAL,
+    DEFAULT_DEVICE_MID_VAL,
+    DEFAULT_DEVICE_MAX_VAL,
+])
 
-DEFAULT_OUTPUT_RANGE: tuple[int, int, int] = tuple(
-    [
-        EVENT_MIN_VAL,
-        EVENT_MID_VAL,
-        EVENT_MAX_VAL,
-    ]
-)
+DEFAULT_OUTPUT_RANGE: tuple[int, int, int] = tuple([
+    EVENT_MIN_VAL,
+    EVENT_MID_VAL,
+    EVENT_MAX_VAL,
+])
 
 FUTABA_VENDOR_ID: int = 4104  # 0x1008
 HID_INTERFACE: hex = 0x3  # conincidence
 INTERRUPT_ENDPOINT_ATTRIBUTE: hex = 0x3  # conincidence
-
 
 LOGLEVEL: int = logging.DEBUG
 DRIVER_PATH: Path = Path(__file__).resolve().parent
@@ -63,7 +58,7 @@ CONFIG_PATH: Path = DRIVER_PATH / "configs"
 CALIBRATION_PATH: Path = DRIVER_PATH / "calibrations"
 LOG_PATH: Path = DRIVER_PATH / "logs"
 
-with open(CONFIG_PATH / "_default.json") as f:
+with open(CONFIG_PATH / "_default.json", encoding="utf-8") as f:
     DEFAULT_CONFIG: dict = json.load(f)
 
 DEFAULT_CALIBRATION: list = [DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])]
