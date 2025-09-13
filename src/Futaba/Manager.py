@@ -97,11 +97,11 @@ class FutabaDeviceManager:
 
         # Add new devices
         for device in foundDevices:
-            if device not in self._futabaCoreDevices:
+            if device not in self._devices:
                 self._addDevice(device)
 
         # Remove devices that are no longer present
-        for device in self._futabaCoreDevices:
+        for device in self._devices:
             if device not in foundDevices:
                 self._removeDevice(device)
         return self.listDevices()
@@ -173,7 +173,7 @@ class FutabaDeviceManager:
             list[dict]: A list of available devices.
 
         """
-        for device, driver in zip(self._futabaCoreDevices, self._drivers):
+        for device, driver in zip(self._devices, self._drivers):
             if driver.getState() == DriverState.RUNNING:
                 driver.stop()
             self._removeDevice(device)
@@ -186,11 +186,11 @@ class FutabaDeviceManager:
             RuntimeError: Raised if no Futaba USB devices are detected
 
         """
-        self._futabaCoreDevices = [
+        self._devices = [
             device for device in usb.core.find(find_all=True)
             if FutabaDeviceDriver.deviceIsSupported(device)
         ]
-        self._drivers = [FutabaDeviceDriver(device) for device in self._futabaCoreDevices]
+        self._drivers = [FutabaDeviceDriver(device) for device in self._devices]
 
         if len(self._drivers) == 0:
             raise DeviceNotFoundError
@@ -226,9 +226,9 @@ class FutabaDeviceManager:
         Args:
             device (usb.core.Device): The core device to index
         """
-        assert len(self._futabaCoreDevices) == len(self._drivers), "driver/device count mismatch"
-        if device not in self._futabaCoreDevices:
-            self._futabaCoreDevices.append(device)
+        assert len(self._devices) == len(self._drivers), "driver/device count mismatch"
+        if device not in self._devices:
+            self._devices.append(device)
             self._drivers.append(FutabaDeviceDriver(device))
 
     def _removeDevice(self, device: usb.core.Device) -> None:
@@ -237,13 +237,13 @@ class FutabaDeviceManager:
         Args:
             device (usb.core.Device): The core device to remove from the index
         """
-        assert len(self._futabaCoreDevices) == len(self._drivers), "driver/device count mismatch"
+        assert len(self._devices) == len(self._drivers), "driver/device count mismatch"
         # Safely clean up after ourselves here
         # Value errors raised if the device to remove doesn't exist, so we ignore them
         with suppress(ValueError):
             # Get index of driver or raise a value error, which we can safely ignore and
             # return from.
-            idx = self._futabaCoreDevices.index(device)
+            idx = self._devices.index(device)
             self.stop(idx)  # Ensure driver is stopped
-            del self._futabaCoreDevices[idx]  # Remove from our index
+            del self._devices[idx]  # Remove from our index
             del self._drivers[idx]
