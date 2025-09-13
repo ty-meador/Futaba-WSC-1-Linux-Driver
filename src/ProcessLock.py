@@ -1,9 +1,10 @@
+"""Module for preventing duplicate processes."""
 import atexit
 import socket
 
 
 class LockNotAcquired(Exception):
-    """Presents a class based representation of a failure to acquire a lock"""
+    """Exception which represents a failure to acquire a process lock"""
     def __init__(self, message):
         super().__init__(message)
 
@@ -16,7 +17,7 @@ class ProcessLock:
         try:
             self.lockSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.lockSocket.bind(("127.0.0.1", self.lockPort))
-        except OSError as e:
+        except Exception as e:
             raise LockNotAcquired(
                 "Unable to obtain process lock, driver is likely already running"
             ) from e
