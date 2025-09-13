@@ -13,6 +13,7 @@ futaba-rc-driver
 *\.txt.*
 *logs/*
 *.egg*
+.vscode
 
 # Ignore all files in calibrations directory except those starting with underscore and ending in .json
 # (users custom calibration files)
