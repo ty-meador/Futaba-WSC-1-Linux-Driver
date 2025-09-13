@@ -201,3 +201,7 @@ def calibrationMode(
 
     calibrationWidget.generateFile(fileName)
     mgr.stopAll()
+
+
+if __name__ == "__main__":
+    main()
