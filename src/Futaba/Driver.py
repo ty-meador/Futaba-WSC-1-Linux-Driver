@@ -4,20 +4,19 @@ import atexit
 import multiprocessing
 import os
 import socket
-from enum import Enum, auto
+from enum import Enum
+from enum import auto
 from typing import Any
 
 import usb
 
 from . import Util as utils
 from . import Worker
-from .__config__ import (
-    CALIBRATION_PATH,
-    CONFIG_PATH,
-    DEFAULT_CALIBRATION,
-    DEFAULT_CONFIG,
-    FUTABA_VENDOR_ID,
-)
+from .__config__ import CALIBRATION_PATH
+from .__config__ import CONFIG_PATH
+from .__config__ import DEFAULT_CALIBRATION
+from .__config__ import DEFAULT_CONFIG
+from .__config__ import FUTABA_VENDOR_ID
 from .InputChannel import InputChannel
 from .IPC import WorkerControl
 
@@ -33,7 +32,6 @@ class DriverState(Enum):
 
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device."""
-
     def disableEcho(self):
         """Disable input echoing."""
         if self.workerCtl.echoFlag.is_set():
@@ -102,20 +100,18 @@ class FutabaDeviceDriver:
 
     def toDict(self) -> dict[str, Any]:
         """Create a dictionary representation of this driver."""
-        return dict(
-            {
-                "config": self.config,
-                "deviceChannels": len(self.deviceChannels),
-                "deviceUUID": self.deviceUUID,
-                "interruptEndpoint": self.interruptEndpoint,
-                "productName": self.productName,
-                "productID": self.productID,
-                "manufacturer": self.manufacturer,
-                "name": self.name,
-                "serialNumber": self.serialNumber,
-                "speed": self.speed,
-            }
-        )
+        return dict({
+            "config": self.config,
+            "deviceChannels": len(self.deviceChannels),
+            "deviceUUID": self.deviceUUID,
+            "interruptEndpoint": self.interruptEndpoint,
+            "productName": self.productName,
+            "productID": self.productID,
+            "manufacturer": self.manufacturer,
+            "name": self.name,
+            "serialNumber": self.serialNumber,
+            "speed": self.speed,
+        })
 
     def toggleEcho(
         self,
@@ -126,9 +122,6 @@ class FutabaDeviceDriver:
         else:
             self.workerCtl.echoFlag.set()
 
-    ##
-    # Private Methods
-    ##
     def _loadConfig(self, productName: str) -> dict[str, Any]:
         """Load the device config.
 
@@ -146,17 +139,17 @@ class FutabaDeviceDriver:
         filePath = os.path.join(CONFIG_PATH, f"_{productName}.json")
         defaultPath = os.path.join(CONFIG_PATH, "_default.json")
 
-        self.logger.debug(f"loading {filePath}")
+        self.logger.debug("loading %s", filePath)
         config = utils.parseJsonFile(filePath)
 
         if config is None:
-            self.logger.debug(f"device config not found, loading {defaultPath}")
+            self.logger.debug("device config not found, loading %s", defaultPath)
             config = utils.parseJsonFile(defaultPath)
         if config is None:
             self.logger.debug("using hard-coded defaults")
             config = DEFAULT_CONFIG
 
-        self.logger.debug(f"config={config}")
+        self.logger.debug("config=%s", config)
         return config
 
     def _loadCalibration(self, productName: str, deviceUUID: str) -> list[list[int]]:
@@ -175,17 +168,17 @@ class FutabaDeviceDriver:
         defaultPath = os.path.join(CALIBRATION_PATH, "_default.json")
 
         # Load custom calibration if it exists
-        self.logger.debug(f"loading {filePath}")
+        self.logger.debug("loading %s", filePath)
         channelCalibrations = utils.parseJsonFile(filePath)
 
         # If that fails, load the default calibration file for this product
         if channelCalibrations is None:
-            self.logger.debug(f"loading {defaultProductPath}")
+            self.logger.debug("loading %s", defaultProductPath)
             channelCalibrations = utils.parseJsonFile(defaultProductPath)
 
         # If that fails, load the global default config file
         if channelCalibrations is None:
-            self.logger.debug(f"loading {defaultPath}")
+            self.logger.debug("loading %s", defaultPath)
             channelCalibrations = utils.parseJsonFile(defaultPath)
 
         # If that fails, use the hard-coded values
@@ -193,7 +186,7 @@ class FutabaDeviceDriver:
             self.logger.debug("using hard-coded defaults")
             channelCalibrations = DEFAULT_CALIBRATION
 
-        self.logger.debug(f"channelCalibrations={channelCalibrations}")
+        self.logger.debug("channelCalibrations=%s", channelCalibrations)
         return channelCalibrations
 
     def _toSubprocTuple(
@@ -211,24 +204,19 @@ class FutabaDeviceDriver:
             tuple: The tuple that you will pass to the worker function
 
         """
-        return tuple(
-            [
-                self.workerCtl,
-                utils.DeviceConfig(
-                    channelEvents=self.config["channel_events"],
-                    deadZone=self.config["dead_zone"],
-                    frameSize=self.config["frame_size"],
-                    noiseFilter=self.config["noise_filter"],
-                ),
-                tuple([channel.toDict() for channel in self.deviceChannels]),
-                self.name,
-                self.interruptEndpoint,
-            ]
-        )
+        return tuple([
+            self.workerCtl,
+            utils.DeviceConfig(
+                channelEvents=self.config["channel_events"],
+                deadZone=self.config["dead_zone"],
+                frameSize=self.config["frame_size"],
+                noiseFilter=self.config["noise_filter"],
+            ),
+            tuple([channel.toDict() for channel in self.deviceChannels]),
+            self.name,
+            self.interruptEndpoint,
+        ])
 
-    ##
-    # Magic Methods
-    ##
     def __init__(self, device: usb.core.Device) -> None:
         """Create an object that drives a single device on it's own process.
 
@@ -247,18 +235,14 @@ class FutabaDeviceDriver:
 
         self.endpoint = utils.findInterruptEndpoint(device)
 
-        self.deviceInfo = (
-            {
-                "productID": device.idProduct,
-                "serialNumber": device.serial_number,
-                "product": device.product,
-                "manufacturer": device.manufacturer,
-                "speed": device.speed,
-                "interruptEndpoint": self.endpoint,
-            }
-            if device
-            else None
-        )
+        self.deviceInfo = ({
+            "productID": device.idProduct,
+            "serialNumber": device.serial_number,
+            "product": device.product,
+            "manufacturer": device.manufacturer,
+            "speed": device.speed,
+            "interruptEndpoint": self.endpoint,
+        } if device else None)
 
         if self.endpoint is None:
             raise TypeError("Unable to find interrupt endpoint for device")
@@ -315,9 +299,6 @@ class FutabaDeviceDriver:
         """Destructor."""
         self.stop()
 
-    ##
-    # Static Methods
-    ##
     @staticmethod
     def deviceIsSupported(coreDevice: usb.core.Device) -> bool:
         """Determine if the device is compatable with this driver class.
@@ -339,9 +320,6 @@ class FutabaDeviceDriver:
             and utils.findInterruptEndpoint(coreDevice) is not None
         )
 
-    ##
-    # Class Properties
-    ##
     @property
     def deadZone(self) -> int:
         """The size of the dead zone for the device.
@@ -418,13 +396,6 @@ class FutabaDeviceDriver:
 
 class ProcessLock:
     """Create a lock that prevents multiple driver instances."""
-
-    def __init__(self):
-        """Create a process lock."""
-        self.lockPort = 1962  # 🥚
-        self.lockSocket = None
-        atexit.register(self.unlock)
-
     def lock(self):
         """Lock the process to prevent multiple instances."""
         # Socket-lock method
@@ -436,6 +407,12 @@ class ProcessLock:
         if self.lockSocket:
             self.lockSocket.close()
             self.lockSocket = None
+
+    def __init__(self):
+        """Create a process lock."""
+        self.lockPort = 1962  # 🥚
+        self.lockSocket = None
+        atexit.register(self.unlock)
 
     def __enter__(self):
         """Enter."""

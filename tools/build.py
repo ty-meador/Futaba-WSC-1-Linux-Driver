@@ -69,8 +69,6 @@ def buildExecutable():
         "--remove-output",
         f"--jobs={jobs}",
         "--lto=yes",
-        "--enable-plugin=anti-bloat",
-        "--enable-plugin=implicit-imports",
         "--include-package=Futaba",
         "--include-package=usb",
         "--include-package=uinput",
