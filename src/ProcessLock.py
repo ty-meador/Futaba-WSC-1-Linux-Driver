@@ -1,5 +1,6 @@
 """Module for preventing duplicate processes."""
 import atexit
+import errno
 import socket
 
 
@@ -7,6 +8,10 @@ class LockNotAcquired(Exception):
     """Exception which represents a failure to acquire a process lock"""
     def __init__(self, message):
         super().__init__(message)
+
+
+class DuplicateProcess(LockNotAcquired):
+    """Exception which should be raised if the process is already running"""
 
 
 class ProcessLock:
@@ -17,10 +22,12 @@ class ProcessLock:
         try:
             self.lockSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.lockSocket.bind(("127.0.0.1", self.lockPort))
-        except Exception as e:
-            raise LockNotAcquired(
-                "Unable to obtain process lock, driver is likely already running"
-            ) from e
+        except OSError as e:
+            if e.errno == errno.EADDRINUSE:
+                raise DuplicateProcess(
+                    "Unable to obtain process lock, driver is likely already running"
+                ) from e
+            raise e
 
     def unlock(self):
         """Unlock the process and release resources back to OS."""
