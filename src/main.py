@@ -6,14 +6,14 @@ This program comes with ABSOLUTELY NO WARRANTY;.
 This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
-
 import asyncio
+import atexit
 import curses
+import socket
 import sys
 import time
 import traceback
 from argparse import ArgumentParser
-from argparse import Namespace
 from contextlib import suppress
 from pathlib import Path
 
@@ -44,33 +44,33 @@ parser.add_argument("--daemonize", action="store_true", help="Run as a backgroun
 parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
 parser.add_argument("--port", help="The port of the device you want start a driver for")
 parser.add_argument("--version", action="store_true", help="Get driver version")
+ARGS = parser.parse_args()
 
 
 def main():
     """Project entrypoint."""
-    args = parser.parse_args()
     try:
         # No reason to proceed if all they want is the version.
-        if args.version:
+        if ARGS.version:
             print(PYPROJECT["project"]["version"])
             sys.exit(0)
 
         # Futaba.Driver.ProcessLock: Prevents multiple driver instances from running.
         # Futaba.DeviceManager: It's a futaba device manager...
         mgr = Futaba.DeviceManager()
-        with Futaba.Driver.ProcessLock():
-            if args.calibrate:
+        with ProcessLock():
+            if ARGS.calibrate:
                 try:
-                    curses.wrapper(calibrationMode, *(args, mgr))
+                    curses.wrapper(calibrationMode, *(ARGS, mgr))
                 except Exception:
                     # Make sure we get a stack trace from curses
                     traceback.print_exc()
                     raise
                 print("Calibration complete!")
                 sys.exit(0)
-            elif args.daemonize:
+            elif ARGS.daemonize:
                 loop = asyncio.new_event_loop()
-                loop.create_task(daemonMode(args, mgr))
+                loop.create_task(daemonMode(mgr))
                 loop.run_forever()
             else:
                 print("asdf")
@@ -95,11 +95,11 @@ def main():
         print("🏴 Driver stopped")
 
 
-async def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
+async def daemonMode(mgr: Futaba.DeviceManager) -> None:
     """Run the driver in cli-mode.
 
     Args:
-        args (argparse.ArgumentParser.arg): Arguments passed to the cli
+        ARGS (argparse.ArgumentParser.arg): Arguments passed to the cli
         mgr (Futaba.DeviceManager): The global device manager
 
     Raises:
@@ -114,7 +114,6 @@ async def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
 
 def calibrationMode(
     parentScreen: curses.window,
-    args: Namespace,
     mgr: Futaba.DeviceManager,
 ) -> None:
     """Run the driver with a text mode ui."""
@@ -200,6 +199,36 @@ def calibrationMode(
 
     calibrationWidget.generateFile(fileName)
     mgr.stopAll()
+
+
+class ProcessLock:
+    """Create a lock that prevents multiple driver instances."""
+    def lock(self):
+        """Lock the process to prevent multiple instances."""
+        # Socket-lock method
+        self.lockSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.lockSocket.bind(("127.0.0.1", self.lockPort))
+
+    def unlock(self):
+        """Unlock the process and release resources back to OS."""
+        if self.lockSocket:
+            self.lockSocket.close()
+            self.lockSocket = None
+
+    def __init__(self):
+        """Create a process lock."""
+        self.lockPort = 1962  # 🥚
+        self.lockSocket = None
+        atexit.register(self.unlock)
+
+    def __enter__(self):
+        """Enter."""
+        return self
+
+    def __exit__(self, exc_type, exc_value, stacktrace):
+        """Exit."""
+        self.unlock()
+        return self
 
 
 if __name__ == "__main__":
