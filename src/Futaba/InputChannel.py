@@ -1,11 +1,11 @@
 """Classes for handling input channels."""
 
+from __future__ import annotations
 import array
 import logging
 import sys
 import typing
 from dataclasses import dataclass, field
-from typing import Any
 
 from . import Util as utils
 from .__config__ import DEFAULT_INPUT_RANGE, DEFAULT_OUTPUT_RANGE
@@ -15,7 +15,7 @@ class ChannelDict(typing.TypedDict):
     """Stores information for a single input channel."""
 
     eventName: str
-    valueMap: array.array
+    valueMap: array.array[int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,12 +72,12 @@ class ChannelCalibration:
 
     """
 
-    inputRange: typing.Iterable = field(default_factory=lambda: DEFAULT_INPUT_RANGE)
-    outputRange: typing.Iterable = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
+    inputRange: typing.Iterable[int] = field(default_factory=lambda: DEFAULT_INPUT_RANGE)
+    outputRange: typing.Iterable[int] = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
 
     logger: logging.Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
-    valueMap: array.array = field(init=False, repr=False)
+    valueMap: array.array[int] = field(init=False, repr=False)
     valueMapSize: int = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -118,7 +118,7 @@ class ChannelCalibration:
         inputRange: typing.Iterable[int],
         outputRange: typing.Iterable[int],
         reverse: bool = False,
-    ) -> array.array:
+    ) -> array.array[int]:
         """Generate a list of values that maps the input range to the output range.
 
         Args:
@@ -182,7 +182,7 @@ class InputChannel:
     calibrationRange: typing.Iterable[int]
     isReversed: bool = False
     logger: object = field(default_factory=lambda: utils.newLogger("InputChannel"))
-    valueMap: array.array = field(default_factory=lambda: [])
+    valueMap: array.array[int] = field(default_factory=lambda: array.array('i'))
     calibration: ChannelCalibration | None = None
 
     def __post_init__(self) -> None:
@@ -211,12 +211,14 @@ class InputChannel:
             bool: True if the channels are equal, false otherwise.
 
         """
+        if not isinstance(other, InputChannel):
+            return False
         return hasattr(other, "eventName") and self.eventName == other.eventName
 
     def __hash__(self) -> int:
         """Determine the objects hash."""
         return hash(self.toDict())
 
-    def toDict(self) -> dict[str, Any]:
+    def toDict(self) -> ChannelDict:
         """Generate a dictionary representation of this input channel."""
         return ChannelDict(eventName=self.eventName, valueMap=self.valueMap)
