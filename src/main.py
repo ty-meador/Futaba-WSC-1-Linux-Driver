@@ -73,7 +73,6 @@ def main():
                 loop.create_task(daemonMode(mgr))
                 loop.run_forever()
             else:
-                print("asdf")
                 choice = None
                 devList = mgr.listDevices()
                 keyList = list(map(lambda device: device["key"], devList))
