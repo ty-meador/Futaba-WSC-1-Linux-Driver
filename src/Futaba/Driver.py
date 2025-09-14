@@ -82,7 +82,7 @@ class FutabaDeviceDriver:
     def stop(self) -> None:
         """Stop the driver and kill the subprocess."""
         # It's possible for the constructor to fail before one or any of these are instantiated
-        if hasattr(self, "workerCtl.killswitch") and not self.workerCtl.killswitch.is_set():
+        if hasattr(self, "workerCtl") and hasattr(self.workerCtl, "killswitch") and not self.workerCtl.killswitch.is_set():
             self.workerCtl.killswitch.set()
         # Give the worker up to 1 second to shut down gracefully
         if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
@@ -230,10 +230,11 @@ class FutabaDeviceDriver:
         ##
         # meta-stuff
         ##
-
         self.state = DriverState.INITIALIZING
 
         self.endpoint = utils.findInterruptEndpoint(device)
+        if self.endpoint is None:
+            raise TypeError("Unable to find interrupt endpoint for device")
 
         self.deviceInfo = ({
             "productID": device.idProduct,
@@ -243,9 +244,6 @@ class FutabaDeviceDriver:
             "speed": device.speed,
             "interruptEndpoint": self.endpoint,
         } if device else None)
-
-        if self.endpoint is None:
-            raise TypeError("Unable to find interrupt endpoint for device")
 
         self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
         ##
