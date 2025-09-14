@@ -1,9 +1,8 @@
-"""Driver for Futaba RC to USB adapters."""
+"""Driver for Futaba RC USB devices."""
 
 import atexit
 import multiprocessing
 import os
-import socket
 from enum import Enum
 from enum import auto
 from typing import Any

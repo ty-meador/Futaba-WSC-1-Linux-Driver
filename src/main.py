@@ -7,9 +7,7 @@ This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
 import asyncio
-import atexit
 import curses
-import socket
 import sys
 import time
 import traceback
@@ -18,11 +16,11 @@ from contextlib import suppress
 from pathlib import Path
 
 import tomllib
+from ProcessLock import LockNotAcquired
+from ProcessLock import ProcessLock
 
 import Futaba
 import UI
-from ProcessLock import LockNotAcquired
-from ProcessLock import ProcessLock
 
 # Project structure
 PWD = Path(__file__).parent.resolve()

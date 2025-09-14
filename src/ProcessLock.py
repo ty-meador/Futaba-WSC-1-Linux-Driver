@@ -36,17 +36,14 @@ class ProcessLock:
             self.lockSocket = None
 
     def __init__(self):
-        """Create a process lock."""
         self.lockPort = 1962  # 🥚
         self.lockSocket = None
         atexit.register(self.unlock)
 
     def __enter__(self):
-        """Enter."""
         self.lock()
         return self
 
     def __exit__(self, exc_type, exc_value, stacktrace):
-        """Exit."""
         self.unlock()
         return self
