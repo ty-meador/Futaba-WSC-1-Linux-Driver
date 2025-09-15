@@ -3,7 +3,7 @@
 
 from .InputChannel import ChannelDict
 from .IPC import DataFrame, WorkerControl
-from .Util import DeviceConfig
+from .__config__ import DeviceConfig
 
 
 ##

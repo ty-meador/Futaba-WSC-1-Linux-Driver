@@ -6,6 +6,7 @@ import os
 from enum import Enum
 from enum import auto
 from typing import Any
+from multiprocessing.connection import Connection
 
 import usb
 from . import Util as utils
@@ -225,20 +226,20 @@ class FutabaDeviceDriver:
         ##
         # meta-stuff
         ##
-        self.state = DriverState.INITIALIZING
+        self.state: DriverState = DriverState.INITIALIZING
 
-        self.endpoint = utils.findInterruptEndpoint(device)
+        self.endpoint: int | None = utils.findInterruptEndpoint(device)
         if self.endpoint is None:
             raise TypeError("Unable to find interrupt endpoint for device")
 
-        self.deviceInfo = ({
+        self.deviceInfo: dict[str, Any] = {
             "productID": device.idProduct,
             "serialNumber": device.serial_number,
             "product": device.product,
             "manufacturer": device.manufacturer,
             "speed": device.speed,
             "interruptEndpoint": self.endpoint,
-        } if device else None)
+        }
 
         self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
         ##
@@ -273,7 +274,7 @@ class FutabaDeviceDriver:
             bool: True if the devices have the same interrupt endpoint address
 
         """
-        return hasattr(other, "endpoint") and self.endpoint == other.endpoint
+        return isinstance(other, FutabaDeviceDriver) and self.endpoint == other.endpoint
 
     def __hash__(self) -> int:
         """Generate a has for this object.
@@ -362,7 +363,7 @@ class FutabaDeviceDriver:
         return self.config["noise_filter"]
 
     @property
-    def pipe(self) -> multiprocessing.Pipe:
+    def pipe(self) -> Connection:
         """A duple pipe providing real-time communication to the running driver."""
         return self.frontPipe
 

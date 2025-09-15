@@ -7,14 +7,13 @@ import logging
 import os
 import re
 from logging.handlers import RotatingFileHandler
-from typing import Any, Optional
+from typing import Any
 import usb
-from usb.core import Device
-from __config__ import FUTABA_VENDOR_ID, LOG_PATH
+from __config__ import FUTABA_VENDOR_ID, LOG_PATH, PWD, INTERRUPT_ENDPOINT_ATTRIBUTE
 from .InputChannel import InputChannel
 
 
-def findEndpointDevice(endpoint: int) -> Optional[Device]:
+def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
     """Get the core USB device handle that has the provided enpoint.
 
     Args:
@@ -37,7 +36,7 @@ def findEndpointDevice(endpoint: int) -> Optional[Device]:
     return results[0]
 
 
-def findInterruptEndpoint(device: Device) -> int:
+def findInterruptEndpoint(device: usb.core.Device) -> int | None:
     """Take in a device and returns is interrupt enpoint address.
 
     Args:
@@ -59,7 +58,7 @@ def findInterruptEndpoint(device: Device) -> int:
                     and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
                 ):
                     return endpoint.bEndpointAddress
-    raise RuntimeError("No interrupt endpoint found!")
+    return None
 
 
 # DEFAULT_LOG_HANDLER: logging.handlers.RotatingFileHandler = handlers.RotatingFileHandler(
@@ -211,7 +210,7 @@ class CalibrationWidget:
 
     def __init__(self) -> None:
         """Create a Channel calibrator."""
-        self.knownChannels: dict[str, list[int]] = {}
+        self.knownChannels: dict[tuple[int, int], InputChannel]
 
     def _defaultBounds(self, default: int | None = None) -> dict[str, int | None]:
         return {"min": default, "mid": default, "max": default}
