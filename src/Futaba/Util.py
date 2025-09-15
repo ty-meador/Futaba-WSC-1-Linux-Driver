@@ -10,7 +10,6 @@ from logging.handlers import RotatingFileHandler
 from typing import Any
 import usb
 from __config__ import FUTABA_VENDOR_ID, LOG_PATH, PWD, INTERRUPT_ENDPOINT_ATTRIBUTE
-from .InputChannel import InputChannel
 
 
 def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
@@ -166,7 +165,7 @@ def interpolate(
 
 class CalibrationWidget:
     """Generates a channel calibration for the running device."""
-    def minMax(self, channel: InputChannel, rawV: int) -> None:
+    def minMax(self, channel: Any, rawV: int) -> None:
         """Process value as min/max.
 
         If the provided value is a new high or low value for the given channel then the min or max
@@ -185,7 +184,7 @@ class CalibrationWidget:
         elif rawV > self.knownChannels[channel]["max"]:
             self.knownChannels[channel]["max"] = rawV
 
-    def mid(self, channel, rawV) -> None:
+    def mid(self, channel: Any, rawV: int) -> None:
         """Set the mid point for the given channel.
 
         Args:
@@ -207,19 +206,18 @@ class CalibrationWidget:
 
     def __init__(self) -> None:
         """Create a Channel calibrator."""
-        self.knownChannels: dict[tuple[int, int], InputChannel]
+        self.knownChannels: dict[tuple[int, int], dict[str, int]] = {}
 
-    def _defaultBounds(self, default: int | None = None) -> dict[str, int | None]:
+    def _defaultBounds(self, default: int) -> dict[str, int]:
         return {"min": default, "mid": default, "max": default}
 
     def _generateCalibration(self) -> list[list[int]]:
         """Generate the devices calibration object."""
-        container = []
+        container: list[list[int]] = []
         for channelData in self.knownChannels.values():
             # Account for channels that might not be used by the transmitter
-            # FIXME - We have to do this because the interpolation function used to generate the
+            # We have to do this because the interpolation function used to generate the
             # calibrated value map requires an ascending input range to be considered "sane".
-            # TODO - Think of a better way
             if channelData["min"] == channelData["mid"] == channelData["max"]:
                 channelData["min"] = channelData["mid"] - 1
                 channelData["max"] = channelData["mid"] + 1
