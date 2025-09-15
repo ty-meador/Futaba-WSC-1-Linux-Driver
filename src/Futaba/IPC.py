@@ -1,10 +1,11 @@
 """Inter-process communication tools."""
 
-import multiprocessing
+from __future__ import annotations
+from multiprocessing import Event
+from multiprocessing.synchronize import Event as EventType
+from multiprocessing.connection import Connection
 from dataclasses import dataclass, field
 
-
-##
 # Data Classes
 ##
 @dataclass(slots=True, frozen=True)
@@ -24,7 +25,7 @@ class DataFrame:
 class WorkerControl:
     """Effecient picklable wrapper for worker inter-process communication methods."""
 
-    pipe: multiprocessing.Pipe
-    killswitch: multiprocessing.Event = field(default_factory=multiprocessing.Event)
-    runFlag: multiprocessing.Event = field(default_factory=multiprocessing.Event)
-    echoFlag: multiprocessing.Event = field(default_factory=multiprocessing.Event)
+    pipe: Connection
+    killswitch: EventType = field(default_factory=Event)
+    runFlag: EventType = field(default_factory=Event)
+    echoFlag: EventType = field(default_factory=Event)

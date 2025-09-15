@@ -1,39 +1,20 @@
 """Contains atomic utility functions for the project."""
-
+from __future__ import annotations
+import array
 import bisect
 import json
 import logging
 import os
 import re
-import typing
-from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
-
+from typing import Any, Optional
 import usb
-
-from .__config__ import (
-    DEFAULT_CONFIG,
-    DEFAULT_DEADZONE,
-    DEFAULT_NOISE_FILTER,
-    FUTABA_VENDOR_ID,
-    INTERRUPT_ENDPOINT_ATTRIBUTE,
-    LOG_PATH,
-    PWD,
-)
+from usb.core import Device
+from __config__ import FUTABA_VENDOR_ID, LOG_PATH
+from .InputChannel import InputChannel
 
 
-@dataclass(frozen=True, slots=True)
-class DeviceConfig:
-    """Stores the configuration settings for a single device."""
-
-    channelEvents: list[str] = field(default_factory=lambda: DEFAULT_CONFIG["channel_events"])
-    deadZone: int = DEFAULT_DEADZONE
-    frameSize: int = field(default_factory=lambda: DEFAULT_CONFIG["frame_size"])
-    noiseFilter: int = DEFAULT_NOISE_FILTER
-
-
-def findEndpointDevice(endpoint: int) -> usb.core.Device | bool:
+def findEndpointDevice(endpoint: int) -> Optional[Device]:
     """Get the core USB device handle that has the provided enpoint.
 
     Args:
@@ -52,11 +33,11 @@ def findEndpointDevice(endpoint: int) -> usb.core.Device | bool:
     ]
 
     if len(results) != 1:
-        return False
+        return None
     return results[0]
 
 
-def findInterruptEndpoint(device: usb.core.Device) -> int:
+def findInterruptEndpoint(device: Device) -> int:
     """Take in a device and returns is interrupt enpoint address.
 
     Args:
@@ -70,8 +51,6 @@ def findInterruptEndpoint(device: usb.core.Device) -> int:
         int: The endpoint object used to capture frames from the physical device
 
     """
-    if not isinstance(device, usb.core.Device):
-        raise ValueError("Expected first param to be of type usb.core.Device")
     for config in device:
         for interface in config:
             for endpoint in interface:
@@ -126,7 +105,7 @@ def newLogger(
     return logger
 
 
-def parseJsonFile(filePath: Path | str) -> dict:
+def parseJsonFile(filePath:  str) -> Any:
     """Load a JSON file into a dictionary.
 
     Args:
@@ -136,19 +115,16 @@ def parseJsonFile(filePath: Path | str) -> dict:
         dict: The parsed json
 
     """
-    try:
-        parsedJson = None
-        with open(filePath, encoding="utf-8") as jsonFile:
-            parsedJson = json.load(jsonFile)
-        return parsedJson
-    except Exception as e:
-        return None
+    parsedJson = None
+    with open(filePath, encoding="utf-8") as jsonFile:
+        parsedJson = json.load(jsonFile)
+    return parsedJson
 
 
 def interpolate(
-    xVals: typing.Iterable[int],
-    xPoints: typing.Iterable[int],
-    yPoints: typing.Iterable[int],
+    xVals: array.array[int],
+    xPoints: array.array[int],
+    yPoints: array.array[int],
     left: int | None = None,
     right: int | None = None,
 ) -> list[int]:
@@ -164,7 +140,7 @@ def interpolate(
     Returns:
         List of interpolated integer values
     """
-    result = []
+    result: list[int] = []
 
     for x in xVals:
         # Handle boundary conditions
@@ -194,7 +170,7 @@ def interpolate(
 class CalibrationWidget:
     """Generates a channel calibration for the running device."""
 
-    def minMax(self, channel, rawV) -> None:
+    def minMax(self, channel: InputChannel, rawV: int) -> None:
         """Process value as min/max.
 
         If the provided value is a new high or low value for the given channel then the min or max
@@ -235,12 +211,12 @@ class CalibrationWidget:
 
     def __init__(self) -> None:
         """Create a Channel calibrator."""
-        self.knownChannels = {}
+        self.knownChannels: dict[str, list[int]] = {}
 
-    def _defaultBounds(self, default=None) -> dict[str, int]:
+    def _defaultBounds(self, default: int | None = None) -> dict[str, int | None]:
         return {"min": default, "mid": default, "max": default}
 
-    def _generateCalibration(self) -> list[list]:
+    def _generateCalibration(self) -> list[list[int]]:
         """Generate the devices calibration object."""
         container = []
         for channelData in self.knownChannels.values():

@@ -1,11 +1,13 @@
 """Module provides a simple interface to spawn and manage multiple Futaba RC to USB adapters."""
-
+from __future__ import annotations
 import atexit
-import multiprocessing
+
+from multiprocessing.connection import Connection
 from contextlib import suppress
 
 import usb
-
+from usb.core import Device
+from typing import Any
 from . import Util as utils
 from .Driver import DriverState
 from .Driver import FutabaDeviceDriver
@@ -14,7 +16,7 @@ from .Error import DeviceNotFoundError
 
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
-    def findDevice(self, endpoint: int | None = None) -> usb.core.Device | None:
+    def findDevice(self, endpoint: int | None = None) -> Device | None:
         """Find the Futaba device that has the provided endpoint.
 
         Args:
@@ -50,7 +52,7 @@ class FutabaDeviceManager:
             self.logger.warning(e)
             return None
 
-    def deviceInfo(self, deviceIndex: int, prop: str) -> str | int:
+    def deviceInfo(self, deviceIndex: int, prop: str) -> Any:
         """Get a property value of the specified device.
 
         Args:
@@ -60,12 +62,9 @@ class FutabaDeviceManager:
         Returns:
             str|int: The specified attributes value from the specified device.
         """
-        try:
-            return getattr(self._drivers[deviceIndex], prop)
-        except Exception:
-            return None
+        return getattr(self._drivers[deviceIndex], prop)
 
-    def getPipe(self, deviceIndex: int) -> multiprocessing.Pipe:
+    def getPipe(self, deviceIndex: int) -> Connection:
         """Get a duplex pipe for real-time driver communication.
 
         Args:
@@ -77,7 +76,7 @@ class FutabaDeviceManager:
         self._drivers[deviceIndex].enableEcho()
         return self._drivers[deviceIndex].pipe
 
-    def listDevices(self) -> list[dict]:
+    def listDevices(self) -> list[dict[Any, ...]]:
         """Get an ordered list of available devices.
 
         Returns:

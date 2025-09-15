@@ -8,7 +8,6 @@ from enum import auto
 from typing import Any
 
 import usb
-
 from . import Util as utils
 from . import Worker
 from .__config__ import CALIBRATION_PATH
@@ -16,7 +15,8 @@ from .__config__ import CONFIG_PATH
 from .__config__ import DEFAULT_CALIBRATION
 from .__config__ import DEFAULT_CONFIG
 from .__config__ import FUTABA_VENDOR_ID
-from .InputChannel import InputChannel
+from .__config__ import DeviceConfig
+from .InputChannel import InputChannel, ChannelDict
 from .IPC import WorkerControl
 
 
@@ -152,7 +152,7 @@ class FutabaDeviceDriver:
         self.logger.debug("config=%s", config)
         return config
 
-    def _loadCalibration(self, productName: str, deviceUUID: str) -> list[list[int]]:
+    def _loadCalibration(self, productName: str, deviceUUID: str) -> list[tuple[int, ...]]:
         """Load the calibration file for the given product.
 
         Args:
@@ -191,22 +191,17 @@ class FutabaDeviceDriver:
 
     def _toSubprocTuple(
         self,
-    ) -> tuple[
-        WorkerControl,
-        int,  # frameSize
-        list[dict[str, Any]],  # device Channels
-        str,  # name
-        int,  # interrupt endpoint
-    ]:
+    ) -> tuple[WorkerControl, DeviceConfig, tuple[ChannelDict, ...], str, int]:
         """Create a tuple that is compatable with the worker function.
 
         Returns:
             tuple: The tuple that you will pass to the worker function
 
         """
-        return tuple([
+        
+        return (
             self.workerCtl,
-            utils.DeviceConfig(
+            DeviceConfig(
                 channelEvents=self.config["channel_events"],
                 deadZone=self.config["dead_zone"],
                 frameSize=self.config["frame_size"],
@@ -214,8 +209,8 @@ class FutabaDeviceDriver:
             ),
             tuple([channel.toDict() for channel in self.deviceChannels]),
             self.name,
-            self.interruptEndpoint,
-        ])
+            self.interruptEndpoint
+        )
 
     def __init__(self, device: usb.core.Device) -> None:
         """Create an object that drives a single device on it's own process.

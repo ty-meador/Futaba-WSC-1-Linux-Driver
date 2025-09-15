@@ -1,5 +1,5 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
-# ruff: noqa: PLC0415, C901, PLR0915, PLR0912
+# pylint: disable=import-outside-toplevel
 
 from .InputChannel import ChannelDict
 from .IPC import DataFrame, WorkerControl
@@ -115,7 +115,6 @@ def run(
     # (See "Attributes Lookup" section in docstring above)
     ##
     frameSize = deviceConfig.frameSize
-
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
