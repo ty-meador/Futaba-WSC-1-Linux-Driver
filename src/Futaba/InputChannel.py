@@ -181,22 +181,27 @@ class InputChannel:
     eventName: str
     calibrationRange: typing.Iterable[int]
     isReversed: bool = False
-    logger: object = field(default_factory=lambda: utils.newLogger("InputChannel"))
+    logger: logging.Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
     valueMap: array.array[int] = field(default_factory=lambda: array.array('i'))
     calibration: ChannelCalibration | None = None
 
     def __post_init__(self) -> None:
         """Instantiate our ChannelCalibration object."""
-        object.__setattr__(
-            self,
-            "calibration",
-            ChannelCalibration(
-                logger=self.logger,
-                inputRange=self.calibrationRange,
-                reverse=self.isReversed,
-            ),
-        )
-        object.__setattr__(self, "valueMap", self.calibration.valueMap)
+        # Set calibration
+        if self.calibration is None:
+            object.__setattr__(
+                self,
+                "calibration",
+                ChannelCalibration(
+                    logger=self.logger,
+                    inputRange=self.calibrationRange,
+                    reverse=self.isReversed,
+                ),
+            )
+
+        # Extract calibrated value map and set it
+        if self.calibration is not None:
+            object.__setattr__(self, "valueMap", self.calibration.valueMap)
 
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
         self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")

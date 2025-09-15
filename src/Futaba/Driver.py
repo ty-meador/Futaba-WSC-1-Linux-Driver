@@ -83,7 +83,10 @@ class FutabaDeviceDriver:
     def stop(self) -> None:
         """Stop the driver and kill the subprocess."""
         # It's possible for the constructor to fail before one or any of these are instantiated
-        if hasattr(self, "workerCtl") and hasattr(self.workerCtl, "killswitch") and not self.workerCtl.killswitch.is_set():
+        if (
+            hasattr(self, "workerCtl") and hasattr(self.workerCtl, "killswitch")
+            and not self.workerCtl.killswitch.is_set()
+        ):
             self.workerCtl.killswitch.set()
         # Give the worker up to 1 second to shut down gracefully
         if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
@@ -199,7 +202,7 @@ class FutabaDeviceDriver:
             tuple: The tuple that you will pass to the worker function
 
         """
-        
+
         return (
             self.workerCtl,
             DeviceConfig(
@@ -207,10 +210,8 @@ class FutabaDeviceDriver:
                 deadZone=self.config["dead_zone"],
                 frameSize=self.config["frame_size"],
                 noiseFilter=self.config["noise_filter"],
-            ),
-            tuple([channel.toDict() for channel in self.deviceChannels]),
-            self.name,
-            self.interruptEndpoint
+            ), tuple([channel.toDict()
+                      for channel in self.deviceChannels]), self.name, self.interruptEndpoint
         )
 
     def __init__(self, device: usb.core.Device) -> None:

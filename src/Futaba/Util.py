@@ -26,8 +26,7 @@ def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
 
     """
     results = [
-        device
-        for device in usb.core.find(find_all=True)
+        device for device in usb.core.find(find_all=True)
         if device.idVendor == FUTABA_VENDOR_ID and findInterruptEndpoint(device) == endpoint
     ]
 
@@ -104,7 +103,7 @@ def newLogger(
     return logger
 
 
-def parseJsonFile(filePath:  str) -> Any:
+def parseJsonFile(filePath: str) -> Any:
     """Load a JSON file into a dictionary.
 
     Args:
@@ -122,8 +121,8 @@ def parseJsonFile(filePath:  str) -> Any:
 
 def interpolate(
     xVals: array.array[int],
-    xPoints: array.array[int],
-    yPoints: array.array[int],
+    xPoints: tuple[int, ...],
+    yPoints: tuple[int, ...],
     left: int | None = None,
     right: int | None = None,
 ) -> list[int]:
@@ -157,8 +156,7 @@ def interpolate(
         y1, y2 = yPoints[i], yPoints[i + 1]
 
         interpolated = (
-            y1
-            if x2 == x1  # Avoid division by zero
+            y1 if x2 == x1  # Avoid division by zero
             else y1 + (y2 - y1) * (x - x1) / (x2 - x1)  # Linear interpolation
         )
 
@@ -168,7 +166,6 @@ def interpolate(
 
 class CalibrationWidget:
     """Generates a channel calibration for the running device."""
-
     def minMax(self, channel: InputChannel, rawV: int) -> None:
         """Process value as min/max.
 
