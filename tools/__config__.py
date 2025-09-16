@@ -19,7 +19,6 @@ PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 
 # Load project configuration
 with open(PYPROJECT_PATH, "rb") as f:
-    """Load pyproject.toml file."""
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
 
