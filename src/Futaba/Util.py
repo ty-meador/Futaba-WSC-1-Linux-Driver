@@ -80,7 +80,7 @@ def newLogger(
 
     """
     if level is None:
-        level = logging.DEBUG
+        level = logging.WARNING
     if fileName is None:
         fileName = re.sub(r"\W", "_", name) + ".txt"
 
