@@ -195,7 +195,7 @@ class CalibrationWidget:
 
     def generateFile(self, fileName: str) -> None:
         """Generate a calibration file."""
-        calibration = self._generateCalibration()
+        calibration = self._generateCalibrationBreakpoints()
         calibrationFile = PWD / "calibrations" / fileName
         calibrationFile.write_text(json.dumps(calibration, indent=4))
 
@@ -206,9 +206,9 @@ class CalibrationWidget:
     def _defaultBounds(self, default: int) -> dict[str, int]:
         return {"min": default, "mid": default, "max": default}
 
-    def _generateCalibration(self) -> list[list[int]]:
-        """Generate the devices calibration object."""
-        container: list[list[int]] = []
+    def _generateCalibrationBreakpoints(self) -> tuple[tuple[int, int, int], ...]:
+        """Generate a list of channels, each containing a list of calibration break points."""
+        channelList: list[tuple[int, int, int]] = []
         for channelData in self.knownChannels.values():
             # Account for channels that might not be used by the transmitter
             # We have to do this because the interpolation function used to generate the
@@ -216,5 +216,5 @@ class CalibrationWidget:
             if channelData["min"] == channelData["mid"] == channelData["max"]:
                 channelData["min"] = channelData["mid"] - 1
                 channelData["max"] = channelData["mid"] + 1
-            container.append([channelData["min"], channelData["mid"], channelData["max"]])
-        return container
+            channelList.append((channelData["min"], channelData["mid"], channelData["max"]))
+        return tuple(channelList)
