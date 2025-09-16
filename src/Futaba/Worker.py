@@ -6,11 +6,6 @@ from .IPC import DataFrame, WorkerControl
 from .__config__ import DeviceConfig
 
 
-##
-# Disabled mccabe linting as this function is specifically meant to be the
-# target of a separate process. As such the function is more complex and
-# contains more statments that would otherwise be tolerated
-##
 def run(
     controller: WorkerControl,
     deviceConfig: DeviceConfig,
@@ -182,7 +177,6 @@ def run(
         except KeyboardInterrupt:
             # Set our own killswitch and exit gracefully
             controller.killswitch.set()
-            pass
         except Exception as e:
             # We want to capture everything and log it to a file and then re-raise it.
             # This is because this will be running in a seperate process and as such
