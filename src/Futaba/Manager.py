@@ -73,7 +73,7 @@ class FutabaDeviceManager:
         self._drivers[deviceIndex].enableEcho()
         return self._drivers[deviceIndex].pipe
 
-    def listDevices(self) -> list[dict[str, int | Any]]:
+    def listDevices(self) -> list[dict[str, Any]]:
         """Get an ordered list of available devices.
 
         Returns:
@@ -192,7 +192,7 @@ class FutabaDeviceManager:
         """Enter."""
         return self
 
-    def __exit__(self,exc_type: Any, exc_value: Any, traceback: Any) -> FutabaDeviceManager:
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> FutabaDeviceManager:
         """Exit."""
         self.stopAll()
         return self

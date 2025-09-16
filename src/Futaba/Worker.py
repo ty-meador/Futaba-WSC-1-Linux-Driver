@@ -105,6 +105,7 @@ def run(
     # Cache all attribute lookups to maximize main loop performance.
     # (See "Attributes Lookup" section in docstring above)
     ##
+    product = coreDevice.product
     frameSize = deviceConfig.frameSize
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
@@ -173,7 +174,13 @@ def run(
                     )
 
         except usb.core.USBTimeoutError:
-            pass
+            pass  # Ignore, happens if device doesn't send a frame for a bit
+        except usb.core.USBError as e:
+            logger.warning(e)
+            if e.errno == 19:  # Device disconnected
+                logger.warning("device disconnected: %s", product)
+                # Set our own killswitch and exit gracefully
+                controller.killswitch.set()
         except KeyboardInterrupt:
             # Set our own killswitch and exit gracefully
             controller.killswitch.set()

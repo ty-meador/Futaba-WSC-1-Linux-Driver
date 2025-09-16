@@ -106,10 +106,12 @@ async def daemonMode(mgr: Futaba.DeviceManager) -> None:
         RuntimeError: Raised if the specified device cannot be found
 
     """
-    print("Autostarting the following devices:")
-    for device in mgr.listDevices():
-        print(f"    {device['deviceUUID']}({device['productName']})")
-    mgr.startAll()
+    print("Running in deamon mode: Scanning and starting new devices every second")
+
+    while True:
+        mgr.scanForDevices()  # scan for devices,
+        mgr.startAll()  # start new ones.
+        await asyncio.sleep(1)  #yield to event loop for at least 1 second
 
 
 def calibrationMode(
