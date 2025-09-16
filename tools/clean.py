@@ -7,11 +7,9 @@ from argparse import ArgumentParser
 from __config__ import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT
 
 parser = ArgumentParser()
-
-
-parser = ArgumentParser()
 parser.add_argument("--build", action="store_true", help="Remove previous build artifacts")
 parser.add_argument("--package", action="store_true", help="Remove previous package artifacts")
+ARGS = parser.parse_args()
 
 
 def cleanBuildArtifacts():
@@ -35,12 +33,11 @@ def cleanPackageArtifacts():
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
 
-    if args.build:
+    if ARGS.build:
         print("🧹 Removing previous build artifacts...")
         cleanBuildArtifacts()
-    elif args.package:
+    elif ARGS.package:
         print("🧹 Removing previous package artifacts...")
         cleanPackageArtifacts()
     else:
