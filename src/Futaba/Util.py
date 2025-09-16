@@ -172,7 +172,7 @@ class CalibrationWidget:
         """
         # Detect new channels
         if channel not in self.knownChannels:
-            self.knownChannels[channel] = self._defaultBounds(rawV)
+            self.knownChannels[channel] = self._defaultChannelDict(rawV)
         # Update boundaries
         elif rawV < self.knownChannels[channel]["min"]:
             self.knownChannels[channel]["min"] = rawV
@@ -188,13 +188,17 @@ class CalibrationWidget:
         """
         # Detect new channels
         if channel not in self.knownChannels:
-            self.knownChannels[channel] = self._defaultBounds(rawV)
+            self.knownChannels[channel] = self._defaultChannelDict(rawV)
 
         # Update midpoint
         self.knownChannels[channel]["mid"] = rawV
 
     def generateFile(self, fileName: str) -> None:
-        """Generate a calibration file."""
+        """Generate the calibration file.
+
+        Args:
+            fileName (str): The name to use for the generated file.
+        """
         calibration = self._generateCalibrationBreakpoints()
         calibrationFile = PWD / "calibrations" / fileName
         calibrationFile.write_text(json.dumps(calibration, indent=4))
@@ -203,11 +207,11 @@ class CalibrationWidget:
         """Create a Channel calibrator."""
         self.knownChannels: dict[tuple[int, int], dict[str, int]] = {}
 
-    def _defaultBounds(self, default: int) -> dict[str, int]:
+    def _defaultChannelDict(self, default: int) -> dict[str, int]:
         return {"min": default, "mid": default, "max": default}
 
     def _generateCalibrationBreakpoints(self) -> tuple[tuple[int, int, int], ...]:
-        """Generate a list of channels, each containing a list of calibration break points."""
+        """Generate a tuple of channels, each containing a tuple of calibration break points."""
         channelList: list[tuple[int, int, int]] = []
         for channelData in self.knownChannels.values():
             # Account for channels that might not be used by the transmitter
