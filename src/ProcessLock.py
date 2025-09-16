@@ -6,7 +6,7 @@ import socket
 
 class LockNotAcquired(Exception):
     """Exception which represents a failure to acquire a process lock"""
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 

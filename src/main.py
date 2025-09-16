@@ -61,7 +61,7 @@ def main():
         with ProcessLock():
             if ARGS.calibrate:
                 try:
-                    curses.wrapper(calibrationMode, *(ARGS, mgr))
+                    curses.wrapper(calibrationMode, mgr)
                 except Exception:
                     # Make sure we get a stack trace from curses
                     traceback.print_exc()
@@ -73,10 +73,11 @@ def main():
                 loop.create_task(daemonMode(mgr))
                 loop.run_forever()
             else:
-                choice = None
+
                 devList = mgr.listDevices()
                 keyList = list(map(lambda device: device["key"], devList))
                 print(keyList)
+                choice = -1  # Keys will never be negative
                 while choice not in keyList:
                     print(f"Found {len(devList)} Futaba devices")
                     print("Which one would you like to test?")
@@ -120,7 +121,7 @@ def calibrationMode(
     # Keycodes
     ##
     ENTER = 10
-    SPACE = 32
+    # SPACE = 32
     # LEFT_ARROW = 68
     UP_ARROW = 65
     # RIGHT_ARROW = 67

@@ -2,14 +2,15 @@
 from __future__ import annotations
 import array
 import bisect
+from contextlib import suppress
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import re
-from logging.handlers import RotatingFileHandler
 from typing import Any
 import usb
-from __config__ import FUTABA_VENDOR_ID, LOG_PATH, PWD, INTERRUPT_ENDPOINT_ATTRIBUTE
+from .__config__ import FUTABA_VENDOR_ID, LOG_PATH, PWD, INTERRUPT_ENDPOINT_ATTRIBUTE
 
 
 def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
@@ -59,13 +60,6 @@ def findInterruptEndpoint(device: usb.core.Device) -> int | None:
     return None
 
 
-# DEFAULT_LOG_HANDLER: logging.handlers.RotatingFileHandler = handlers.RotatingFileHandler(
-#     "logs.txt",
-#     maxBytes=5 * 1024 * 1024,  # 5 megabytes
-#     backupCount=5,
-# )
-
-
 def newLogger(
     name: str,
     fileName: str | None = None,
@@ -109,12 +103,13 @@ def parseJsonFile(filePath: str) -> Any:
         filePath (str): The path to the json file you want to load
 
     Returns:
-        dict: The parsed json
+        dict or None: The parsed json as a dict. If the file is not found None is returned
 
     """
     parsedJson = None
-    with open(filePath, encoding="utf-8") as jsonFile:
-        parsedJson = json.load(jsonFile)
+    with suppress(FileNotFoundError):
+        with open(filePath, encoding="utf-8") as jsonFile:
+            parsedJson = json.load(jsonFile)
     return parsedJson
 
 

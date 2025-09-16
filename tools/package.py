@@ -163,7 +163,10 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     renderTemplate(
         TEMPLATES_DIR / "VERSION",
-        {"version": version, "build_date": buildDate},
+        {
+            "version": version,
+            "build_date": buildDate
+        },
         packagePath / "VERSION",
     )
 
@@ -175,6 +178,8 @@ def packageDistribution() -> None:  # noqa: PLR0915
     if duResult:
         packageSize = duResult.split()[0]
         print(f"📦 Package size: {packageSize}")
+    else:
+        packageSize = 0
 
     print("🗜️  Creating compressed archives...")
 
@@ -196,16 +201,17 @@ def packageDistribution() -> None:  # noqa: PLR0915
     shutil.move(tempTarXz, finalTarXz)
 
     # Get archive sizes
-    tarGzSize = (
-        runCommand(f"du -sh {finalTarGz}").split()[0]
-        if runCommand(f"du -sh {finalTarGz}")
-        else "Unknown"
-    )
-    tarXzSize = (
-        runCommand(f"du -sh {finalTarXz}").split()[0]
-        if runCommand(f"du -sh {finalTarXz}")
-        else "Unknown"
-    )
+    tarGzSize = runCommand(f"du -sh {finalTarGz}")
+    if tarGzSize:
+        tarGzSize = tarGzSize.split()[0]
+    else:
+        tarGzSize = 0
+
+    tarXzSize = runCommand(f"du -sh {finalTarXz}")
+    if tarXzSize is not None:
+        tarXzSize = tarXzSize.split()[0]
+    else:
+        tarXzSize = 0
 
     # Create checksums
     print("🔐 Creating checksums...")
@@ -236,11 +242,12 @@ def packageDistribution() -> None:  # noqa: PLR0915
     for filePath in sorted(distFiles):
         fileName = filePath.name
         if filePath.is_file():
-            size = (
-                runCommand(f"du -sh {filePath}").split()[0]
-                if runCommand(f"du -sh {filePath}")
-                else "?"
-            )
+            size = runCommand(f"du -sh {filePath}")
+            if size is not None:
+                size = size.split()[0]
+            else:
+                size = 0
+
             print(f"  📄 {fileName} ({size})")
         else:
             print(f"  📁 {fileName}/")

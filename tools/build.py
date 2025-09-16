@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 from argparse import ArgumentParser
-
+from pathlib import Path
 from __config__ import (
     BUILD_DIR,
     EXECUTABLE_NAME,
@@ -141,13 +141,12 @@ def installDependencies():
         sys.exit(1)
 
     # Install project requirements if they exist
-    if (PROJECT_ROOT / "requirements.txt").exists() and runCommand(
-        "pip3 install -r requirements.txt"
-    ) is None:
+    if (PROJECT_ROOT /
+        "requirements.txt").exists() and runCommand("pip3 install -r requirements.txt") is None:
         sys.exit(1)
 
 
-def setupExecutable(execPath):
+def setupExecutable(execPath: Path):
     """Set up the final executable distribution."""
     print("🔧 Setting up executable...")
 
@@ -161,7 +160,10 @@ def setupExecutable(execPath):
 
     renderTemplate(
         SCRIPTS_TEMPLATES_DIR / "wrapper-script.sh",
-        {"build_dir": os.path.basename(BUILD_DIR), "executable_name": EXECUTABLE_NAME},
+        {
+            "build_dir": os.path.basename(BUILD_DIR),
+            "executable_name": EXECUTABLE_NAME
+        },
         WRAPPER_SCRIPT,
     )
 
