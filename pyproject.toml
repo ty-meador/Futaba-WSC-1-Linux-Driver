@@ -26,6 +26,7 @@ Issues = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issue
 Repository = "https://gitlab.com/Native-Coder/futaba-usb-driver/"
 
 [tool.build_tool]
+native_dependencies = ["usb", "uinput"]
 install_script_name = "install.sh"
 uninstall_script_name = "uninstall.sh"
 web_install_script_name = "web-installer.sh"

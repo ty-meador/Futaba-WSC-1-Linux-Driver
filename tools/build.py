@@ -102,7 +102,8 @@ def buildExecutable():
 def findNativeLibraries():
     """Find native libraries to include."""
     print("🔍 Locating native libraries...")
-    nuitkaArgs = ["--include-package-data=uinput"]
+    # Hard-coded because the package name is "python-uinput"
+    nuitkaArgs: list[str] = []
 
     # Define the virtual environment path
     venvPath = PROJECT_ROOT / ".venv"
@@ -112,7 +113,7 @@ def findNativeLibraries():
 
     # Find .so files in the virtual environment
     dependencyPatterns = [
-        "*uinput*.so",
+        *[f"*{dep}*.so" for dep in PYPROJECT["tool"]["build_tool"]["native_dependencies"]],
         *[
             f"*{re.split(r'(>=|==|~=)', dep)[0]}*.so"
             for dep in PYPROJECT["project"]["dependencies"]
@@ -124,7 +125,6 @@ def findNativeLibraries():
             if libPath.is_file():
                 nuitkaArgs.append(f"--include-data-files={libPath}={libPath.name}")
                 print(f"📚 Found library: {libPath.name}")
-
     return nuitkaArgs
 
 
