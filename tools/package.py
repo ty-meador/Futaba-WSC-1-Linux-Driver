@@ -26,7 +26,12 @@ from clean import cleanPackageArtifacts
 from util import renderTemplate, runCommand
 
 parser = ArgumentParser()
-parser.add_argument("--clean", action="store_true")
+parser.add_argument(
+    "--clean",
+    action="store_true",
+    help="Clean up previously generated artifacts before building new ones."
+)
+ARGS = parser.parse_args()
 
 
 def getVersionInfo() -> tuple[str, str]:
@@ -275,8 +280,6 @@ def packageDistribution() -> None:  # noqa: PLR0915
 if __name__ == "__main__":
     print("📦 Futaba RC Driver Packaging Tool")
     print("=" * 40)
-    args = parser.parse_args()
-    if args.clean:
+    if ARGS.clean:
         cleanPackageArtifacts()
-    else:
-        packageDistribution()
+    packageDistribution()

@@ -22,7 +22,12 @@ from clean import cleanBuildArtifacts
 from util import renderTemplate, runCommand
 
 parser = ArgumentParser()
-parser.add_argument("--clean", action="store_true")
+parser.add_argument(
+    "--clean",
+    action="store_true",
+    help="Clean up previously generated artifacts before building new ones."
+)
+ARGS = parser.parse_args()
 
 
 def build():
@@ -208,8 +213,6 @@ def validateEnvironment():
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
-    if args.clean:
+    if ARGS.clean:
         cleanBuildArtifacts()
-    else:
-        build()
+    build()

@@ -11,12 +11,14 @@ from multiprocessing.connection import Connection
 import usb
 from . import Util as utils
 from . import Worker
-from .__config__ import CALIBRATION_PATH
-from .__config__ import CONFIG_PATH
-from .__config__ import DEFAULT_CALIBRATION
-from .__config__ import DEFAULT_CONFIG
-from .__config__ import FUTABA_VENDOR_ID
-from .__config__ import DeviceConfig
+from .__config__ import (
+    CALIBRATION_PATH,
+    CONFIG_PATH,
+    DEFAULT_CALIBRATION,
+    DEFAULT_CONFIG,
+    FUTABA_VENDOR_ID,
+    DeviceConfig,
+)
 from .InputChannel import InputChannel, ChannelDict
 from .IPC import WorkerControl
 

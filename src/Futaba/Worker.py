@@ -6,11 +6,6 @@ from .IPC import DataFrame, WorkerControl
 from .__config__ import DeviceConfig
 
 
-##
-# Disabled mccabe linting as this function is specifically meant to be the
-# target of a separate process. As such the function is more complex and
-# contains more statments that would otherwise be tolerated
-##
 def run(
     controller: WorkerControl,
     deviceConfig: DeviceConfig,
@@ -110,6 +105,7 @@ def run(
     # Cache all attribute lookups to maximize main loop performance.
     # (See "Attributes Lookup" section in docstring above)
     ##
+    product = coreDevice.product
     frameSize = deviceConfig.frameSize
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
@@ -178,11 +174,16 @@ def run(
                     )
 
         except usb.core.USBTimeoutError:
-            pass
+            pass  # Ignore, happens if device doesn't send a frame for a bit
+        except usb.core.USBError as e:
+            logger.warning(e)
+            if e.errno == 19:  # Device disconnected
+                logger.warning("device disconnected: %s", product)
+                # Set our own killswitch and exit gracefully
+                controller.killswitch.set()
         except KeyboardInterrupt:
             # Set our own killswitch and exit gracefully
             controller.killswitch.set()
-            pass
         except Exception as e:
             # We want to capture everything and log it to a file and then re-raise it.
             # This is because this will be running in a seperate process and as such

@@ -80,7 +80,7 @@ def newLogger(
 
     """
     if level is None:
-        level = logging.DEBUG
+        level = logging.WARNING
     if fileName is None:
         fileName = re.sub(r"\W", "_", name) + ".txt"
 
@@ -172,7 +172,7 @@ class CalibrationWidget:
         """
         # Detect new channels
         if channel not in self.knownChannels:
-            self.knownChannels[channel] = self._defaultBounds(rawV)
+            self.knownChannels[channel] = self._defaultChannelDict(rawV)
         # Update boundaries
         elif rawV < self.knownChannels[channel]["min"]:
             self.knownChannels[channel]["min"] = rawV
@@ -188,14 +188,18 @@ class CalibrationWidget:
         """
         # Detect new channels
         if channel not in self.knownChannels:
-            self.knownChannels[channel] = self._defaultBounds(rawV)
+            self.knownChannels[channel] = self._defaultChannelDict(rawV)
 
         # Update midpoint
         self.knownChannels[channel]["mid"] = rawV
 
     def generateFile(self, fileName: str) -> None:
-        """Generate a calibration file."""
-        calibration = self._generateCalibration()
+        """Generate the calibration file.
+
+        Args:
+            fileName (str): The name to use for the generated file.
+        """
+        calibration = self._generateCalibrationBreakpoints()
         calibrationFile = PWD / "calibrations" / fileName
         calibrationFile.write_text(json.dumps(calibration, indent=4))
 
@@ -203,12 +207,12 @@ class CalibrationWidget:
         """Create a Channel calibrator."""
         self.knownChannels: dict[tuple[int, int], dict[str, int]] = {}
 
-    def _defaultBounds(self, default: int) -> dict[str, int]:
+    def _defaultChannelDict(self, default: int) -> dict[str, int]:
         return {"min": default, "mid": default, "max": default}
 
-    def _generateCalibration(self) -> list[list[int]]:
-        """Generate the devices calibration object."""
-        container: list[list[int]] = []
+    def _generateCalibrationBreakpoints(self) -> tuple[tuple[int, int, int], ...]:
+        """Generate a tuple of channels, each containing a tuple of calibration break points."""
+        channelList: list[tuple[int, int, int]] = []
         for channelData in self.knownChannels.values():
             # Account for channels that might not be used by the transmitter
             # We have to do this because the interpolation function used to generate the
@@ -216,5 +220,5 @@ class CalibrationWidget:
             if channelData["min"] == channelData["mid"] == channelData["max"]:
                 channelData["min"] = channelData["mid"] - 1
                 channelData["max"] = channelData["mid"] + 1
-            container.append([channelData["min"], channelData["mid"], channelData["max"]])
-        return container
+            channelList.append((channelData["min"], channelData["mid"], channelData["max"]))
+        return tuple(channelList)
