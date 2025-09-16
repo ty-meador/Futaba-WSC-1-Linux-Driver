@@ -1,0 +1,53 @@
+[style]
+# Based on Google style but customized to match your ruff settings
+based_on_style = google
+
+# Line length to match your ruff config
+column_limit = 100
+
+# Indentation
+indent_width = 4
+continuation_indent_width = 4
+
+# Use spaces for indentation (matches ruff)
+use_tabs = false
+
+# String formatting
+# Use double quotes for strings (matches ruff)
+# Note: yapf doesn't have direct quote control, but it generally preserves existing quotes
+
+# Function and class formatting
+dedent_closing_brackets = true
+coalesce_brackets = true
+split_before_logical_operator = true
+split_before_arithmetic_operator = false
+
+# List/dict formatting
+allow_split_before_dict_value = false
+split_before_dict_set_generator = true
+split_before_first_argument = false
+
+# Blank lines
+blank_line_before_nested_class_or_def = false
+blank_lines_around_top_level_definition = 2
+blank_lines_between_top_level_imports_and_variables = 1
+
+# Comment formatting
+spaces_before_comment = 2
+
+# Other formatting options
+join_multiple_lines = true
+split_arguments_when_comma_terminated = true
+split_all_comma_separated_values = false
+
+# Penalty system to guide formatting decisions
+split_penalty_after_opening_bracket = 30
+split_penalty_after_unary_operator = 10000
+split_penalty_arithmetic_operator = 300
+split_penalty_before_if_expr = 0
+split_penalty_bitwise_operator = 300
+split_penalty_comprehension = 80
+split_penalty_excess_character = 7000
+split_penalty_for_added_line_split = 30
+split_penalty_import_names = 0
+split_penalty_logical_operator = 300

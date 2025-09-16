@@ -1,9 +1,9 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
-# ruff: noqa: PLC0415, C901, PLR0915, PLR0912
+# pylint: disable=import-outside-toplevel
 
 from .InputChannel import ChannelDict
 from .IPC import DataFrame, WorkerControl
-from .Util import DeviceConfig
+from .__config__ import DeviceConfig
 
 
 ##
@@ -82,10 +82,8 @@ def run(
             print("Warning: Cannot set process priority")
 
     channelEventsMap, channelCalibrations = zip(
-        *[
-            (getattr(uinput, channel["eventName"]), channel["valueMap"])
-            for channel in deviceChannels
-        ],
+        *[(getattr(uinput, channel["eventName"]), channel["valueMap"])
+          for channel in deviceChannels],
         strict=True,
     )
 
@@ -100,12 +98,10 @@ def run(
     # Create a virtual device for the found device
     channelEventsMap = tuple(channelEventsMap)
     virtualDevice = uinput.Device(
-        tuple(
-            [
-                event + (EVENT_MIN_VAL, EVENT_MAX_VAL, deadZone, noiseFilter)
-                for event in channelEventsMap
-            ]
-        ),
+        tuple([
+            event + (EVENT_MIN_VAL, EVENT_MAX_VAL, deadZone, noiseFilter)
+            for event in channelEventsMap
+        ]),
         name,
         vendor=FUTABA_VENDOR_ID,
     )
@@ -115,7 +111,6 @@ def run(
     # (See "Attributes Lookup" section in docstring above)
     ##
     frameSize = deviceConfig.frameSize
-
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
     fromBytes = int.from_bytes
@@ -129,7 +124,7 @@ def run(
         coreDevice.detach_kernel_driver(0)
     coreDevice.set_configuration()
 
-    logger.info(f"Driver started: {interruptEndpoint} -> {name}")
+    logger.info("Driver started: %s -> %s", interruptEndpoint, name)
 
     # -- MAIN LOOP --
     # - Runs until main process sets the killswitch event
@@ -156,7 +151,7 @@ def run(
             for i in range(0, len(rawData), 2):
                 channel = i // 2
                 calibration = channelCalibrations[channel]
-                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
+                rawValue = int(fromBytes(rawData[i:i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
                 maxInputVal = len(calibration) - 1  # account for off-by-one
@@ -199,16 +194,16 @@ def run(
     try:
         usb.util.release_interface(coreDevice, 0)
     except Exception as e:
-        logger.warning(f"Unable to release the USB interface, {e}")
+        logger.warning("Unable to release the USB interface %s", e)
 
     logger.debug("Reattaching the kernel ..")
     try:
         coreDevice.attach_kernel_driver(0)
     except Exception as e:
-        logger.warning(f"Unable to reattach the kernel driver, {e}")
+        logger.warning("Unable to reattach the kernel driver, %s", e)
 
     logger.debug("Resetting device...")
     try:
         coreDevice.reset()
     except Exception as e:
-        logger.warning(f"Unable to reset the USB interface, {e}")
+        logger.warning("Unable to reset the USB interface, %s", e)

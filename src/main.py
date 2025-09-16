@@ -6,15 +6,18 @@ This program comes with ABSOLUTELY NO WARRANTY;.
 This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
-
 import asyncio
 import curses
 import sys
 import time
-import tomllib
 import traceback
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
+from contextlib import suppress
 from pathlib import Path
+
+import tomllib
+from ProcessLock import LockNotAcquired
+from ProcessLock import ProcessLock
 
 import Futaba
 import UI
@@ -29,7 +32,6 @@ if not PYPROJECT_PATH.exists():
 
 # Load project configuration
 with open(PYPROJECT_PATH, "rb") as f:
-    """Load pyproject.toml file."""
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
 CALIBRATIONS_PATH = PWD / "Futaba/calibrations"
@@ -42,33 +44,76 @@ parser.add_argument("--daemonize", action="store_true", help="Run as a backgroun
 parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
 parser.add_argument("--port", help="The port of the device you want start a driver for")
 parser.add_argument("--version", action="store_true", help="Get driver version")
+ARGS = parser.parse_args()
 
 
-async def daemonMode(args: Namespace, mgr: Futaba.DeviceManager) -> None:
+def main():
+    """Project entrypoint."""
+    try:
+        # No reason to proceed if all they want is the version.
+        if ARGS.version:
+            print(PYPROJECT["project"]["version"])
+            sys.exit(0)
+
+        # Futaba.Driver.ProcessLock: Prevents multiple driver instances from running.
+        # Futaba.DeviceManager: It's a futaba device manager...
+        mgr = Futaba.DeviceManager()
+        with ProcessLock():
+            if ARGS.calibrate:
+                try:
+                    curses.wrapper(calibrationMode, mgr)
+                except Exception:
+                    # Make sure we get a stack trace from curses
+                    traceback.print_exc()
+                    raise
+                print("Calibration complete!")
+                sys.exit(0)
+            elif ARGS.daemonize:
+                loop = asyncio.new_event_loop()
+                loop.create_task(daemonMode(mgr))
+                loop.run_forever()
+            else:
+
+                devList = mgr.listDevices()
+                keyList = list(map(lambda device: device["key"], devList))
+                print(keyList)
+                choice = -1  # Keys will never be negative
+                while choice not in keyList:
+                    print(f"Found {len(devList)} Futaba devices")
+                    print("Which one would you like to test?")
+                    for device in devList:
+                        print(f"{device['key']}: {device['name']}")
+                    choice = int(input("Choice: "))
+                mgr.start(choice)
+                print("🏳️  Driver running, ctrl+c to quit")
+
+                while True:
+                    time.sleep(0.1)  # Prevent busy waiting
+    except LockNotAcquired:
+        print("🏁 Driver already running. Have Fun!")
+    except KeyboardInterrupt:
+        print("🏴 Driver stopped")
+
+
+async def daemonMode(mgr: Futaba.DeviceManager) -> None:
     """Run the driver in cli-mode.
 
     Args:
-        args (argparse.ArgumentParser.arg): Arguments passed to the cli
+        ARGS (argparse.ArgumentParser.arg): Arguments passed to the cli
         mgr (Futaba.DeviceManager): The global device manager
 
     Raises:
         RuntimeError: Raised if the specified device cannot be found
 
     """
-    device = None
-    if args.endpoint is not None:
-        device = mgr.findDevice(endpoint=args.endpoint)
-        if device is None:
-            raise OSError(f"No Futaba device found at endpoint {args.endpoint}")
-    else:
-        print(f"Found {len(mgr.listDevices())} Futaba devices, autostarting all...")
-        mgr.startAll()
-        # TODO - Implement loop to detect new devices etc
+    print("Autostarting the following devices:")
+    for device in mgr.listDevices():
+        print(f"    {device['deviceUUID']}({device['productName']})")
+    mgr.startAll()
 
 
 def calibrationMode(
     parentScreen: curses.window,
-    args: Namespace,
     mgr: Futaba.DeviceManager,
 ) -> None:
     """Run the driver with a text mode ui."""
@@ -76,7 +121,7 @@ def calibrationMode(
     # Keycodes
     ##
     ENTER = 10
-    SPACE = 32
+    # SPACE = 32
     # LEFT_ARROW = 68
     UP_ARROW = 65
     # RIGHT_ARROW = 67
@@ -128,7 +173,7 @@ def calibrationMode(
     calibrationUI.setTitle("( Center all inputs, then press enter )")
     calibrationUI.render()
     fileName = f"{selectedDevice['productName']}_{selectedDevice['deviceUUID']}.json"
-    try:
+    with suppress(KeyboardInterrupt):
         mode = "center"
         done = False
         while not done:
@@ -151,52 +196,10 @@ def calibrationMode(
                     calibrationWidget.minMax(channel, rawV)
                 calibrationUI.updateChannel(channel, calibV)
                 calibrationUI.render()
-    except KeyboardInterrupt:
-        pass
 
     calibrationWidget.generateFile(fileName)
     mgr.stopAll()
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
-    try:
-        # No reason to proceed if all they want is the version.
-        if args.version:
-            print(PYPROJECT["project"]["version"])
-            sys.exit(0)
-
-        # Futaba.Driver.ProcessLock: Prevents multiple driver instances from running.
-        # Futaba.DeviceManager: It's a futaba device manager...
-        with Futaba.Driver.ProcessLock():
-            mgr = Futaba.DeviceManager()
-            if args.calibrate:
-                try:
-                    curses.wrapper(calibrationMode, *(args, mgr))
-                except Exception:
-                    traceback.print_exc()
-                    raise
-                print("Calibration complete!")
-                sys.exit(0)
-            elif args.daemonize:
-                loop = asyncio.new_event_loop()
-                loop.create_task(daemonMode(args, mgr))
-                loop.run_forever()
-            else:
-                devList = mgr.listDevices()
-                print(f"Found {len(devList)} Futaba devices")
-                print("Which one would you like to test?")
-                for device in devList:
-                    print(f"{device['key']}: {device['name']}")
-                choice = input("Choice: ")
-                mgr.start(device["key"])
-                print("🏳️  Driver running, ctrl+c to quit")
-
-                while True:
-                    time.sleep(0.1)  # Prevent busy waiting
-
-    except OSError:
-        print("🏁 Driver already running. Have Fun!")
-    except KeyboardInterrupt:
-        print("🏴 Driver stopped")
-        pass
+    main()

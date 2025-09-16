@@ -1,39 +1,19 @@
 """Contains atomic utility functions for the project."""
-
+from __future__ import annotations
+import array
 import bisect
+from contextlib import suppress
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import re
-import typing
-from dataclasses import dataclass, field
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
-
+from typing import Any
 import usb
-
-from .__config__ import (
-    DEFAULT_CONFIG,
-    DEFAULT_DEADZONE,
-    DEFAULT_NOISE_FILTER,
-    FUTABA_VENDOR_ID,
-    INTERRUPT_ENDPOINT_ATTRIBUTE,
-    LOG_PATH,
-    PWD,
-)
+from .__config__ import FUTABA_VENDOR_ID, LOG_PATH, PWD, INTERRUPT_ENDPOINT_ATTRIBUTE
 
 
-@dataclass(frozen=True, slots=True)
-class DeviceConfig:
-    """Stores the configuration settings for a single device."""
-
-    channelEvents: list[str] = field(default_factory=lambda: DEFAULT_CONFIG["channel_events"])
-    deadZone: int = DEFAULT_DEADZONE
-    frameSize: int = field(default_factory=lambda: DEFAULT_CONFIG["frame_size"])
-    noiseFilter: int = DEFAULT_NOISE_FILTER
-
-
-def findEndpointDevice(endpoint: int) -> usb.core.Device | bool:
+def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
     """Get the core USB device handle that has the provided enpoint.
 
     Args:
@@ -46,17 +26,16 @@ def findEndpointDevice(endpoint: int) -> usb.core.Device | bool:
 
     """
     results = [
-        device
-        for device in usb.core.find(find_all=True)
+        device for device in usb.core.find(find_all=True)
         if device.idVendor == FUTABA_VENDOR_ID and findInterruptEndpoint(device) == endpoint
     ]
 
     if len(results) != 1:
-        return False
+        return None
     return results[0]
 
 
-def findInterruptEndpoint(device: usb.core.Device) -> int:
+def findInterruptEndpoint(device: usb.core.Device) -> int | None:
     """Take in a device and returns is interrupt enpoint address.
 
     Args:
@@ -70,8 +49,6 @@ def findInterruptEndpoint(device: usb.core.Device) -> int:
         int: The endpoint object used to capture frames from the physical device
 
     """
-    if not isinstance(device, usb.core.Device):
-        raise ValueError("Expected first param to be of type usb.core.Device")
     for config in device:
         for interface in config:
             for endpoint in interface:
@@ -80,14 +57,7 @@ def findInterruptEndpoint(device: usb.core.Device) -> int:
                     and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
                 ):
                     return endpoint.bEndpointAddress
-    raise RuntimeError("No interrupt endpoint found!")
-
-
-# DEFAULT_LOG_HANDLER: logging.handlers.RotatingFileHandler = handlers.RotatingFileHandler(
-#     "logs.txt",
-#     maxBytes=5 * 1024 * 1024,  # 5 megabytes
-#     backupCount=5,
-# )
+    return None
 
 
 def newLogger(
@@ -126,29 +96,27 @@ def newLogger(
     return logger
 
 
-def parseJsonFile(filePath: Path | str) -> dict:
+def parseJsonFile(filePath: str) -> Any:
     """Load a JSON file into a dictionary.
 
     Args:
         filePath (str): The path to the json file you want to load
 
     Returns:
-        dict: The parsed json
+        dict or None: The parsed json as a dict. If the file is not found None is returned
 
     """
-    try:
-        parsedJson = None
+    parsedJson = None
+    with suppress(FileNotFoundError):
         with open(filePath, encoding="utf-8") as jsonFile:
             parsedJson = json.load(jsonFile)
-        return parsedJson
-    except Exception as e:
-        return None
+    return parsedJson
 
 
 def interpolate(
-    xVals: typing.Iterable[int],
-    xPoints: typing.Iterable[int],
-    yPoints: typing.Iterable[int],
+    xVals: array.array[int],
+    xPoints: tuple[int, ...],
+    yPoints: tuple[int, ...],
     left: int | None = None,
     right: int | None = None,
 ) -> list[int]:
@@ -164,7 +132,7 @@ def interpolate(
     Returns:
         List of interpolated integer values
     """
-    result = []
+    result: list[int] = []
 
     for x in xVals:
         # Handle boundary conditions
@@ -182,8 +150,7 @@ def interpolate(
         y1, y2 = yPoints[i], yPoints[i + 1]
 
         interpolated = (
-            y1
-            if x2 == x1  # Avoid division by zero
+            y1 if x2 == x1  # Avoid division by zero
             else y1 + (y2 - y1) * (x - x1) / (x2 - x1)  # Linear interpolation
         )
 
@@ -193,8 +160,7 @@ def interpolate(
 
 class CalibrationWidget:
     """Generates a channel calibration for the running device."""
-
-    def minMax(self, channel, rawV) -> None:
+    def minMax(self, channel: Any, rawV: int) -> None:
         """Process value as min/max.
 
         If the provided value is a new high or low value for the given channel then the min or max
@@ -213,7 +179,7 @@ class CalibrationWidget:
         elif rawV > self.knownChannels[channel]["max"]:
             self.knownChannels[channel]["max"] = rawV
 
-    def mid(self, channel, rawV) -> None:
+    def mid(self, channel: Any, rawV: int) -> None:
         """Set the mid point for the given channel.
 
         Args:
@@ -235,19 +201,18 @@ class CalibrationWidget:
 
     def __init__(self) -> None:
         """Create a Channel calibrator."""
-        self.knownChannels = {}
+        self.knownChannels: dict[tuple[int, int], dict[str, int]] = {}
 
-    def _defaultBounds(self, default=None) -> dict[str, int]:
+    def _defaultBounds(self, default: int) -> dict[str, int]:
         return {"min": default, "mid": default, "max": default}
 
-    def _generateCalibration(self) -> list[list]:
+    def _generateCalibration(self) -> list[list[int]]:
         """Generate the devices calibration object."""
-        container = []
+        container: list[list[int]] = []
         for channelData in self.knownChannels.values():
             # Account for channels that might not be used by the transmitter
-            # FIXME - We have to do this because the interpolation function used to generate the
+            # We have to do this because the interpolation function used to generate the
             # calibrated value map requires an ascending input range to be considered "sane".
-            # TODO - Think of a better way
             if channelData["min"] == channelData["mid"] == channelData["max"]:
                 channelData["min"] = channelData["mid"] - 1
                 channelData["max"] = channelData["mid"] + 1

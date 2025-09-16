@@ -1,0 +1,35 @@
+[MAIN]
+# Use multiple processes to speed up Pylint
+jobs=0
+
+[BASIC]
+# Variables: camelCase or _camelCase for private
+variable-rgx=(_?[a-z][a-zA-Z0-9]*|__[a-zA-Z0-9_]+__)$
+
+# Function arguments: camelCase
+argument-rgx=[a-z][a-zA-Z0-9]*$
+
+# Object attributes: camelCase or _camelCase for private
+attr-rgx=(_?[a-z][a-zA-Z0-9]*|__[a-zA-Z0-9_]+__)$
+
+# Method names: camelCase or _camelCase for private, plus dunders
+method-rgx=(_?[a-z][a-zA-Z0-9]*|__[a-zA-Z0-9_]+__)$
+
+# Function names: camelCase or _camelCase for private, plus dunders
+function-rgx=(_?[a-z][a-zA-Z0-9]*|__[a-zA-Z0-9_]+__)$
+
+# Constants: SCREAMING_SNAKE_CASE
+const-rgx=[A-Z_][A-Z0-9_]*$
+
+# Class names: PascalCase
+class-rgx=[A-Z][a-zA-Z0-9]*$
+
+# Module names: snake_case
+module-rgx=[a-z_][a-z0-9_]*$
+
+# Allow short variable names and common Python names
+good-names=i,j,k,x,y,z,f,_,self,cls
+
+[MESSAGES CONTROL]
+# Disable the invalid-name check since we're using custom naming
+disable=invalid-name,import-error

@@ -6,8 +6,8 @@ from pathlib import Path
 
 def renderTemplate(
     templatePath: Path,
-    replacements: dict,
-    outputPath: Path = None,
+    replacements: dict[str, Path | str],
+    outputPath: Path | None = None,
 ) -> str | None:
     """Render a template file with given replacements.
 
@@ -33,11 +33,10 @@ def renderTemplate(
         return rendered
     except Exception as e:
         raise RuntimeError("Failed to render template file.") from e
-    return True
 
 
 def runCommand(
-    cmd: str,
+    cmd: str | list[str],
     cwd: str | None = None,
     capture: bool = True,
     shell: bool = True,

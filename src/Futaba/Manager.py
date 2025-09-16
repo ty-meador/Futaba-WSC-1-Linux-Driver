@@ -1,48 +1,18 @@
 """Module provides a simple interface to spawn and manage multiple Futaba RC to USB adapters."""
-
+from __future__ import annotations
 import atexit
-import multiprocessing
-
+from multiprocessing.connection import Connection
+from contextlib import suppress
+from typing import Any
 import usb
-
 from . import Util as utils
-from .Driver import DriverState, FutabaDeviceDriver
+from .Driver import DriverState
+from .Driver import FutabaDeviceDriver
 from .Error import DeviceNotFoundError
 
 
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
-
-    def __init__(self, debugMode: bool = False) -> None:
-        """Create an object that manages Futaba drivers.
-
-        Raises:
-            RuntimeError: Raised if no Futaba USB devices are detected
-
-        """
-        self._futabaDevices = tuple(
-            [
-                FutabaDeviceDriver(device)
-                for device in usb.core.find(find_all=True)
-                if FutabaDeviceDriver.deviceIsSupported(device)
-            ]
-        )
-
-        if len(self._futabaDevices) == 0:
-            raise DeviceNotFoundError
-
-        self.logger = utils.newLogger("FutabaDeviceManager")
-        atexit.register(self.stopAll)
-
-    def __enter__(self):
-        """Enter."""
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        """Exit."""
-        self.stopAll()
-        return self
-
     def findDevice(self, endpoint: int | None = None) -> usb.core.Device | None:
         """Find the Futaba device that has the provided endpoint.
 
@@ -74,12 +44,12 @@ class FutabaDeviceManager:
 
         """
         try:
-            return self._futabaDevices[deviceIndex].getState()
+            return self._drivers[deviceIndex].getState()
         except Exception as e:
             self.logger.warning(e)
             return None
 
-    def deviceInfo(self, deviceIndex: int, prop: str) -> str | int:
+    def deviceInfo(self, deviceIndex: int, prop: str) -> Any:
         """Get a property value of the specified device.
 
         Args:
@@ -89,12 +59,9 @@ class FutabaDeviceManager:
         Returns:
             str|int: The specified attributes value from the specified device.
         """
-        try:
-            return getattr(self._futabaDevices[deviceIndex], prop)
-        except Exception:
-            return None
+        return getattr(self._drivers[deviceIndex], prop)
 
-    def getPipe(self, deviceIndex: int) -> multiprocessing.Pipe:
+    def getPipe(self, deviceIndex: int) -> Connection:
         """Get a duplex pipe for real-time driver communication.
 
         Args:
@@ -103,19 +70,38 @@ class FutabaDeviceManager:
         Returns:
             multiprocessing.Pipe: Front-end of a duplex pipe
         """
-        self._futabaDevices[deviceIndex].enableEcho()
-        return self._futabaDevices[deviceIndex].pipe
+        self._drivers[deviceIndex].enableEcho()
+        return self._drivers[deviceIndex].pipe
 
-    def listDevices(self) -> list[dict]:
+    def listDevices(self) -> list[dict[str, int | Any]]:
         """Get an ordered list of available devices.
 
         Returns:
             list[dict]: A list of available devices.
 
         """
-        return [{"key": i, **device.toDict()} for i, device in enumerate(self._futabaDevices)]
+        return [{"key": i, **device.toDict()} for i, device in enumerate(self._drivers)]
 
-    def start(self, deviceIndex: int) -> list[dict]:
+    def scanForDevices(self) -> None:
+        """Scan for new devices."""
+
+        # Find all devices
+        foundDevices = [
+            device for device in usb.core.find(find_all=True)
+            if FutabaDeviceDriver.deviceIsSupported(device)
+        ]
+
+        # Add new devices
+        for device in foundDevices:
+            if device not in self._devices:
+                self._addDevice(device)
+
+        # Remove devices that are no longer present
+        for device in self._devices:
+            if device not in foundDevices:
+                self._removeDevice(device)
+
+    def start(self, deviceIndex: int) -> None:
         """Start the devices at the given indexes.
 
         Args:
@@ -126,24 +112,37 @@ class FutabaDeviceManager:
             list[dict]: A list of available devices.
 
         """
-        self.logger.debug(f"Attempting to start device at index {deviceIndex}")
-        result = self._futabaDevices[deviceIndex].start()
+        self.logger.debug("Attempting to start device at index %s", deviceIndex)
+        driver = self._drivers[deviceIndex]
+        if driver.getState() == DriverState.RUNNING:
+            self.logger.debug("Device at index %s is already running!", deviceIndex)
+            return
 
-        if result:
-            self.logger.debug(f"-> {self._futabaDevices[deviceIndex]} started")
+        if driver.start():
+            self.logger.debug("%s -> started", self._drivers[deviceIndex])
         else:
             raise RuntimeError(
                 f"Start requested failed for item at index {deviceIndex}",
             )
 
-        return self.listDevices()
+    def startAll(self, autoscan: bool = True) -> None:
+        """Start a driver for all connected Futaba devices
 
-    def startAll(self):
-        """Start a driver for each Futaba device."""
-        for device in self.listDevices():
-            self.start(device["key"])
+        Args:
+            autoscan (bool, optional): If true a preliminary scan will be
+            performed to detect devices. Defaults to True.
 
-    def stop(self, deviceIndex: int) -> list[dict]:
+        Returns:
+            list[dict]: list of dictionaries each representing a single
+            detected Futaba device
+        """
+        if autoscan:
+            self.scanForDevices()
+        for driver in self._drivers:
+            if driver.getState() != DriverState.RUNNING:
+                driver.start()
+
+    def stop(self, deviceIndex: int) -> None:
         """Stop the devices at the given indexes.
 
         Args:
@@ -154,29 +153,52 @@ class FutabaDeviceManager:
 
         """
         try:
-            self._futabaDevices[deviceIndex].stop()
+            self._drivers[deviceIndex].stop()
         except Exception as e:
             self.logger.warning(e)
-        return self.listDevices()
 
-    def stopAll(self, deviceList: list = None) -> list[dict]:
+    def stopAll(self) -> None:
         """Stop all running drivers.
 
         Returns:
             list[dict]: A list of available devices.
 
         """
-        try:
-            if not deviceList:
-                deviceList = self._futabaDevices
-            for device in deviceList:
-                device.stop()
-        except Exception as e:
-            self.logger.warning(e)
-        return self.listDevices()
+        for device, driver in zip(self._devices, self._drivers):
+            if driver.getState() == DriverState.RUNNING:
+                driver.stop()
+            self._removeDevice(device)
+
+    def __init__(self) -> None:
+        """Create an object that manages Futaba drivers.
+
+        Raises:
+            RuntimeError: Raised if no Futaba USB devices are detected
+
+        """
+        self._devices = [
+            device for device in usb.core.find(find_all=True)
+            if FutabaDeviceDriver.deviceIsSupported(device)
+        ]
+        self._drivers = [FutabaDeviceDriver(device) for device in self._devices]
+
+        if len(self._drivers) == 0:
+            raise DeviceNotFoundError
+
+        self.logger = utils.newLogger("FutabaDeviceManager")
+        atexit.register(self.stopAll)
+
+    def __enter__(self):
+        """Enter."""
+        return self
+
+    def __exit__(self,exc_type: Any, exc_value: Any, traceback: Any) -> FutabaDeviceManager:
+        """Exit."""
+        self.stopAll()
+        return self
 
     @staticmethod
-    def _deviceIsRunning(futabaDeviceDriver: FutabaDeviceDriver) -> bool:
+    def _deviceIsRunning(driver: FutabaDeviceDriver) -> bool:
         """Determine if the provided driver is currently running or not.
 
         Args:
@@ -186,4 +208,32 @@ class FutabaDeviceManager:
             bool: True if the device has a subprocess
 
         """
-        return futabaDeviceDriver.getState() == DriverState.RUNNING
+        return driver.getState() == DriverState.RUNNING
+
+    def _addDevice(self, device: usb.core.Device) -> None:
+        """Index a new Futaba device
+
+        Args:
+            device (usb.core.Device): The core device to index
+        """
+        assert len(self._devices) == len(self._drivers), "driver/device count mismatch"
+        if device not in self._devices:
+            self._devices.append(device)
+            self._drivers.append(FutabaDeviceDriver(device))
+
+    def _removeDevice(self, device: usb.core.Device) -> None:
+        """Remove a Futaba device from the index
+
+        Args:
+            device (usb.core.Device): The core device to remove from the index
+        """
+        assert len(self._devices) == len(self._drivers), "driver/device count mismatch"
+        # Safely clean up after ourselves here
+        # Value errors raised if the device to remove doesn't exist, so we ignore them
+        with suppress(ValueError):
+            # Get index of driver or raise a value error, which we can safely ignore and
+            # return from.
+            idx = self._devices.index(device)
+            self.stop(idx)  # Ensure driver is stopped
+            del self._devices[idx]  # Remove from our index
+            del self._drivers[idx]

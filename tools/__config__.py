@@ -23,7 +23,6 @@ with open(PYPROJECT_PATH, "rb") as f:
     toml_data = tomllib.load(f)
 PYPROJECT = toml_data
 
-
 # Refuse to run if we aren't operating in a venv
 if sys.prefix == sys.base_prefix:
     if not (PROJECT_ROOT / ".venv").exists():
@@ -48,32 +47,31 @@ if sys.prefix == sys.base_prefix:
         print("=" * 80)
     sys.exit(1)
 
-
 # Extract configuration values
 project_config = PYPROJECT["project"]
 build_config = PYPROJECT["tool"]["build_tool"]
 
 # Build configuration
 BIN_DIR = build_config["bin_dir"]
-BUILD_DIR = PROJECT_ROOT / build_config["build_dir"]
-EXECUTABLE_NAME = build_config["executable_name"]
-INSTALL_DIR = build_config["install_dir"]
-INSTALL_SCRIPT_NAME = build_config["install_script_name"]
-PACKAGE_DIR = PROJECT_ROOT / build_config["package_dir"]
-UNINSTALL_SCRIPT_NAME = build_config["uninstall_script_name"]
-WEB_INSTALL_SCRIPT_NAME = build_config["web_install_script_name"]
+BUILD_DIR: Path = PROJECT_ROOT / build_config["build_dir"]
+EXECUTABLE_NAME: Path = build_config["executable_name"]
+INSTALL_DIR: Path = build_config["install_dir"]
+INSTALL_SCRIPT_NAME: Path = build_config["install_script_name"]
+PACKAGE_DIR: Path = PROJECT_ROOT / build_config["package_dir"]
+UNINSTALL_SCRIPT_NAME: Path = build_config["uninstall_script_name"]
+WEB_INSTALL_SCRIPT_NAME: Path = build_config["web_install_script_name"]
 
 # Project metadata
-HOMEPAGE = project_config["urls"]["Homepage"]
-DISTRIBUTABLES_PAGE = project_config["urls"]["Distributables"]
-REPOSITORY = project_config["urls"]["Repository"]
-VERSION = project_config["version"]
+HOMEPAGE: Path = project_config["urls"]["Homepage"]
+DISTRIBUTABLES_PAGE: Path = project_config["urls"]["Distributables"]
+REPOSITORY: Path = project_config["urls"]["Repository"]
+VERSION: Path = project_config["version"]
 
 # Template paths
-TEMPLATES_DIR = PWD / "artifact-templates"
-SCRIPTS_TEMPLATES_DIR = TEMPLATES_DIR / "scripts"
+TEMPLATES_DIR: Path = PWD / "artifact-templates"
+SCRIPTS_TEMPLATES_DIR: Path = TEMPLATES_DIR / "scripts"
 
 # Additional build-specific paths
-SOURCE_MAIN = PROJECT_ROOT / "src" / "main.py"
-NUITKA_OUTPUT_DIR = PROJECT_ROOT / f"{SOURCE_MAIN.stem}.dist"
-WRAPPER_SCRIPT = PROJECT_ROOT / EXECUTABLE_NAME
+SOURCE_MAIN: Path = PROJECT_ROOT / "src" / "main.py"
+NUITKA_OUTPUT_DIR: Path = PROJECT_ROOT / f"{SOURCE_MAIN.stem}.dist"
+WRAPPER_SCRIPT: Path = PROJECT_ROOT / EXECUTABLE_NAME
