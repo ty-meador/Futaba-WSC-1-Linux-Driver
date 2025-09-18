@@ -58,22 +58,24 @@ CONFIG_PATH: Path = DRIVER_PATH / "configs"
 CALIBRATION_PATH: Path = DRIVER_PATH / "calibrations"
 LOG_PATH: Path = DRIVER_PATH / "logs"
 
-DDEFAULT_CONFIG: dict[int, list[str]]
 with open(CONFIG_PATH / "_default.json", encoding="utf-8") as f:
     DEFAULT_CONFIG = json.load(f)
 
 DEFAULT_CALIBRATION: list[tuple[int, ...]] = [
-    DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"]
-)]
+    DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])
+]
 
 if not os.path.exists(LOG_PATH):
     os.makedirs(LOG_PATH)
+
 
 @dataclass(frozen=True, slots=True)
 class DeviceConfig:
     """Stores the configuration settings for a single device."""
 
-    channelEvents: list[str] = field(default_factory=lambda: DEFAULT_CONFIG["channel_events"])
+    channelEvents: tuple[str, ...] = field(
+        default_factory=lambda: tuple(DEFAULT_CONFIG["channel_events"])
+    )
     deadZone: int = DEFAULT_DEADZONE
     frameSize: int = field(default_factory=lambda: DEFAULT_CONFIG["frame_size"])
     noiseFilter: int = DEFAULT_NOISE_FILTER

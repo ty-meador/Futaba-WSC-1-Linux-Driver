@@ -76,7 +76,6 @@ def main():
 
                 devList = mgr.listDevices()
                 keyList = list(map(lambda device: device["key"], devList))
-                print(keyList)
                 choice = -1  # Keys will never be negative
                 while choice not in keyList:
                     print(f"Found {len(devList)} Futaba devices")
