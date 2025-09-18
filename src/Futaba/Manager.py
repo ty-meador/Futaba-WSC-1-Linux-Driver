@@ -80,7 +80,7 @@ class FutabaDeviceManager:
             list[dict]: A list of available devices.
 
         """
-        return [{"key": i, **device.toDict()} for i, device in enumerate(self._drivers)]
+        return [{"key": i, **device.__dict__} for i, device in enumerate(self._drivers)]
 
     def scanForDevices(self) -> None:
         """Scan for new devices."""

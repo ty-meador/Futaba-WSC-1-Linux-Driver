@@ -7,6 +7,7 @@ from enum import Enum
 from enum import auto
 from typing import Any
 from multiprocessing.connection import Connection
+from multiprocessing import Process
 
 import usb
 from . import Util as utils
@@ -104,20 +105,20 @@ class FutabaDeviceDriver:
         if self.workerCtl.runFlag.is_set():
             self.workerCtl.runFlag.clear()
 
-    def toDict(self) -> dict[str, Any]:
-        """Create a dictionary representation of this driver."""
-        return dict({
-            "config": self.config,
-            "deviceChannels": len(self.deviceChannels),
-            "deviceUUID": self.deviceUUID,
-            "interruptEndpoint": self.interruptEndpoint,
-            "productName": self.productName,
-            "productID": self.productID,
-            "manufacturer": self.manufacturer,
-            "name": self.name,
-            "serialNumber": self.serialNumber,
-            "speed": self.speed,
-        })
+    # def toDict(self) -> dict[str, Any]:
+    #     """Create a dictionary representation of this driver."""
+    #     return dict({
+    #         "config": self.config,
+    #         "deviceChannels": len(self.deviceChannels),
+    #         "deviceUUID": self.deviceUUID,
+    #         "interruptEndpoint": self.interruptEndpoint,
+    #         "productName": self.productName,
+    #         "productID": self.productID,
+    #         "manufacturer": self.manufacturer,
+    #         "name": self.name,
+    #         "serialNumber": self.serialNumber,
+    #         "speed": self.speed,
+    #     })
 
     def toggleEcho(
         self,
@@ -197,7 +198,7 @@ class FutabaDeviceDriver:
 
     def _toSubprocTuple(
         self,
-    ) -> tuple[WorkerControl, DeviceConfig, tuple[ChannelDict, ...], str, int]:
+    ) -> tuple[WorkerControl, DeviceConfig, tuple[ChannelDict, ...], str, int | None]:
         """Create a tuple that is compatable with the worker function.
 
         Returns:
@@ -208,12 +209,12 @@ class FutabaDeviceDriver:
         return (
             self.workerCtl,
             DeviceConfig(
-                channelEvents=self.config["channel_events"],
-                deadZone=self.config["dead_zone"],
-                frameSize=self.config["frame_size"],
-                noiseFilter=self.config["noise_filter"],
+                channelEvents=self.channelEvents,
+                deadZone=self.deadZone,
+                frameSize=self.frameSize,
+                noiseFilter=self.noiseFilter,
             ), tuple([channel.toDict()
-                      for channel in self.deviceChannels]), self.name, self.interruptEndpoint
+                      for channel in self.deviceChannels]), self.name, self.endpoint
         )
 
     def __init__(self, device: usb.core.Device) -> None:
@@ -230,40 +231,43 @@ class FutabaDeviceDriver:
         # meta-stuff
         ##
         self.state: DriverState = DriverState.INITIALIZING
-
         self.endpoint: int | None = utils.findInterruptEndpoint(device)
         if self.endpoint is None:
             raise TypeError("Unable to find interrupt endpoint for device")
 
-        self.deviceInfo: dict[str, Any] = {
-            "productID": device.idProduct,
-            "serialNumber": device.serial_number,
-            "product": device.product,
-            "manufacturer": device.manufacturer,
-            "speed": device.speed,
-            "interruptEndpoint": self.endpoint,
-        }
-
-        self.logger = utils.newLogger(f"{self.deviceInfo['product']}_driver")
+        self.logger = utils.newLogger(f"{device.product}_driver")
         ##
         # Worker subproc stuff
         ##
-        self.subProc = None
-        self.frontPipe, self.backPipe = multiprocessing.Pipe()
-        self.workerCtl = WorkerControl(pipe=self.backPipe)
+        self.subProc: Process | None = None
+        self._frontPipe, self._backPipe = multiprocessing.Pipe()
+        self.workerCtl: WorkerControl = WorkerControl(pipe=self._backPipe)
 
         ##
         # Device stuff
         ##
-        self.config = self._loadConfig(self.productName)
-        self.deviceChannels = [
+        config = self._loadConfig(device.product)
+        self.channelEvents: tuple[str, ...] = tuple(config["channel_events"])
+        self.deadZone: int = config["dead_zone"]
+        self.deviceUUID: str = f"{device.idProduct:04X}-{device.serial_number}"
+        self.frameSize: int = config["frame_size"]
+        self.manufacturer: str = device.manufacturer
+        self.name: str = f"Futaba {device.product}({self.endpoint})"
+        self.noiseFilter: int = config["noise_filter"]
+        self.pipe: Connection = self._frontPipe
+        self.product: str = device.product
+        self.productID: str = device.idProduct
+        self.speed: int = device.speed
+        self.serialNumber: str = device.serial_number
+
+        self.deviceChannels = (
             InputChannel(eventName, calibration, False, logger=self.logger)
             for eventName, calibration in zip(
-                self.config["channel_events"],
-                self._loadCalibration(self.productName, self.deviceUUID),
+                config["channel_events"],
+                self._loadCalibration(self.product, self.deviceUUID),
                 strict=True,  # 1 event name and 1 calibration per channel
             )
-        ]
+        )
 
         atexit.register(self.stop)
 
@@ -286,7 +290,7 @@ class FutabaDeviceDriver:
             hash: The hash.
 
         """
-        return hash(self.toDict())
+        return hash(self.endpoint)
 
     def __str__(self) -> str:
         """Generate a string representation of this device driver."""
@@ -316,76 +320,3 @@ class FutabaDeviceDriver:
             coreDevice.idVendor == FUTABA_VENDOR_ID
             and utils.findInterruptEndpoint(coreDevice) is not None
         )
-
-    @property
-    def deadZone(self) -> int:
-        """The size of the dead zone for the device.
-
-        Returns:
-            int: The size of the dead zone for the device
-        """
-        return self.config["dead_zone"]
-
-    @property
-    def deviceUUID(self) -> str:
-        """Get a deterministic UUID for this device."""
-        return f"{self.productID:04X}-{self.serialNumber}"
-
-    @property
-    def frameSize(self) -> int:
-        """The frame size is the number of bytes read from the USB device per cycle."""
-        return self.config["frame_size"]
-
-    @property
-    def interruptEndpoint(self) -> int:
-        """The interrupt endpoint for the device."""
-        return int(self.deviceInfo["interruptEndpoint"])
-
-    @property
-    def manufacturer(self) -> str:
-        """The manufacturer of the device."""
-        return self.deviceInfo["manufacturer"]
-
-    @property
-    def model(self) -> str:
-        """The product name/model of the device."""
-        return self.name
-
-    @property
-    def name(self) -> str:
-        """The name that the virtual device will show up as to the operating system."""
-        return f"Futaba {self.deviceInfo['product']}({self.endpoint})"
-
-    @property
-    def noiseFilter(self) -> int:
-        """The minimum input change necessary trigger an output change.
-
-        Returns:
-            int: The noise filter value.
-        """
-        return self.config["noise_filter"]
-
-    @property
-    def pipe(self) -> Connection:
-        """A duple pipe providing real-time communication to the running driver."""
-        return self.frontPipe
-
-    @property
-    def productName(self) -> str:
-        """The product name/model of the device."""
-        return self.deviceInfo["product"]
-
-    @property
-    def productID(self) -> int:
-        """The product ID is a unique number assigned to vendors by the governing body."""
-        return self.deviceInfo["productID"]
-
-    @property
-    def serialNumber(self) -> str:
-        """The serial number of the device."""
-        return self.deviceInfo["serialNumber"]
-
-    @property
-    def speed(self) -> str:
-        """USB generation speed supported by the device."""
-        return self.deviceInfo["speed"]
