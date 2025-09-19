@@ -70,7 +70,6 @@ def packageDistribution() -> None:  # noqa: PLR0915
     """
     print("📦 Creating standalone distribution package...")
 
-    # Get version info
     version, buildDate = getVersionInfo()
     print(f"📋 Version: {version}")
     print(f"📅 Build: {buildDate}")

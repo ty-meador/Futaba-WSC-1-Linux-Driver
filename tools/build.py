@@ -2,7 +2,6 @@
 """Build script to create standalone executable for Futaba RC Driver."""
 
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -69,6 +68,7 @@ def buildExecutable():
         "nuitka",
         "--standalone",
         "--assume-yes-for-downloads",
+        "--enable-plugin=anti-bloat",
         "--show-progress",
         f"--output-filename={EXECUTABLE_NAME}",
         "--remove-output",
@@ -77,6 +77,10 @@ def buildExecutable():
         "--include-package=Futaba",
         "--include-package=usb",
         "--include-package=uinput",
+        "--noinclude-default-mode=error",
+        "--noinclude-setuptools-mode=nofollow",
+        "--noinclude-pytest-mode=nofollow",
+        "--noinclude-unittest-mode=nofollow",
         "--follow-import-to=uinput",
         "--follow-import-to=usb",
         "--follow-import-to=Futaba",
@@ -84,6 +88,7 @@ def buildExecutable():
         "--include-package-data=uinput",
         "--include-package-data=usb",
         "--include-data-files=pyproject.toml=pyproject.toml",
+        "--report=compilation-report.xml",
         str(SOURCE_MAIN),
         *findNativeLibraries(),
     ]
@@ -118,26 +123,24 @@ def findNativeLibraries():
 
     # Find .so files in the virtual environment
     dependencyPatterns = [
-        *[f"*{dep}*.so" for dep in PYPROJECT["tool"]["build_tool"]["native_dependencies"]],
-        *[
-            f"*{re.split(r'(>=|==|~=)', dep)[0]}*.so"
-            for dep in PYPROJECT["project"]["dependencies"]
-        ],
+        *[f"*{dep}*.so" for dep in PYPROJECT["tool"]["build_tool"]["native_dependencies"]]
     ]
 
     for pattern in dependencyPatterns:
+        print(f"    {pattern}")
         for libPath in venvPath.rglob(pattern):
+            print(f"        {libPath}")
             if libPath.is_file():
                 nuitkaArgs.append(f"--include-data-files={libPath}={libPath.name}")
                 print(f"📚 Found library: {libPath.name}")
+
     return nuitkaArgs
 
 
 def installDependencies():
     """Install build dependencies."""
     print("📦 Installing dependencies...")
-    # Install project requirements
-    if runCommand("pip3 install -r .") is None:
+    if runCommand("pip3 install .") is None:
         sys.exit(1)
 
 
