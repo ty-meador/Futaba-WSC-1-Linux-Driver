@@ -136,18 +136,8 @@ def findNativeLibraries():
 def installDependencies():
     """Install build dependencies."""
     print("📦 Installing dependencies...")
-
-    # Install build requirements
-    buildDeps = [
-        *PYPROJECT["build-system"]["requires"],
-        *PYPROJECT["project"]["dependencies"],
-    ]
-    if runCommand(f"pip3 install {' '.join(buildDeps)}") is None:
-        sys.exit(1)
-
-    # Install project requirements if they exist
-    if (PROJECT_ROOT /
-        "requirements.txt").exists() and runCommand("pip3 install -r requirements.txt") is None:
+    # Install project requirements
+    if runCommand("pip3 install -r .") is None:
         sys.exit(1)
 
 
