@@ -81,6 +81,7 @@ def buildExecutable():
         "--noinclude-setuptools-mode=nofollow",
         "--noinclude-pytest-mode=nofollow",
         "--noinclude-unittest-mode=nofollow",
+        "--noinclude-data-files=*.log",
         "--follow-import-to=uinput",
         "--follow-import-to=usb",
         "--follow-import-to=Futaba",

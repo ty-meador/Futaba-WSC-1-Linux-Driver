@@ -72,5 +72,7 @@ SCRIPTS_TEMPLATES_DIR: Path = TEMPLATES_DIR / "scripts"
 
 # Additional build-specific paths
 SOURCE_MAIN: Path = PROJECT_ROOT / "src" / "main.py"
+SRC_DIR = PROJECT_ROOT / "src"
+LOGS_DIR = PROJECT_ROOT / "src" / "Futaba" / "logs"
 NUITKA_OUTPUT_DIR: Path = PROJECT_ROOT / f"{SOURCE_MAIN.stem}.dist"
 WRAPPER_SCRIPT: Path = PROJECT_ROOT / EXECUTABLE_NAME

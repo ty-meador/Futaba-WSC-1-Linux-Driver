@@ -1,15 +1,33 @@
 #!./.venv/bin/python
 """Cleans up build and packaging artifacts."""
 
-import shutil
+import shutil, sys
 from argparse import ArgumentParser
+from typing import Callable
 
-from __config__ import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT
+from __config__ import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT, LOGS_DIR
 
 parser = ArgumentParser()
 parser.add_argument("--build", action="store_true", help="Remove previous build artifacts")
 parser.add_argument("--package", action="store_true", help="Remove previous package artifacts")
+parser.add_argument(
+    "--empty-log-dir", action="store_true", help="Remove everything inside src/Futaba/logs"
+)
 ARGS = parser.parse_args()
+
+
+def cleanLogsDir():
+    """Remove any log files from the driver package."""
+    for item in LOGS_DIR.iterdir():
+        try:
+            if item.is_file() or item.is_symlink():
+                item.unlink()
+            if item.is_dir():
+                shutil.rmtree(item)
+        except Exception as e:
+            print(f"⚠️  WARNING: Unable to remove {item}")
+            print(e)
+            print(f"⚠️  WARNING: Unable to remove {item}")
 
 
 def cleanBuildArtifacts():
@@ -37,15 +55,24 @@ def cleanAll():
 
 
 if __name__ == "__main__":
+    # If there were no arguments passed (except the script name, which is always passed)
+    # assume that we need to clean *everything*
+    if len(sys.argv) - 1 == 0:
+        ARGS.build = True
+        ARGS.package = True
+        ARGS.empty_log_dir = True
+
+    # List to hold the functions that we need
+    callables: list[Callable[[], None]] = []
 
     if ARGS.build:
-        print("🧹 Removing previous build artifacts...")
-        cleanBuildArtifacts()
-    elif ARGS.package:
-        print("🧹 Removing previous package artifacts...")
-        cleanPackageArtifacts()
-    else:
-        print("🧹 Removing previous artifacts...")
-        cleanBuildArtifacts()
-        cleanPackageArtifacts()
+        callables.append(cleanBuildArtifacts)
+    if ARGS.package:
+        callables.append(cleanPackageArtifacts)
+    if ARGS.empty_log_dir:
+        callables.append(cleanLogsDir)
+
+    print("🧹 Removing previous artifacts...")
+    for func in callables:
+        func()
     print("✨ Done!")
