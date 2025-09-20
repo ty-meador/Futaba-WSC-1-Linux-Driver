@@ -1,7 +1,8 @@
 #!./.venv/bin/python
 """Cleans up build and packaging artifacts."""
 
-import shutil, sys
+import shutil
+import sys
 from argparse import ArgumentParser
 from typing import Callable
 

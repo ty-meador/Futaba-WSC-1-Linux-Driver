@@ -18,7 +18,7 @@ VENV="${PROEJECT_ROOT}/.venv"
 if [ ! -f "${VENV}/bin/activate" ]; then
     echo "Error: Virtual environment not found at ${VENV}"
     echo "Please create a virtual environment with minimum python version 3.11.0"
-    echo "python3 -m venv venv"
+    echo "python3 -m venv .venv"
     exit 1
 fi
 
