@@ -5,13 +5,13 @@ from array import array
 from dataclasses import dataclass, field
 from logging import Logger
 import sys
-import typing
+import typing as t
 
 from . import Util as utils
 from .__config__ import DEFAULT_INPUT_RANGE, DEFAULT_OUTPUT_RANGE
 
 
-class ChannelDict(typing.TypedDict):
+class ChannelDict(t.TypedDict):
     """Stores information for a single input channel."""
 
     eventName: str
@@ -24,10 +24,10 @@ class ChannelCalibration:
 
     Args:
         logger (logging.Logger): The logger you want this class to use
-        inputRange (typing.typing.Iterable, optional): An iterable of length 3 where each item represents
+        inputRange (t.t.Iterable, optional): An iterable of length 3 where each item represents
         the low, middle, and high point respectively in increasing order.
         defaults to DEFAULT_INPUT_RANGE
-        outputRange (typing.typing.Iterable, optional): An iterable of length 3 where each item represents
+        outputRange (t.t.Iterable, optional): An iterable of length 3 where each item represents
         the low, middle, and high point respectively in increasing order.
         defaults to DEFAULT_OUTPUT_RANGE
         reverse (bool, optional): If reverse the calibrated values will be
@@ -72,8 +72,8 @@ class ChannelCalibration:
 
     """
 
-    inputRange: typing.Iterable[int] = field(default_factory=lambda: DEFAULT_INPUT_RANGE)
-    outputRange: typing.Iterable[int] = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
+    inputRange: t.Iterable[int] = field(default_factory=lambda: DEFAULT_INPUT_RANGE)
+    outputRange: t.Iterable[int] = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
 
     logger: Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
@@ -115,16 +115,16 @@ class ChannelCalibration:
     @classmethod
     def _generateValueMap(
         cls,
-        inputRange: typing.Iterable[int],
-        outputRange: typing.Iterable[int],
+        inputRange: t.Iterable[int],
+        outputRange: t.Iterable[int],
         reverse: bool = False,
     ) -> array[int]:
         """Generate a list of values that maps the input range to the output range.
 
         Args:
-            inputRange (typing.typing.Iterable[int]): This determines the size of the map.
+            inputRange (t.t.Iterable[int]): This determines the size of the map.
             Defaults to utils.DEFAULT_INPUT_RANGE.
-            outputRange (typing.typing.Iterable[int]): This determines what values are generated in the
+            outputRange (t.t.Iterable[int]): This determines what values are generated in the
             map. Defaults to utils.DEFAULT_OUTPUT_RANGE.
             reverse (bool, optional): If set to true the map will be generated backwards. This will
             reverse the direction of the input.
@@ -179,7 +179,7 @@ class InputChannel:
     """Provides a class based representation of a single input channel."""
 
     eventName: str
-    calibrationRange: typing.Iterable[int]
+    calibrationRange: t.Iterable[int]
     isReversed: bool = False
     logger: Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
     valueMap: array[int] = field(default_factory=lambda: array('i'))

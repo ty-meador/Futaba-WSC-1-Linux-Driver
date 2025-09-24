@@ -151,7 +151,7 @@ def run(
                 rawValue = int(fromBytes(rawData[i:i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
-                maxInputVal = len(calibration) - 1  # account for off-by-one
+                maxInputVal = len(calibration) - 1  # account for classic decimal to bin off-by-one
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
                 # The way that we generate the calibration table means there will always be an
