@@ -2,7 +2,7 @@
 # pylint: disable=import-outside-toplevel
 
 from .InputChannel import ChannelDict
-from .IPC import DataFrame, WorkerControl
+from .IPC import WorkerControl
 from .__config__ import DeviceConfig
 
 
@@ -54,6 +54,7 @@ def run(
         FUTABA_VENDOR_ID,
     )
     from .Error import DeviceNotFoundError
+    from .IPC import DataFrame
 
     logger = utils.newLogger(f"{name}_subproc")
 

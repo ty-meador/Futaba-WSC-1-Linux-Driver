@@ -1,11 +1,11 @@
 """Classes for handling input channels."""
 
 from __future__ import annotations
-import array
-import logging
+from array import array
+from dataclasses import dataclass, field
+from logging import Logger
 import sys
 import typing
-from dataclasses import dataclass, field
 
 from . import Util as utils
 from .__config__ import DEFAULT_INPUT_RANGE, DEFAULT_OUTPUT_RANGE
@@ -15,7 +15,7 @@ class ChannelDict(typing.TypedDict):
     """Stores information for a single input channel."""
 
     eventName: str
-    valueMap: array.array[int]
+    valueMap: array[int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,10 +24,10 @@ class ChannelCalibration:
 
     Args:
         logger (logging.Logger): The logger you want this class to use
-        inputRange (typing.Iterable, optional): An iterable of length 3 where each item represents
+        inputRange (typing.typing.Iterable, optional): An iterable of length 3 where each item represents
         the low, middle, and high point respectively in increasing order.
         defaults to DEFAULT_INPUT_RANGE
-        outputRange (typing.Iterable, optional): An iterable of length 3 where each item represents
+        outputRange (typing.typing.Iterable, optional): An iterable of length 3 where each item represents
         the low, middle, and high point respectively in increasing order.
         defaults to DEFAULT_OUTPUT_RANGE
         reverse (bool, optional): If reverse the calibrated values will be
@@ -75,9 +75,9 @@ class ChannelCalibration:
     inputRange: typing.Iterable[int] = field(default_factory=lambda: DEFAULT_INPUT_RANGE)
     outputRange: typing.Iterable[int] = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
 
-    logger: logging.Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
+    logger: Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
-    valueMap: array.array[int] = field(init=False, repr=False)
+    valueMap: array[int] = field(init=False, repr=False)
     valueMapSize: int = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -118,19 +118,19 @@ class ChannelCalibration:
         inputRange: typing.Iterable[int],
         outputRange: typing.Iterable[int],
         reverse: bool = False,
-    ) -> array.array[int]:
+    ) -> array[int]:
         """Generate a list of values that maps the input range to the output range.
 
         Args:
-            inputRange (typing.Iterable[int]): This determines the size of the map.
+            inputRange (typing.typing.Iterable[int]): This determines the size of the map.
             Defaults to utils.DEFAULT_INPUT_RANGE.
-            outputRange (typing.Iterable[int]): This determines what values are generated in the
+            outputRange (typing.typing.Iterable[int]): This determines what values are generated in the
             map. Defaults to utils.DEFAULT_OUTPUT_RANGE.
             reverse (bool, optional): If set to true the map will be generated backwards. This will
             reverse the direction of the input.
 
         Returns:
-            array.array: An array of all possible output values which can be interpolated from the
+            array: An array of all possible output values which can be interpolated from the
             range of input values.
 
         """
@@ -154,7 +154,7 @@ class ChannelCalibration:
 
         # Create a value map such that the index of the array represents
         # the input value, and the contents at that index is the output
-        allPossibleInputValues = array.array("i", [outputMin] * mapSize)
+        allPossibleInputValues = array("i", [outputMin] * mapSize)
 
         arrayRange = range(inputMin, inputMax)
         if reverse:
@@ -162,7 +162,7 @@ class ChannelCalibration:
         for i in arrayRange:
             allPossibleInputValues[i] = i
 
-        return array.array(
+        return array(
             "i",
             utils.interpolate(
                 allPossibleInputValues,
@@ -181,8 +181,8 @@ class InputChannel:
     eventName: str
     calibrationRange: typing.Iterable[int]
     isReversed: bool = False
-    logger: logging.Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
-    valueMap: array.array[int] = field(default_factory=lambda: array.array('i'))
+    logger: Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
+    valueMap: array[int] = field(default_factory=lambda: array('i'))
     calibration: ChannelCalibration | None = None
 
     def __post_init__(self) -> None:

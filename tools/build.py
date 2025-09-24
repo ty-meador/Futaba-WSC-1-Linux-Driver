@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Build script to create standalone executable for Futaba RC Driver."""
-
-import os
-import shutil
-import subprocess
-import sys
 from argparse import ArgumentParser
+import os
 from pathlib import Path
+import shutil
+from subprocess import CalledProcessError
+import sys
+
+from clean import cleanBuildArtifacts
 from __config__ import (
     BUILD_DIR,
     EXECUTABLE_NAME,
@@ -17,8 +18,8 @@ from __config__ import (
     SOURCE_MAIN,
     WRAPPER_SCRIPT,
 )
-from clean import cleanBuildArtifacts
-from util import renderTemplate, runCommand
+
+import util
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -95,8 +96,8 @@ def buildExecutable():
     ]
 
     try:
-        runCommand(cmd, capture=False, shell=False)
-    except subprocess.CalledProcessError:
+        util.runCommand(cmd, capture=False, shell=False)
+    except CalledProcessError:
         print("❌ Nuitka build failed")
         return None
 
@@ -141,7 +142,7 @@ def findNativeLibraries():
 def installDependencies():
     """Install build dependencies."""
     print("📦 Installing dependencies...")
-    if runCommand("pip3 install .") is None:
+    if util.runCommand("pip3 install .") is None:
         sys.exit(1)
 
 
@@ -154,10 +155,10 @@ def setupExecutable(execPath: Path):
 
     # Move to final location
     if BUILD_DIR.exists():
-        shutil.rmtree(BUILD_DIR)
-    shutil.move(str(execPath.parent), str(BUILD_DIR))
+        shutil.rmtree(BUILD_DIR)  # shutil
+    shutil.move(str(execPath.parent), str(BUILD_DIR))  # shutil
 
-    renderTemplate(
+    util.renderTemplate(
         SCRIPTS_TEMPLATES_DIR / "wrapper-script.sh",
         {
             "build_dir": os.path.basename(BUILD_DIR),
@@ -167,7 +168,7 @@ def setupExecutable(execPath: Path):
     )
 
     # Show stats
-    result = runCommand(f"du -sh {BUILD_DIR}")
+    result = util.runCommand(f"du -sh {BUILD_DIR}")
     if result:
         print(f"📦 Distribution size: {result.split()[0]}")
 
@@ -175,7 +176,7 @@ def setupExecutable(execPath: Path):
 def testExecutable():
     """Test the built executable."""
     print("🧪 Testing executable...")
-    if runCommand(f"{BUILD_DIR / EXECUTABLE_NAME} --version") is not None:
+    if util.runCommand(f"{BUILD_DIR / EXECUTABLE_NAME} --version") is not None:
         print("✅ Executable test successful")
         return True
     print("⚠️  Executable may have issues")
@@ -188,18 +189,18 @@ def validateEnvironment():
 
     # Check Nuitka
     try:
-        runCommand("python3 -m nuitka --version", capture=False)
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        util.runCommand("python3 -m nuitka --version", capture=False)
+    except (CalledProcessError, FileNotFoundError):
         print("❌ Nuitka not found. Install with: pip3 install nuitka")
         sys.exit(1)
 
     # Check C compiler
     for compiler in ["gcc", "clang", "cc"]:
         try:
-            runCommand(f"{compiler} --version", capture=False)
+            util.runCommand(f"{compiler} --version", capture=False)
             print(f"✅ Found C compiler: {compiler}")
             break
-        except (subprocess.CalledProcessError, FileNotFoundError):
+        except (CalledProcessError, FileNotFoundError):
             continue
     else:
         print("❌ No C compiler found! Install with: sudo apt install build-essential")

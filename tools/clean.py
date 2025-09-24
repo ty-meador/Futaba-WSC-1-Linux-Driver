@@ -1,10 +1,10 @@
 #!./.venv/bin/python
 """Cleans up build and packaging artifacts."""
 
+from argparse import ArgumentParser
+import typing as t
 import shutil
 import sys
-from argparse import ArgumentParser
-from typing import Callable
 
 from __config__ import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT, LOGS_DIR
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
         ARGS.empty_log_dir = True
 
     # List to hold the functions that we need
-    callables: list[Callable[[], None]] = []
+    callables: list[t.Callable[[], None]] = []
 
     if ARGS.build:
         callables.append(cleanBuildArtifacts)
