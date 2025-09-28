@@ -33,12 +33,13 @@ CALIBRATIONS_PATH = PWD / "Futaba/calibrations"
 EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
 
 parser = ArgumentParser()
-parser.add_argument("--bus", help="The bus of the device you want to start a driver for")
 parser.add_argument("--calibrate", action="store_true", help="Used for calibration")
 parser.add_argument("--daemonize", action="store_true", help="Run as a background daemon")
-parser.add_argument("--endpoint", help="Start a driver on the device at this endpoint")
 parser.add_argument("--port", help="The port of the device you want start a driver for")
 parser.add_argument("--version", action="store_true", help="Get driver version")
+parser.add_argument(
+    "--setup", action="store_true", help="Setup a new device or reconfigure an existing one"
+)
 ARGS = parser.parse_args()
 
 
@@ -58,8 +59,9 @@ def main():
                 loop = asyncio.new_event_loop()
                 loop.create_task(daemonMode(mgr))
                 loop.run_forever()
+            elif ARGS.setup:
+                setup()
             else:
-
                 devList = mgr.listDevices()
                 keyList = list(map(lambda device: device["key"], devList))
                 choice = -1  # Keys will never be negative
@@ -97,6 +99,15 @@ async def daemonMode(mgr: Futaba.DeviceManager) -> None:
         mgr.scanForDevices()  # scan for devices,
         mgr.startAll()  # start new ones.
         await asyncio.sleep(1)  # yield to event loop for at least 1 second
+
+
+def setup(mgr: Futaba.DeviceManager) -> None:
+    """Set up a new device"""
+
+    print("Which Futaba device would you like to set up?")
+    mgr.scanForDevices()
+    for device in mgr.listDevices():
+        print(device)
 
 
 if __name__ == "__main__":

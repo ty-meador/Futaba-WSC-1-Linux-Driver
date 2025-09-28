@@ -35,6 +35,11 @@ class SocketLock:
             self.lockSocket = None
 
     def __init__(self, port: int = 1962):  # 🥚
+        """Create a SocketLock instance
+
+        Args:
+            port (int, optional): The port to bind the lock to. Defaults to 1962.
+        """
         self.lockPort = port
         self.lockSocket = None
         atexit.register(self.unlock)
