@@ -77,6 +77,7 @@ class FutabaDeviceDriver:
             target=Worker.run,
             args=self._toSubprocTuple(),
         )
+
         self.subProc.start()
 
         return self.getState()

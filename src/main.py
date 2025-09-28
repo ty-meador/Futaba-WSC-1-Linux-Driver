@@ -13,7 +13,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import tomllib
-from ProcessLock import LockNotAcquired, ProcessLock
+from SocketLock import LockNotAcquired, SocketLock
 
 import Futaba
 
@@ -50,10 +50,10 @@ def main():
             print(PYPROJECT["project"]["version"])
             sys.exit(0)
 
-        # Futaba.Driver.ProcessLock: Prevents multiple driver instances from running.
+        # Futaba.Driver.SocketLock: Prevents multiple driver instances from running.
         # Futaba.DeviceManager: It's a futaba device manager...
         mgr = Futaba.DeviceManager()
-        with ProcessLock():
+        with SocketLock():
             if ARGS.daemonize:
                 loop = asyncio.new_event_loop()
                 loop.create_task(daemonMode(mgr))
