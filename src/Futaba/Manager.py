@@ -109,7 +109,7 @@ class FutabaDeviceManager:
                 f"Start requested failed for item at index {deviceIndex}",
             )
 
-    def startAll(self, autoscan: bool = True) -> None:
+    def startAll(self) -> None:
         """Start a driver for all connected Futaba devices
 
         Args:
@@ -120,8 +120,6 @@ class FutabaDeviceManager:
             list[dict]: list of dictionaries each representing a single
             detected Futaba device
         """
-        if autoscan:
-            self.scanForDevices()
         for driver in self._drivers:
             if driver.getState() != DriverState.RUNNING:
                 driver.start()
