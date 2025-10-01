@@ -1,7 +1,11 @@
 """Module for preventing duplicate application instances."""
 import atexit
 import errno
+import os
 import socket
+from pathlib import Path
+
+PWD = Path(__file__).parent.resolve()
 
 
 class LockNotAcquired(Exception):
@@ -21,6 +25,7 @@ class SocketLock:
         try:
             self.lockSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.lockSocket.bind(("127.0.0.1", self.lockPort))
+            self.pidFile.touch()
         except OSError as e:
             if e.errno == errno.EADDRINUSE:
                 raise DuplicateProcess(
@@ -33,6 +38,8 @@ class SocketLock:
         if self.lockSocket:
             self.lockSocket.close()
             self.lockSocket = None
+        if self.pidFile.exists():
+            self.pidFile.unlink()
 
     def __init__(self, port: int = 1962):  # 🥚
         """Create a SocketLock instance
@@ -42,6 +49,7 @@ class SocketLock:
         """
         self.lockPort = port
         self.lockSocket = None
+        self.pidFile = PWD / f"{os.getpid()}.pid"
         atexit.register(self.unlock)
 
     def __enter__(self):

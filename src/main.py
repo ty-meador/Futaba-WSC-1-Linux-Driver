@@ -8,12 +8,13 @@ under certain conditions; See GNU GPL V3 for more info.
 """
 import asyncio
 import curses
+import os
+import signal
 import sys
 import time
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
-from contextlib import suppress
 
 import tomllib
 from SocketLock import LockNotAcquired, SocketLock
@@ -35,12 +36,12 @@ with open(PYPROJECT_PATH, "rb") as f:
 PYPROJECT = toml_data
 CALIBRATIONS_PATH = PWD / "Futaba/calibrations"
 EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
-
 parser = ArgumentParser()
 parser.add_argument(
     "--calibrate", action="store_true", help="Calibrate a transmitter to a receiver"
 )
 parser.add_argument("--daemonize", action="store_true", help="Run as a background daemon")
+parser.add_argument("--reload", action="store_true", help="Restart the running background daemon")
 parser.add_argument("--version", action="store_true", help="Get driver version")
 parser.add_argument(
     "--setup", action="store_true", help="Setup a new device or reconfigure an existing one"
@@ -181,27 +182,26 @@ def calibrationMode(
     calibrationUI.nodelay(True)
     calibrationUI.render()
     fileName = f"{selectedDevice['product']}_{selectedDevice['deviceUUID']}.json"
-    with suppress(KeyboardInterrupt):
+    done = False
+    try:
         mode = "minmax"
-        done = False
         while not done:
             time.sleep(0.01)  # Prevent busy-waiting
             while pipe.poll():
                 [channel, rawV, calibV] = pipe.recv()
                 # move to next calibration step every time they press enter
                 if calibrationUI.getch() == ENTER:
-                    # If we've already min/maxd, we're done. generate the file.
-                    if mode == "minmax":
-                        done = True
-                        break
-                    mode = "minmax"
+                    done = True
+                    break
                 if mode == "minmax":
                     calibrationWidget.minMax(channel, rawV)
                 calibrationUI.updateChannel(channel, calibV)
                 calibrationUI.render()
-
-    calibrationWidget.generateFile(fileName)
-    mgr.stopAll()
+        if not done:
+            raise RuntimeError("CALIBRATION DID NOT COMPLETE SUCCESSFULLY")
+        calibrationWidget.generateFile(fileName)
+    finally:
+        mgr.stopAll()
 
 
 async def daemonMode(mgr: Futaba.DeviceManager) -> None:
@@ -223,9 +223,34 @@ async def daemonMode(mgr: Futaba.DeviceManager) -> None:
         await asyncio.sleep(.1)  # yield to event loop for at least .1 second
 
 
+def findPidFile():
+    """Find the pid file if one exists"""
+    search = list(PWD.glob("*.pid"))
+    if len(search) == 0:
+        return None
+    return search[0]
+
+
+def killRunningProcess():
+    """Reload the driver."""
+    pidFile = findPidFile()
+    if not pidFile:
+        return
+    print("🔄 Reloading driver")
+    [pid, _] = pidFile.name.split(".")
+    os.kill(int(pid), signal.SIGTERM)
+    time.sleep(1)  # Give it time to shut down
+    pidFile.unlink()
+
+
 if __name__ == "__main__":
     try:
         with SocketLock():
             main()
     except LockNotAcquired:
-        print("🏁 Driver already running. Have Fun!")
+        if ARGS.reload:
+            killRunningProcess()
+            with SocketLock():
+                main()
+        else:
+            print("🏁 Driver already running. Have Fun!")
