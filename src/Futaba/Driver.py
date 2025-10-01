@@ -109,9 +109,9 @@ class FutabaDeviceDriver:
     ):
         """Toggle echo on or off."""
         if self.workerCtl.echoFlag.is_set():
-            self.workerCtl.echoFlag.clear()
+            self.disableEcho()
         else:
-            self.workerCtl.echoFlag.set()
+            self.enableEcho()
 
     def _loadConfig(self, productName: str) -> dict[str, Any]:
         """Load the device config.
@@ -228,7 +228,7 @@ class FutabaDeviceDriver:
         self.workerCtl: WorkerControl = WorkerControl(pipe=self._backPipe)
 
         ##
-        # usb.core.Device stuff
+        # Device stuff
         ##
         config = self._loadConfig(device.product)
         self.channelEvents: tuple[str, ...] = tuple(config["channel_events"])

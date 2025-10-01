@@ -6,8 +6,9 @@
 
 from .Driver import FutabaDeviceDriver
 from .Manager import FutabaDeviceManager
+from .Util import CalibrationWidget
 
-__all__ = ["FutabaDeviceManager", "FutabaDeviceDriver"]
+__all__ = ["FutabaDeviceManager", "FutabaDeviceDriver", "CalibrationWidget"]
 
 # Allows
 # `import Futaba`

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class WindowCoords:
     """Store all the necessary coordinate metadata for a single window."""
-
     x: int
     y: int
     width: int
@@ -16,8 +15,7 @@ class WindowCoords:
 
 class Window:
     """Represents a single window."""
-
-    def __init__(self, windowCoords: WindowCoords, title: str = None):
+    def __init__(self, windowCoords: WindowCoords, title: str | None = None):
         """Create and render a window."""
         curses.curs_set(0)
         self.window = curses.newwin(
@@ -53,7 +51,7 @@ class Window:
         self.title = title
         self.render()
 
-    def render(self):
+    def render(self) -> None:
         """Clear the window and redraw it."""
         self._render()
         self.window.border()
@@ -65,6 +63,6 @@ class Window:
             )
         self.window.refresh()
 
-    def _render(self):
+    def _render(self) -> None:
         """Render the window."""
         raise TypeError("Window._render must be implemented by subclasses")

@@ -1,6 +1,7 @@
 """Module for cralibation UI components."""
 
-from .Window import Window
+
+from .Window import Window, WindowCoords
 
 MIN = -32768
 MAX = 32767
@@ -17,12 +18,14 @@ MAX = 32767
 ##
 class CalibrationUI(Window):
     """Draw the status UI element."""
-    def __init__(self, windowCoords):
+    def __init__(self, windowCoords: WindowCoords):
         """Create a calibration feedback UI element."""
         super().__init__(windowCoords)
         self.barSegmentsRight = tuple(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"])
         self.barSegmentsLeft = tuple(["▕", "🮇", "🮈", "▐", "🮉", "🮊", "🮋", "█"])
-        self.knownChannels = {}
+        self.steeringPos = 0
+        self.throttlePos = 0
+        self.knownChannels: dict[tuple[int, int], str] = {}
         self.throttleChannel = (3, 1)
         self.length = 80
         ##
@@ -47,7 +50,7 @@ class CalibrationUI(Window):
         self.hito = "──────人──────"  # "human/person" - the operator at the center of control
         self.haya = " 速 "  # "speed"
 
-    def setBoth(self, steeringPos, throttlePos):
+    def setBoth(self, steeringPos: int, throttlePos: int):
         """Update both the steering and throttle position in a single render.
 
         Args:
@@ -59,11 +62,7 @@ class CalibrationUI(Window):
         self.throttlePos = throttlePos
         self.render()
 
-    def setInfoMessage(self, msg):
-        """Set the info message."""
-        self.infoMsg = msg
-
-    def updateChannel(self, channel, calibV):
+    def updateChannel(self, channel: tuple[int, int], calibV: int):
         """Update the UI display for the given channel.
 
         Args:
@@ -82,7 +81,7 @@ class CalibrationUI(Window):
             -barLen if channel == self.throttleChannel else barLen,
         )
 
-    def _render(self):
+    def _render(self) -> None:  # type: ignore[override]
         vOffset = (self.height // 2) - (
             len(self.knownChannels) - 1  # Account for added hito decoration
         )
@@ -114,7 +113,7 @@ class CalibrationUI(Window):
                 self.knownChannels[self.throttleChannel],
             )
 
-    def _generateCenterLine(self, centerPiece, totalLength):
+    def _generateCenterLine(self, centerPiece: str, totalLength: int):
         """Generate the center line that aligns with other bars' centers.
 
         Args:
@@ -127,7 +126,7 @@ class CalibrationUI(Window):
         """
         return self._positionAtCenter(totalLength, centerPiece)
 
-    def _positionAtCenter(self, totalLength, content):
+    def _positionAtCenter(self, totalLength: int, content: str):
         """Center any content within the total length.
 
         This is the core centering function used by both bars and center line.
@@ -137,7 +136,7 @@ class CalibrationUI(Window):
         rightPadding = " " * (totalLength - contentStart - len(content))
         return leftPadding + content + rightPadding
 
-    def _generateAxisBar(self, hito, totalLength, progress):
+    def _generateAxisBar(self, hito: str, totalLength: int, progress: int) -> str:
         """Generate a progress bar that grows outward from a centered segment.
 
         The center segment stays fixed at the center, and progress bars grow
@@ -167,7 +166,13 @@ class CalibrationUI(Window):
         # Now position everything with center segment truly centered
         return self._positionBarAroundCenter(totalLength, hito, barChars, isLeftSide)
 
-    def _positionBarAroundCenter(self, totalLength, hito, barChars, isLeftSide):
+    def _positionBarAroundCenter(
+        self,
+        totalLength: int,
+        hito: str,
+        barChars: str,
+        isLeftSide: bool,
+    ) -> str:
         """Position the bar and center segment with center segment truly centered."""
         # Calculate where center segment should start to be truly centered
         centerSegmentStart = (totalLength - len(hito)) // 2
