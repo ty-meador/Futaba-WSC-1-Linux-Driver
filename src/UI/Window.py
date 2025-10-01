@@ -66,3 +66,21 @@ class Window:
     def _render(self) -> None:
         """Render the window."""
         raise TypeError("Window._render must be implemented by subclasses")
+
+
+class Banner(Window):
+    """Draw the main options."""
+    def __init__(self, windowCoords: WindowCoords, text: str):
+        """Create a MainMenu window object.
+
+        Args:
+            windowCoords (WindowCoords): The coordinate metadata for the window you want to render
+            options (iterable of str): The options items to display
+
+        """
+        super().__init__(windowCoords)
+        self.title = text
+        self.selected = 0
+
+    def _render(self):
+        pass

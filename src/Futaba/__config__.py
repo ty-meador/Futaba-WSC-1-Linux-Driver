@@ -6,8 +6,6 @@ import logging
 from pathlib import Path
 import tomllib
 
-import evdev
-
 # Project structure
 PWD = Path(__file__).parent.resolve()
 PROJECT_ROOT = PWD.parent.parent
@@ -80,15 +78,3 @@ class DeviceConfig:
     deadZone: int = DEFAULT_DEADZONE
     frameSize: int = field(default_factory=lambda: DEFAULT_CONFIG["frame_size"])
     noiseFilter: int = DEFAULT_NOISE_FILTER
-
-
-# Dynamically generated below
-UINPUT_EVENTS_MAP = {}
-
-for name, code in evdev.ecodes.BTN.items():  # type: ignore
-    UINPUT_EVENTS_MAP[name] = (evdev.ecodes.EV_KEY, code)  # type: ignore
-    UINPUT_EVENTS_MAP[(evdev.ecodes.EV_KEY, code)] = name  # type: ignore
-
-for name, code in evdev.ecodes.ABS.items():  # type: ignore
-    UINPUT_EVENTS_MAP[name] = (evdev.ecodes.EV_ABS, code)  # type: ignore
-    UINPUT_EVENTS_MAP[(evdev.ecodes.EV_ABS, code)] = name  # type: ignore

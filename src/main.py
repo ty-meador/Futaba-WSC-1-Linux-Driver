@@ -55,34 +55,38 @@ if ARGS.version:
 def main():
     """Project entrypoint."""
     mgr = Futaba.DeviceManager()
-    if ARGS.calibrate:
-        try:
-            curses.wrapper(calibrationMode, mgr)
-        except Exception:
-            # Make sure we get a stack trace from curses
-            traceback.print_exc()
-            raise
-        print("Calibration complete!")
-        sys.exit(0)
-    elif ARGS.daemonize:
-        loop = asyncio.new_event_loop()
-        loop.create_task(daemonMode(mgr))
-        loop.run_forever()
-    else:
-        devList = mgr.listDevices()
-        keyList = list(map(lambda device: device["key"], devList))
-        choice = -1  # Keys will never be negative
-        while choice not in keyList:
-            print(f"Found {len(devList)} Futaba devices")
-            print("Which one would you like to test?")
-            for device in devList:
-                print(f"{device['key']}: {device['name']}")
-            choice = int(input("Choice: "))
-        mgr.start(choice)
-        print("🏳️  Driver running, ctrl+c to quit")
+    try:
+        if ARGS.calibrate:
+            try:
+                curses.wrapper(calibrationMode, mgr)
+                print("Calibration complete!")
+                sys.exit(0)
+            except Exception:
+                # Make sure we get a stack trace from curses
+                traceback.print_exc()
+                raise
+        elif ARGS.daemonize:
+            loop = asyncio.new_event_loop()
+            loop.create_task(daemonMode(mgr))
+            loop.run_forever()
+        else:
+            devList = mgr.listDevices()
+            keyList = list(map(lambda device: device["key"], devList))
+            choice = -1  # Keys will never be negative
+            while choice not in keyList:
+                print(f"Found {len(devList)} Futaba devices")
+                print("Which one would you like to test?")
+                for device in devList:
+                    print(f"{device['key']}: {device['name']}")
+                choice = int(input("Choice: "))
+            mgr.start(choice)
+            print("🏳️  Driver running, ctrl+c to quit")
 
-        while True:
-            time.sleep(0.1)  # Prevent busy waiting
+            while True:
+                time.sleep(0.1)  # Prevent busy waiting
+    except KeyboardInterrupt:
+        mgr.stopAll()
+        print("🏴 Driver stopped")
 
 
 def calibrationMode(
@@ -124,7 +128,8 @@ def calibrationMode(
     ##
     menu = UI.Menu(
         windowCoords,
-        [UI.MenuItem(device["name"], device) for device in deviceManager.listDevices()]
+        "( Which receiver is your transmitter paired to? )",
+        [UI.MenuItem(device["name"], device) for device in deviceManager.listDevices()],
     )
     menu.render()
     while inpt != ENTER:
@@ -136,21 +141,48 @@ def calibrationMode(
     inpt = None
 
     selectedDevice = menu.getItem()
+    deviceManager.start(selectedDevice["key"])
+    pipe = deviceManager.getPipe(selectedDevice["key"])
+
     menu.erase()
     parentScreen.refresh()
 
-    deviceManager.start(selectedDevice["key"])
-    pipe = deviceManager.getPipe(selectedDevice["key"])
-    # Generates the calibration
+    # Generates the calibration (not a UI element)
+
+    centerInputs = UI.Banner(
+        UI.WindowCoords(x=xMid, y=yMid, width=width, height=height),
+        "( WAITING FOR TRANSMITTER )",
+    )
+    centerInputs.render()
+
+    # As soon as we get a frame the script will continue
+    while not pipe.poll():
+        time.sleep(0.1)
+
+    centerInputs.setTitle("( Center all inputs, then press enter )")
+    centerInputs.render()
+    centerInputs.getch()
+
+    centerInputs.setTitle("( STANDBY... )")
+    centerInputs.render()
+    # Give them 3 seconds to center everything
     calibrationWidget = Futaba.CalibrationWidget()
-    # Handles user interaction
-    calibrationUI = UI.CalibrationUI(UI.WindowCoords(x=xMid, y=yMid, width=width, height=height))
+    stopAfter = time.time() + 3  # seconds
+    while time.time() < stopAfter:
+        while pipe.poll():
+            [channel, rawV, calibV] = pipe.recv()
+            calibrationWidget.mid(channel, rawV)
+
+    # calibration UI elements
+    calibrationUI = UI.CalibrationUI(
+        UI.WindowCoords(x=xMid, y=yMid, width=width, height=height),
+        "( Slowly move each channel to each of their extremes, then press enter )"
+    )
     calibrationUI.nodelay(True)
-    calibrationUI.setTitle("( Center all inputs, then press enter )")
     calibrationUI.render()
     fileName = f"{selectedDevice['product']}_{selectedDevice['deviceUUID']}.json"
     with suppress(KeyboardInterrupt):
-        mode = "center"
+        mode = "minmax"
         done = False
         while not done:
             time.sleep(0.01)  # Prevent busy-waiting
@@ -163,12 +195,7 @@ def calibrationMode(
                         done = True
                         break
                     mode = "minmax"
-                    calibrationUI.setTitle(
-                        "( Slowly move each channel to each of their extremes, then press enter )"
-                    )
-                if mode == "center":
-                    calibrationWidget.mid(channel, rawV)
-                elif mode == "minmax":
+                if mode == "minmax":
                     calibrationWidget.minMax(channel, rawV)
                 calibrationUI.updateChannel(channel, calibV)
                 calibrationUI.render()
@@ -193,7 +220,7 @@ async def daemonMode(mgr: Futaba.DeviceManager) -> None:
     while True:
         mgr.scanForDevices()  # scan for devices,
         mgr.startAll()  # start new ones.
-        await asyncio.sleep(1)  # yield to event loop for at least 1 second
+        await asyncio.sleep(.1)  # yield to event loop for at least .1 second
 
 
 if __name__ == "__main__":
@@ -202,5 +229,3 @@ if __name__ == "__main__":
             main()
     except LockNotAcquired:
         print("🏁 Driver already running. Have Fun!")
-    except KeyboardInterrupt:
-        print("🏴 Driver stopped")

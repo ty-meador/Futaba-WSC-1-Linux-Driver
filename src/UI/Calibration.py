@@ -1,6 +1,5 @@
 """Module for cralibation UI components."""
 
-
 from .Window import Window, WindowCoords
 
 MIN = -32768
@@ -18,9 +17,9 @@ MAX = 32767
 ##
 class CalibrationUI(Window):
     """Draw the status UI element."""
-    def __init__(self, windowCoords: WindowCoords):
+    def __init__(self, windowCoords: WindowCoords, title: str):
         """Create a calibration feedback UI element."""
-        super().__init__(windowCoords)
+        super().__init__(windowCoords, title)
         self.barSegmentsRight = tuple(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"])
         self.barSegmentsLeft = tuple(["▕", "🮇", "🮈", "▐", "🮉", "🮊", "🮋", "█"])
         self.steeringPos = 0
@@ -81,7 +80,7 @@ class CalibrationUI(Window):
             -barLen if channel == self.throttleChannel else barLen,
         )
 
-    def _render(self) -> None:  # type: ignore[override]
+    def _render(self) -> None:
         vOffset = (self.height // 2) - (
             len(self.knownChannels) - 1  # Account for added hito decoration
         )

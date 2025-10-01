@@ -217,7 +217,9 @@ class CalibrationWidget:
             # Account for channels that might not be used by the transmitter
             # We have to do this because the interpolation function used to generate the
             # calibrated value map requires an ascending input range to be considered "sane".
-            if channelData["min"] == channelData["mid"] == channelData["max"]:
+            if (
+                channelData["min"] == channelData["mid"] or channelData["mid"] == channelData["max"]
+            ):
                 channelData["min"] = channelData["mid"] - 1
                 channelData["max"] = channelData["mid"] + 1
             channelList.append((channelData["min"], channelData["mid"], channelData["max"]))

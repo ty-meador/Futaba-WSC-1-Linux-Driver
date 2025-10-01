@@ -18,7 +18,7 @@ class MenuItem:
 
 class Menu(Window):
     """Draw the main options."""
-    def __init__(self, windowCoords: WindowCoords, options: list[MenuItem]):
+    def __init__(self, windowCoords: WindowCoords, title: str, options: list[MenuItem]):
         """Create a MainMenu window object.
 
         Args:
@@ -28,7 +28,7 @@ class Menu(Window):
         """
         super().__init__(windowCoords)
         self.options = options
-        self.title = "( Which receiver is your transmitter paired to? )"
+        self.title = title
         self.selected = 0
 
     def addItem(self, item: MenuItem):
