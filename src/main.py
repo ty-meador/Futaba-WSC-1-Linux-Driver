@@ -152,7 +152,7 @@ def calibrationMode(
 
     centerInputs = UI.Banner(
         UI.WindowCoords(x=xMid, y=yMid, width=width, height=height),
-        "( WAITING FOR TRANSMITTER )",
+        "( LOOKING FOR TRANSMITTER (is it on? is it connected?) )",
     )
     centerInputs.render()
 
@@ -162,6 +162,8 @@ def calibrationMode(
 
     centerInputs.setTitle("( Center all inputs, then press enter )")
     centerInputs.render()
+    # Flush the input buffer to clear any characters typed prior to now
+    curses.flushinp()
     centerInputs.getch()
 
     centerInputs.setTitle("( STANDBY... )")
