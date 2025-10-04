@@ -2,5 +2,4 @@
 
 from .Calibration import CalibrationUI
 from .Menu import Menu, MenuItem
-from .TextInput import TextInput
-from .Window import Window, WindowCoords, Banner
+from .Window import Window, WindowCoords, TitleOnlyWindow

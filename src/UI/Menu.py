@@ -17,13 +17,14 @@ class MenuItem:
 
 
 class Menu(Window):
-    """Draw the main options."""
+    """UI element that contains multiple options for the user to choose from."""
     def __init__(self, windowCoords: WindowCoords, title: str, options: list[MenuItem]):
         """Create a MainMenu window object.
 
         Args:
-            windowCoords (WindowCoords): The coordinate metadata for the window you want to render
-            options (iterable of str): The options items to display
+            windowCoords (WindowCoords): The coordinate metadata for the window you want to render.
+            title (str): The title of the window (displays at the top).
+            options (list of MenuItem): The options items to display.
 
         """
         super().__init__(windowCoords)
@@ -31,30 +32,30 @@ class Menu(Window):
         self.title = title
         self.selected = 0
 
-    def addItem(self, item: MenuItem):
+    def addItem(self, item: MenuItem) -> None:
         """Add an item to the main options.
 
         Args:
-            item (any): The item to add
+            item (MenuItem): The item to add
 
         """
         self.options.append(item)
 
-    def getItem(self):
+    def getItem(self) -> MenuItem:
         """Get the item that is currently selected.
 
         Returns:
-            str: The item that is currently selected
+            MenuItem: The item that is currently selected
 
         """
         return self.options[self.selected].value
 
-    def up(self):
+    def up(self) -> None:
         """Move the selection up one item."""
         if self.selected > 0:
             self.selected -= 1
 
-    def down(self):
+    def down(self) -> None:
         """Move the selection down one item."""
         if self.selected < len(self.options) - 1:
             self.selected += 1

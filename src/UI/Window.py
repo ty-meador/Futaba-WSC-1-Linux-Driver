@@ -42,7 +42,7 @@ class Window:
         self.nodelay = self.window.nodelay
         self.getch = self.window.getch
 
-    def setTitle(self, title: str):
+    def setTitle(self, title: str) -> None:
         """Set the title of the window.
 
         Args:
@@ -68,7 +68,7 @@ class Window:
         raise TypeError("Window._render must be implemented by subclasses")
 
 
-class Banner(Window):
+class TitleOnlyWindow(Window):
     """Draw the main options."""
     def __init__(self, windowCoords: WindowCoords, text: str):
         """Create a MainMenu window object.
@@ -78,9 +78,8 @@ class Banner(Window):
             options (iterable of str): The options items to display
 
         """
-        super().__init__(windowCoords)
-        self.title = text
+        super().__init__(windowCoords, text)
         self.selected = 0
 
-    def _render(self):
+    def _render(self) -> None:
         pass

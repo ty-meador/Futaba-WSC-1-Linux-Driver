@@ -4,6 +4,9 @@ import errno
 import os
 import socket
 from pathlib import Path
+from types import TracebackType
+
+from Futaba import newLogger
 
 PWD = Path(__file__).parent.resolve()
 
@@ -20,26 +23,40 @@ class DuplicateProcess(LockNotAcquired):
 
 class SocketLock:
     """Create a lock that prevents multiple application instances."""
-    def lock(self):
+    def lock(self) -> None:
         """Create a socket lock to prevent multiple application instances."""
+        self.logger.debug("attempting to lock...")
         try:
             self.lockSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.lockSocket.bind(("127.0.0.1", self.lockPort))
             self.pidFile.touch()
         except OSError as e:
+            self.logger.warning("Unable to obtain socket lock, driver is likely already running")
             if e.errno == errno.EADDRINUSE:
                 raise DuplicateProcess(
                     "Unable to obtain socket lock, driver is likely already running"
                 ) from e
             raise e
 
-    def unlock(self):
+    def unlock(self) -> None:
         """Remove socket lock and release resources back to os."""
-        if self.lockSocket:
+        self.logger.debug("attempting to unlock...")
+        if not self.lockSocket:
+            self.logger.debug("...socket not locked!")
+        else:
+            self.logger.debug("socket locked...")
             self.lockSocket.close()
             self.lockSocket = None
-        if self.pidFile.exists():
+            self.logger.debug("...successfully closed socket!")
+
+        if not self.pidFile.exists():
+            self.logger.debug("...no pid file exists!")
+        else:
+            self.logger.debug("pid file exists...")
             self.pidFile.unlink()
+            self.logger.debug("...successfully removed pid file!")
+
+        self.logger.debug("done!")
 
     def __init__(self, port: int = 1962):  # 🥚
         """Create a SocketLock instance
@@ -49,6 +66,7 @@ class SocketLock:
         """
         self.lockPort = port
         self.lockSocket = None
+        self.logger = newLogger("SocketLock")
         self.pidFile = PWD / f"{os.getpid()}.pid"
         atexit.register(self.unlock)
 
@@ -56,6 +74,14 @@ class SocketLock:
         self.lock()
         return self
 
-    def __exit__(self, exc_type, exc_value, stacktrace):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        stacktrace: TracebackType | None,
+    ) -> bool | None:
+        self.logger.debug("exc_type: %s", exc_type)
+        self.logger.debug("exc_value: %s", exc_value)
+        self.logger.debug("stacktrace: %s", stacktrace)
         self.unlock()
-        return self
+        return False  # Propogate any exceptions that were raised

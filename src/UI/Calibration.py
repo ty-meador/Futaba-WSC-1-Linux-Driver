@@ -49,7 +49,7 @@ class CalibrationUI(Window):
         self.hito = "──────人──────"  # "human/person" - the operator at the center of control
         self.haya = " 速 "  # "speed"
 
-    def setBoth(self, steeringPos: int, throttlePos: int):
+    def setBoth(self, steeringPos: int, throttlePos: int) -> None:
         """Update both the steering and throttle position in a single render.
 
         Args:
@@ -61,7 +61,7 @@ class CalibrationUI(Window):
         self.throttlePos = throttlePos
         self.render()
 
-    def updateChannel(self, channel: tuple[int, int], calibV: int):
+    def updateChannel(self, channel: tuple[int, int], calibV: int) -> None:
         """Update the UI display for the given channel.
 
         Args:
@@ -112,7 +112,7 @@ class CalibrationUI(Window):
                 self.knownChannels[self.throttleChannel],
             )
 
-    def _generateCenterLine(self, centerPiece: str, totalLength: int):
+    def _generateCenterLine(self, centerPiece: str, totalLength: int) -> str:
         """Generate the center line that aligns with other bars' centers.
 
         Args:
@@ -125,7 +125,7 @@ class CalibrationUI(Window):
         """
         return self._positionAtCenter(totalLength, centerPiece)
 
-    def _positionAtCenter(self, totalLength: int, content: str):
+    def _positionAtCenter(self, totalLength: int, content: str) -> str:
         """Center any content within the total length.
 
         This is the core centering function used by both bars and center line.

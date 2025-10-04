@@ -79,7 +79,9 @@ def main():
                 print("Which one would you like to test?")
                 for device in devList:
                     print(f"{device['key']}: {device['name']}")
+
                 choice = int(input("Choice: "))
+
             mgr.start(choice)
             print("🏳️  Driver running, ctrl+c to quit")
 
@@ -141,7 +143,7 @@ def calibrationMode(
             menu.down()
     inpt = None
 
-    selectedDevice = menu.getItem()
+    selectedDevice = menu.getItem().value()
     deviceManager.start(selectedDevice["key"])
     pipe = deviceManager.getPipe(selectedDevice["key"])
 
@@ -150,7 +152,7 @@ def calibrationMode(
 
     # Generates the calibration (not a UI element)
 
-    centerInputs = UI.Banner(
+    centerInputs = UI.TitleOnlyWindow(
         UI.WindowCoords(x=xMid, y=yMid, width=width, height=height),
         "( LOOKING FOR TRANSMITTER (is it on? is it connected?) )",
     )
