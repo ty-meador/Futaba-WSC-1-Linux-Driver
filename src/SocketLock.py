@@ -12,7 +12,7 @@ PWD = Path(__file__).parent.resolve()
 
 
 class LockNotAcquired(Exception):
-    """Exception which represents a failure to acquire a process lock"""
+    """Exception which represents a failure to acquire a socket lock"""
     def __init__(self, message: str):
         super().__init__(message)
 
@@ -80,8 +80,11 @@ class SocketLock:
         exc_value: BaseException | None,
         stacktrace: TracebackType | None,
     ) -> bool | None:
-        self.logger.debug("exc_type: %s", exc_type)
-        self.logger.debug("exc_value: %s", exc_value)
-        self.logger.debug("stacktrace: %s", stacktrace)
+        if exc_type:
+            self.logger.error("exc_type: %s", exc_type)
+        if exc_value:
+            self.logger.error("exc_value: %s", exc_value)
+        if stacktrace:
+            self.logger.error("stacktrace: %s", stacktrace)
         self.unlock()
         return False  # Propogate any exceptions that were raised
