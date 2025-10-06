@@ -143,7 +143,7 @@ def calibrationMode(
             menu.down()
     inpt = None
 
-    selectedDevice = menu.getItem().value()
+    selectedDevice = menu.getItem().value
     deviceManager.start(selectedDevice["key"])
     pipe = deviceManager.getPipe(selectedDevice["key"])
 

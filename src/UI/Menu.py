@@ -48,7 +48,7 @@ class Menu(Window):
             MenuItem: The item that is currently selected
 
         """
-        return self.options[self.selected].value
+        return self.options[self.selected]
 
     def up(self) -> None:
         """Move the selection up one item."""
