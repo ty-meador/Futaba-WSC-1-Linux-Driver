@@ -2,7 +2,6 @@
 """Cleans up build and packaging artifacts."""
 
 from argparse import ArgumentParser
-import typing as t
 from pathlib import Path
 import shutil
 import sys
@@ -15,6 +14,7 @@ parser.add_argument("--package", action="store_true", help="Remove previous pack
 parser.add_argument(
     "--empty-log-dir", action="store_true", help="Remove everything inside src/Futaba/logs"
 )
+parser.add_argument("--pycache", action="store_true", help="Clean up pycache files")
 ARGS = parser.parse_args()
 
 
