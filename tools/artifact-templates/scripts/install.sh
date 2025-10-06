@@ -113,6 +113,18 @@ sudo modprobe uinput || echo "⚠️  Could not load uinput module. Try: sudo mo
 
 echo ""
 echo "✅ Installation complete!"
+
+echo ""
+echo "🔗 If you are using a wireless transmitter please bind it to USB receiver now."
+read -p "Press Enter to continue..."
+
+echo ""
+echo "🔋 Turn on your transmitter and prepare to perform initial calibration."
+read -p "Press Enter to continue..."
+
+
+${INSTALL_DIR}/${EXECUTABLE} --calibrate
+
 echo ""
 echo "🎯 Usage:"
 echo "  ${EXECUTABLE}  # Run the driver manually"

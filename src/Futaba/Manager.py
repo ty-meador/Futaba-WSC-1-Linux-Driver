@@ -1,10 +1,12 @@
 """Module provides a simple interface to spawn and manage multiple Futaba RC to USB adapters."""
+
 from __future__ import annotations
 import atexit
-from multiprocessing.connection import Connection
 from contextlib import suppress
+from multiprocessing.connection import Connection
 from typing import Any
 import usb
+
 from . import Util as utils
 from .Driver import DriverState
 from .Driver import FutabaDeviceDriver
@@ -13,24 +15,6 @@ from .Error import DeviceNotFoundError
 
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
-    def findDevice(self, endpoint: int | None = None) -> usb.core.Device | None:
-        """Find the Futaba device that has the provided endpoint.
-
-        Args:
-            endpoint (int, optional): The endpoint of the device you are looking for. Defaults to
-            None.
-
-        Returns:
-            usb.core.Device or None: Returns None if a device was not found. Otherwise returns the
-            core device handle.
-            None: Returned when:
-                - No Futaba device is found with the given endpoint
-
-        """
-        if endpoint is not None:
-            return utils.findEndpointDevice(endpoint)
-        return None
-
     def getDeviceStatus(self, deviceIndex: int) -> DriverState | None:
         """Get the status of the device at the given index.
 
@@ -115,7 +99,7 @@ class FutabaDeviceManager:
         self.logger.debug("Attempting to start device at index %s", deviceIndex)
         driver = self._drivers[deviceIndex]
         if driver.getState() == DriverState.RUNNING:
-            self.logger.debug("Device at index %s is already running!", deviceIndex)
+            self.logger.debug("usb.core.Device at index %s is already running!", deviceIndex)
             return
 
         if driver.start():
@@ -125,7 +109,7 @@ class FutabaDeviceManager:
                 f"Start requested failed for item at index {deviceIndex}",
             )
 
-    def startAll(self, autoscan: bool = True) -> None:
+    def startAll(self) -> None:
         """Start a driver for all connected Futaba devices
 
         Args:
@@ -136,8 +120,6 @@ class FutabaDeviceManager:
             list[dict]: list of dictionaries each representing a single
             detected Futaba device
         """
-        if autoscan:
-            self.scanForDevices()
         for driver in self._drivers:
             if driver.getState() != DriverState.RUNNING:
                 driver.start()

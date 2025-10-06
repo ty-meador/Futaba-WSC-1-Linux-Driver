@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Package Futaba RC Driver into a standalone distribution."""
-
-import shutil
-import tarfile
 from argparse import ArgumentParser
 from datetime import datetime
+import re
+import shutil
+import tarfile
 
 from __config__ import (
     BIN_DIR,
@@ -44,12 +44,15 @@ def getVersionInfo() -> tuple[str, str]:
         Tuple containing (version, buildDate) strings
 
     """
-    version = "1.0.0"  # Default version
+    version = "UNKNOWN"  # Default version
 
     # Try to get version from git
     gitVersion = runCommand("git describe --tags --always --dirty 2>/dev/null")
     if gitVersion:
-        version = gitVersion
+        # Extract the semantic-versioning number
+        gitVersion = re.search(r".*(\d+\.\d+\.\d+).*", gitVersion)
+        if gitVersion:
+            version = gitVersion.group(1)
 
     buildDate = datetime.now().strftime("%Y%m%d_%H%M%S")
     return version, buildDate
@@ -70,7 +73,6 @@ def packageDistribution() -> None:  # noqa: PLR0915
     """
     print("📦 Creating standalone distribution package...")
 
-    # Get version info
     version, buildDate = getVersionInfo()
     print(f"📋 Version: {version}")
     print(f"📅 Build: {buildDate}")

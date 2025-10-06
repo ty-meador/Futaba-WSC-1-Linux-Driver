@@ -1,4 +1,4 @@
-"""Futaba Device Specific Errors."""
+"""Futaba-specific device errors."""
 
 from dataclasses import dataclass
 

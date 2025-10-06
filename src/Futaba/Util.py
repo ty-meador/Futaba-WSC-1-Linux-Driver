@@ -1,6 +1,6 @@
 """Contains atomic utility functions for the project."""
 from __future__ import annotations
-import array
+from array import array
 import bisect
 from contextlib import suppress
 import json
@@ -20,7 +20,7 @@ def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
         endpoint (int): The interrupt endpoint address as an integer.
 
     Returns:
-        usb.core.Device: The core device handle that has the provided endpoint.
+        usb.core.usb.core.Device: The core device handle that has the provided endpoint.
         False: Returned when:
             - The number of devices found is not exactly 1
 
@@ -39,7 +39,7 @@ def findInterruptEndpoint(device: usb.core.Device) -> int | None:
     """Take in a device and returns is interrupt enpoint address.
 
     Args:
-        device (usb.core.Device): The device that we want to emulate
+        device (usb.core.usb.core.Device): The device that we want to emulate
 
     Raises:
         ValueError: Raised if the provided device is not an of type usb.core.device
@@ -114,7 +114,7 @@ def parseJsonFile(filePath: str) -> Any:
 
 
 def interpolate(
-    xVals: array.array[int],
+    xVals: array[int],
     xPoints: tuple[int, ...],
     yPoints: tuple[int, ...],
     left: int | None = None,
@@ -217,7 +217,9 @@ class CalibrationWidget:
             # Account for channels that might not be used by the transmitter
             # We have to do this because the interpolation function used to generate the
             # calibrated value map requires an ascending input range to be considered "sane".
-            if channelData["min"] == channelData["mid"] == channelData["max"]:
+            if (
+                channelData["min"] == channelData["mid"] or channelData["mid"] == channelData["max"]
+            ):
                 channelData["min"] = channelData["mid"] - 1
                 channelData["max"] = channelData["mid"] + 1
             channelList.append((channelData["min"], channelData["mid"], channelData["max"]))

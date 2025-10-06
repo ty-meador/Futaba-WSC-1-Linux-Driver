@@ -1,15 +1,13 @@
 """Driver for Futaba RC USB devices."""
 
 import atexit
+from enum import auto, Enum
 import multiprocessing
-import os
-from enum import Enum
-from enum import auto
-from typing import Any
 from multiprocessing.connection import Connection
-from multiprocessing import Process
-
+import os
+from typing import Any
 import usb
+
 from . import Util as utils
 from . import Worker
 from .__config__ import (
@@ -79,6 +77,7 @@ class FutabaDeviceDriver:
             target=Worker.run,
             args=self._toSubprocTuple(),
         )
+
         self.subProc.start()
 
         return self.getState()
@@ -105,29 +104,14 @@ class FutabaDeviceDriver:
         if self.workerCtl.runFlag.is_set():
             self.workerCtl.runFlag.clear()
 
-    # def toDict(self) -> dict[str, Any]:
-    #     """Create a dictionary representation of this driver."""
-    #     return dict({
-    #         "config": self.config,
-    #         "deviceChannels": len(self.deviceChannels),
-    #         "deviceUUID": self.deviceUUID,
-    #         "interruptEndpoint": self.interruptEndpoint,
-    #         "productName": self.productName,
-    #         "productID": self.productID,
-    #         "manufacturer": self.manufacturer,
-    #         "name": self.name,
-    #         "serialNumber": self.serialNumber,
-    #         "speed": self.speed,
-    #     })
-
     def toggleEcho(
         self,
     ):
         """Toggle echo on or off."""
         if self.workerCtl.echoFlag.is_set():
-            self.workerCtl.echoFlag.clear()
+            self.disableEcho()
         else:
-            self.workerCtl.echoFlag.set()
+            self.enableEcho()
 
     def _loadConfig(self, productName: str) -> dict[str, Any]:
         """Load the device config.
@@ -221,10 +205,10 @@ class FutabaDeviceDriver:
         """Create an object that drives a single device on it's own process.
 
         Args:
-            device (usb.core.Device): The device you want to spawn a driver for
+            device (usb.core.usb.core.Device): The device you want to spawn a driver for
 
         Raises:
-            TypeError: If device is not of type usb.core.Device
+            TypeError: If device is not of type usb.core.usb.core.Device
 
         """
         ##
@@ -239,7 +223,7 @@ class FutabaDeviceDriver:
         ##
         # Worker subproc stuff
         ##
-        self.subProc: Process | None = None
+        self.subProc: multiprocessing.Process | None = None
         self._frontPipe, self._backPipe = multiprocessing.Pipe()
         self.workerCtl: WorkerControl = WorkerControl(pipe=self._backPipe)
 
@@ -256,8 +240,8 @@ class FutabaDeviceDriver:
         self.noiseFilter: int = config["noise_filter"]
         self.pipe: Connection = self._frontPipe
         self.product: str = device.product
-        self.productID: str = device.idProduct
-        self.speed: int = device.speed
+        self.productID: int = device.idProduct
+        self.speed: int | None = device.speed
         self.serialNumber: str = device.serial_number
 
         self.deviceChannels = (
@@ -306,11 +290,11 @@ class FutabaDeviceDriver:
 
         Determine if the following conditions are true for the provided device:
         - Provided device is a Futaba device
-        - Device has a HID interface
+        - usb.core.Device has a HID interface
         - HID interface has a suitable interrupt endpoint
 
         Args:
-            coreDevice (usb.core.Device): The device to check
+            coreDevice (usb.core.usb.core.Device): The device to check
 
         Returns:
             bool: True if all conditions are met, false otherwise

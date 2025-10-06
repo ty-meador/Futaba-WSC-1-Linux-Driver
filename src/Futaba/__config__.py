@@ -1,10 +1,9 @@
 """Contains atomic utility functions for the project."""
 
+from dataclasses import dataclass, field
 import json
 import logging
-import os
 from pathlib import Path
-from dataclasses import dataclass, field
 import tomllib
 
 # Project structure
@@ -65,8 +64,8 @@ DEFAULT_CALIBRATION: list[tuple[int, ...]] = [
     DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])
 ]
 
-if not os.path.exists(LOG_PATH):
-    os.makedirs(LOG_PATH)
+if not LOG_PATH.exists():
+    LOG_PATH.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass(frozen=True, slots=True)

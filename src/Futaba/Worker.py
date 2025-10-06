@@ -2,7 +2,7 @@
 # pylint: disable=import-outside-toplevel
 
 from .InputChannel import ChannelDict
-from .IPC import DataFrame, WorkerControl
+from .IPC import WorkerControl
 from .__config__ import DeviceConfig
 
 
@@ -54,6 +54,7 @@ def run(
         FUTABA_VENDOR_ID,
     )
     from .Error import DeviceNotFoundError
+    from .IPC import DataFrame
 
     logger = utils.newLogger(f"{name}_subproc")
 
@@ -150,7 +151,7 @@ def run(
                 rawValue = int(fromBytes(rawData[i:i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
-                maxInputVal = len(calibration) - 1  # account for off-by-one
+                maxInputVal = len(calibration) - 1  # account for classic decimal to bin off-by-one
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
                 # The way that we generate the calibration table means there will always be an

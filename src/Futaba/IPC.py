@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 from multiprocessing import Event
-from multiprocessing.synchronize import Event as EventType
-from multiprocessing.connection import Connection
+# multiprocessing.Event is of data type multiprocessing.synchronize.Event
+from multiprocessing.synchronize import Event as MultiprocessingEvent  # typing
+from multiprocessing.connection import Connection  # typing
 from dataclasses import dataclass, field
+
 
 # Data Classes
 ##
@@ -26,6 +28,6 @@ class WorkerControl:
     """Effecient picklable wrapper for worker inter-process communication methods."""
 
     pipe: Connection
-    killswitch: EventType = field(default_factory=Event)
-    runFlag: EventType = field(default_factory=Event)
-    echoFlag: EventType = field(default_factory=Event)
+    killswitch: MultiprocessingEvent = field(default_factory=Event)
+    runFlag: MultiprocessingEvent = field(default_factory=Event)
+    echoFlag: MultiprocessingEvent = field(default_factory=Event)
