@@ -95,7 +95,10 @@ def packageDistribution() -> None:  # noqa: PLR0915
     # Create wrapper script that works from any location
     renderTemplate(
         SCRIPTS_TEMPLATES_DIR / "wrapper.sh",
-        {"executable_path": f"{BUILD_DIR.name}/{EXECUTABLE_NAME}"},  # use relative path
+        {
+            "executable_name": EXECUTABLE_NAME,
+            "install_dir": INSTALL_DIR
+        },
         packagePath / EXECUTABLE_NAME,
     )
 

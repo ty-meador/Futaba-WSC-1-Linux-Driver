@@ -11,6 +11,7 @@ from clean import cleanBuildArtifacts
 from __config__ import (
     BUILD_DIR,
     EXECUTABLE_NAME,
+    INSTALL_DIR,
     NUITKA_OUTPUT_DIR,
     PROJECT_ROOT,
     PYPROJECT,
@@ -162,7 +163,8 @@ def setupExecutable(execPath: Path):
         SCRIPTS_TEMPLATES_DIR / "wrapper-script.sh",
         {
             "build_dir": os.path.basename(BUILD_DIR),
-            "executable_name": EXECUTABLE_NAME
+            "executable_name": EXECUTABLE_NAME,
+            "install_dir": INSTALL_DIR
         },
         WRAPPER_SCRIPT,
     )
