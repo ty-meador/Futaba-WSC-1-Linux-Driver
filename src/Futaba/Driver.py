@@ -197,8 +197,10 @@ class FutabaDeviceDriver:
                 deadZone=self.deadZone,
                 frameSize=self.frameSize,
                 noiseFilter=self.noiseFilter,
-            ), tuple([channel.toDict()
-                      for channel in self.deviceChannels]), self.name, self.endpoint
+            ),
+            tuple([channel.toDict() for channel in self.deviceChannels]),
+            self.name,
+            self.endpoint,
         )
 
     def __init__(self, device: usb.core.Device) -> None:

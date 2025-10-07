@@ -12,9 +12,10 @@ from .__config__ import DEFAULT_INPUT_RANGE, DEFAULT_OUTPUT_RANGE
 
 
 class ChannelDict(t.TypedDict):
-    """Stores information for a single input channel."""
+    """Picklable representation of the channel mappings."""
 
     eventName: str
+    indexOffset: int
     valueMap: array[int]
 
 
@@ -74,6 +75,7 @@ class ChannelCalibration:
 
     inputRange: t.Iterable[int] = field(default_factory=lambda: DEFAULT_INPUT_RANGE)
     outputRange: t.Iterable[int] = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
+    indexOffset: int = 0
 
     logger: Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
     reverse: bool = False
@@ -84,6 +86,7 @@ class ChannelCalibration:
         """Generate the calibration mapping array."""
         inputRange = tuple(self.inputRange)
         outputRange = tuple(self.outputRange)
+        indexOffset = abs(inputRange[0]) if inputRange[0] < 0 else 0
         logger = self.logger
         reverse = self.reverse
         valueMap = self._generateValueMap(
@@ -95,6 +98,7 @@ class ChannelCalibration:
         object.__setattr__(self, "valueMap", valueMap)
         object.__setattr__(self, "inputRange", inputRange)
         object.__setattr__(self, "outputRange", outputRange)
+        object.__setattr__(self, "indexOffset", indexOffset)
         object.__setattr__(self, "valueMapSize", sys.getsizeof(valueMap) // 1024)  # kb
 
         logger.debug(f"-= Channel Calibration({inputRange}, {outputRange}) created! =-")
@@ -112,9 +116,8 @@ class ChannelCalibration:
         logger.debug(f"        med: {outputRange[1]}")
         logger.debug(f"        low: {outputRange[0]}")
 
-    @classmethod
     def _generateValueMap(
-        cls,
+        self,
         inputRange: t.Iterable[int],
         outputRange: t.Iterable[int],
         reverse: bool = False,
@@ -155,13 +158,14 @@ class ChannelCalibration:
         # Create a value map such that the index of the array represents
         # the input value, and the contents at that index is the output
         allPossibleInputValues = array("i", [outputMin] * mapSize)
-
+        indexOffset = abs(inputMin) if inputMin < 0 else 0
         arrayRange = range(inputMin, inputMax)
         if reverse:
             reversed(arrayRange)
-        for i in arrayRange:
-            allPossibleInputValues[i] = i
 
+        # The offset accounts for negative numbers
+        for i in arrayRange:
+            allPossibleInputValues[i + indexOffset] = i
         return array(
             "i",
             utils.interpolate(
@@ -199,10 +203,6 @@ class InputChannel:
                 ),
             )
 
-        # Extract calibrated value map and set it
-        if self.calibration is not None:
-            object.__setattr__(self, "valueMap", self.calibration.valueMap)
-
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
         self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
 
@@ -226,4 +226,10 @@ class InputChannel:
 
     def toDict(self) -> ChannelDict:
         """Generate a dictionary representation of this input channel."""
-        return ChannelDict(eventName=self.eventName, valueMap=self.valueMap)
+        if self.calibration is None:
+            raise TypeError("There is no calibration generated!")
+        return ChannelDict(
+            eventName=self.eventName,
+            valueMap=self.calibration.valueMap,
+            indexOffset=self.calibration.indexOffset,
+        )
