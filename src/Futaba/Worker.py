@@ -77,9 +77,12 @@ def run(
         except PermissionError:
             print("Warning: Cannot set process priority")
 
-    channelEventsMap, channelCalibrations = zip(
-        *[(getattr(uinput, channel["eventName"]), channel["valueMap"])
-          for channel in deviceChannels],
+    channelEventsMap, channelValueMaps, channelIndexOffsets = zip(
+        *[(
+            getattr(uinput, channel["eventName"]),
+            channel["valueMap"],
+            channel["indexOffset"],
+        ) for channel in deviceChannels],
         strict=True,
     )
 
@@ -147,11 +150,12 @@ def run(
 
             for i in range(0, len(rawData), 2):
                 channel = i // 2
-                calibration = channelCalibrations[channel]
+                valueMap = channelValueMaps[channel]
+                indexOffset = channelIndexOffsets[channel]
                 rawValue = int(fromBytes(rawData[i:i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
-                maxInputVal = len(calibration) - 1  # account for classic decimal to bin off-by-one
+                maxInputVal = len(valueMap) - 1  # account for classic decimal to bin off-by-one
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
                 # The way that we generate the calibration table means there will always be an
@@ -159,20 +163,20 @@ def run(
                 elif rawValue < 0:
                     rawValue = 0
 
+                calibratedValue = valueMap[rawValue + indexOffset]
+
                 emit(  # Pass our calibrated input to the virtual device
                     channelEventsMap[channel],
-                    calibration[rawValue],
+                    calibratedValue,
                     syn=True,
                 )
 
                 if echoFlagIsSet():  # Echo back the data frames info - useful for calibration
-                    pipe.send(
-                        DataFrame(
-                            channelEventsMap[channel],
-                            rawValue,
-                            calibration[rawValue],
-                        )
-                    )
+                    pipe.send(DataFrame(
+                        channelEventsMap[channel],
+                        rawValue,
+                        calibratedValue,
+                    ))
 
         except usb.core.USBTimeoutError:
             pass  # Ignore, happens if device doesn't send a frame for a bit
