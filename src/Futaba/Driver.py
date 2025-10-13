@@ -75,7 +75,7 @@ class FutabaDeviceDriver:
         self.subProc = multiprocessing.Process(
             name=f"{self.name} Driver",
             target=Worker.run,
-            args=self._toSubprocTuple(),
+            args=self._workerParams,
         )
 
         self.subProc.start()
@@ -180,7 +180,8 @@ class FutabaDeviceDriver:
         self.logger.debug("channelCalibrations=%s", channelCalibrations)
         return channelCalibrations
 
-    def _toSubprocTuple(
+    @property
+    def _workerParams(
         self,
     ) -> tuple[WorkerControl, DeviceConfig, tuple[ChannelDict, ...], str, int | None]:
         """Create a tuple that is compatable with the worker function.

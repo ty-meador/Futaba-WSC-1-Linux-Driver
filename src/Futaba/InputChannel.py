@@ -4,7 +4,6 @@ from __future__ import annotations
 from array import array
 from dataclasses import dataclass, field
 from logging import Logger
-import sys
 import typing as t
 
 from . import Util as utils
@@ -89,17 +88,12 @@ class ChannelCalibration:
         indexOffset = abs(inputRange[0]) if inputRange[0] < 0 else 0
         logger = self.logger
         reverse = self.reverse
-        valueMap = self._generateValueMap(
-            inputRange,
-            outputRange,
-            reverse,
-        )
+        valueMap = self._generateValueMap(inputRange, outputRange, reverse)
 
         object.__setattr__(self, "valueMap", valueMap)
         object.__setattr__(self, "inputRange", inputRange)
         object.__setattr__(self, "outputRange", outputRange)
         object.__setattr__(self, "indexOffset", indexOffset)
-        object.__setattr__(self, "valueMapSize", sys.getsizeof(valueMap) // 1024)  # kb
 
         logger.debug(f"-= Channel Calibration({inputRange}, {outputRange}) created! =-")
         logger.debug("    valueMap:")
@@ -178,33 +172,88 @@ class ChannelCalibration:
         )
 
 
-@dataclass(frozen=True, slots=True)
+# @dataclass(frozen=True, slots=True)
+# class InputChannel:
+#     """Provides a class based representation of a single input channel."""
+
+#     eventName: str
+#     calibrationRange: t.Iterable[int]
+#     isReversed: bool = False
+#     logger: Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
+#     valueMap: array[int] = field(default_factory=lambda: array('i'))
+#     calibration: ChannelCalibration | None = None
+
+#     def __post_init__(self) -> None:
+#         """Instantiate our ChannelCalibration object."""
+#         # Set calibration
+#         if self.calibration is None:
+#             object.__setattr__(
+#                 self,
+#                 "calibration",
+#                 ChannelCalibration(
+#                     logger=self.logger,
+#                     inputRange=self.calibrationRange,
+#                     reverse=self.isReversed,
+#                 ),
+#             )
+
+#         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
+#         self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
+
+#     def __eq__(self, other: object) -> bool:
+#         """Determine if the Input Channels are equal.
+
+#         Args:
+#             other (object): The object to compare to.
+
+#         Returns:
+#             bool: True if the channels are equal, false otherwise.
+
+#         """
+#         if not isinstance(other, InputChannel):
+#             return False
+#         return hasattr(other, "eventName") and self.eventName == other.eventName
+
+#     def __hash__(self) -> int:
+#         """Determine the objects hash."""
+#         return hash(self.toDict())
+
+#     def toDict(self) -> ChannelDict:
+#         """Generate a dictionary representation of this input channel."""
+#         if self.calibration is None:
+#             raise TypeError("There is no calibration generated!")
+#         return ChannelDict(
+#             eventName=self.eventName,
+#             valueMap=self.calibration.valueMap,
+#             indexOffset=self.calibration.indexOffset,
+#         )
+
+
 class InputChannel:
     """Provides a class based representation of a single input channel."""
+    def __init__(
+        self,
+        eventName: str,
+        calibrationRange: t.Iterable[int],
+        isReversed: bool = False,
+    ) -> None:
 
-    eventName: str
-    calibrationRange: t.Iterable[int]
-    isReversed: bool = False
-    logger: Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
-    valueMap: array[int] = field(default_factory=lambda: array('i'))
-    calibration: ChannelCalibration | None = None
+        self.eventName: str = eventName
+        self.calibrationRange: t.Iterable[int] = calibrationRange
+        self.isReversed: bool = isReversed
+        self.logger: Logger = utils.newLogger("InputChannel")
+        self.valueMap: array[int] = array('i')
+        self.calibration: ChannelCalibration | None = ChannelCalibration(
+            logger=self.logger,
+            inputRange=self.calibrationRange,
+            reverse=self.isReversed,
+        )
 
     def __post_init__(self) -> None:
         """Instantiate our ChannelCalibration object."""
-        # Set calibration
-        if self.calibration is None:
-            object.__setattr__(
-                self,
-                "calibration",
-                ChannelCalibration(
-                    logger=self.logger,
-                    inputRange=self.calibrationRange,
-                    reverse=self.isReversed,
-                ),
-            )
 
-        self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
-        self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
+        self.logger.debug("-= InputChannel(%s) created =-", self.eventName)
+        self.logger.debug("    direction: %s", 'reversed' if self.isReversed else 'normal')
 
     def __eq__(self, other: object) -> bool:
         """Determine if the Input Channels are equal.
