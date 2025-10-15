@@ -1,7 +1,7 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # pylint: disable=import-outside-toplevel
 
-from .InputChannel import ChannelDict
+from .InputChannel import InputChannel
 from .IPC import WorkerControl
 from .__config__ import DeviceConfig
 
@@ -9,7 +9,7 @@ from .__config__ import DeviceConfig
 def run(
     controller: WorkerControl,
     deviceConfig: DeviceConfig,
-    deviceChannels: list[ChannelDict],
+    deviceChannels: list[InputChannel],
     name: str,
     interruptEndpoint: int,
 ) -> None:
@@ -79,9 +79,9 @@ def run(
 
     channelEventsMap, channelValueMaps, channelIndexOffsets = zip(
         *[(
-            getattr(uinput, channel["eventName"]),
-            channel["valueMap"],
-            channel["indexOffset"],
+            getattr(uinput, channel.eventName),
+            channel.valueMap,
+            channel.indexOffset,
         ) for channel in deviceChannels],
         strict=True,
     )
