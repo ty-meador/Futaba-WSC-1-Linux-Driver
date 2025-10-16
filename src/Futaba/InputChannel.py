@@ -185,23 +185,30 @@ class InputChannel:
     eventName: str
     calibrationRange: t.Iterable[int]
     isReversed: bool = False
-    logger: Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
+
+    indexOffset: int = 0
     valueMap: array[int] = field(default_factory=lambda: array('i'))
-    calibration: ChannelCalibration | None = None
+    logger: Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
 
     def __post_init__(self) -> None:
         """Instantiate our ChannelCalibration object."""
-        # Set calibration
-        if self.calibration is None:
-            object.__setattr__(
-                self,
-                "calibration",
-                ChannelCalibration(
-                    logger=self.logger,
-                    inputRange=self.calibrationRange,
-                    reverse=self.isReversed,
-                ),
-            )
+        calibration = ChannelCalibration(
+            logger=self.logger,
+            inputRange=self.calibrationRange,
+            reverse=self.isReversed,
+        )
+
+        object.__setattr__(
+            self,
+            "valueMap",
+            calibration.valueMap,
+        )
+
+        object.__setattr__(
+            self,
+            "indexOffset",
+            calibration.indexOffset,
+        )
 
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
         self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
@@ -216,20 +223,25 @@ class InputChannel:
             bool: True if the channels are equal, false otherwise.
 
         """
-        if not isinstance(other, InputChannel):
-            return False
-        return hasattr(other, "eventName") and self.eventName == other.eventName
-
-    def __hash__(self) -> int:
-        """Determine the objects hash."""
-        return hash(self.toDict())
-
-    def toDict(self) -> ChannelDict:
-        """Generate a dictionary representation of this input channel."""
-        if self.calibration is None:
-            raise TypeError("There is no calibration generated!")
-        return ChannelDict(
-            eventName=self.eventName,
-            valueMap=self.calibration.valueMap,
-            indexOffset=self.calibration.indexOffset,
+        return (
+            isinstance(other, InputChannel) and hasattr(other, "eventName")
+            and self.eventName == other.eventName
         )
+
+    def __getstate__(self):
+        """Returns a dict of attributes to be pickled"""
+        return {
+            "calibrationRange": self.calibrationRange,
+            "eventName": self.eventName,
+            "indexOffset": self.indexOffset,
+            "isReversed": self.isReversed,
+            "valueMap": self.valueMap,
+        }
+
+    def __setstate__(self, state: dict[str, t.Any]):
+        """Recreate object when being unpickled."""
+        object.__setattr__(self, "calibrationRange", state["calibrationRange"])
+        object.__setattr__(self, "eventName", state["eventName"])
+        object.__setattr__(self, "indexOffset", state["indexOffset"])
+        object.__setattr__(self, "isReversed", state["isReversed"])
+        object.__setattr__(self, "valueMap", state["valueMap"])

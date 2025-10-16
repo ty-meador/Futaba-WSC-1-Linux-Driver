@@ -18,7 +18,7 @@ from .__config__ import (
     FUTABA_VENDOR_ID,
     DeviceConfig,
 )
-from .InputChannel import InputChannel, ChannelDict
+from .InputChannel import InputChannel
 from .IPC import WorkerControl
 
 
@@ -75,7 +75,7 @@ class FutabaDeviceDriver:
         self.subProc = multiprocessing.Process(
             name=f"{self.name} Driver",
             target=Worker.run,
-            args=self._toSubprocTuple(),
+            args=self._workerParams,
         )
 
         self.subProc.start()
@@ -180,9 +180,10 @@ class FutabaDeviceDriver:
         self.logger.debug("channelCalibrations=%s", channelCalibrations)
         return channelCalibrations
 
-    def _toSubprocTuple(
+    @property
+    def _workerParams(
         self,
-    ) -> tuple[WorkerControl, DeviceConfig, tuple[ChannelDict, ...], str, int | None]:
+    ) -> tuple[WorkerControl, DeviceConfig, tuple[InputChannel, ...], str, int | None]:
         """Create a tuple that is compatable with the worker function.
 
         Returns:
@@ -198,7 +199,7 @@ class FutabaDeviceDriver:
                 frameSize=self.frameSize,
                 noiseFilter=self.noiseFilter,
             ),
-            tuple([channel.toDict() for channel in self.deviceChannels]),
+            tuple(self.deviceChannels),
             self.name,
             self.endpoint,
         )
