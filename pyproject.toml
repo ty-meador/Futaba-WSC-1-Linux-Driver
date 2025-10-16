@@ -16,7 +16,7 @@ dependencies = ["pyusb==1.3.1", "python-uinput==1.0.1", "nuitka==2.7.14"]
 description = "A Futaba RC Driver for Linux."
 name = "futaba-rc-driver"
 requires-python = ">=3.11.0"
-version = "1.3.0"
+version = "1.4.0"
 
 [project.urls]
 Documentation = "https://tylermeador.com/futaba-rc-driver/docs"
@@ -76,5 +76,5 @@ exclude = ["docs", "setup.py", ".venv", "build", "dist"]
 
 [[tool.pyright.executionEnvironments]]
 root = "."
-include = ["src/**"]  # All files in stubs directory
+include = ["src/**"]         # All files in stubs directory
 reportIncompleteStub = false
