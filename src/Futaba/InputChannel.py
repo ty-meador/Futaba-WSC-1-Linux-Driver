@@ -145,10 +145,10 @@ class ChannelCalibration:
         outputMin, outputMid, outputMax = outputRange
 
         assert inputMin < inputMid < inputMax, (
-            f"Insane input range ({inputMin}, {inputMid}, {inputMax})"
+            f"Input range is not increasing ({inputMin}, {inputMid}, {inputMax})"
         )
         assert outputMin < outputMid < outputMax, (
-            f"Insane output range ({inputMin}, {inputMid}, {inputMax})"
+            f"Output range is not increasing ({inputMin}, {inputMid}, {inputMax})"
         )
 
         # If the input uses both positive and negative values we need to
