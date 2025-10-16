@@ -101,20 +101,20 @@ class ChannelCalibration:
         object.__setattr__(self, "indexOffset", indexOffset)
         object.__setattr__(self, "valueMapSize", sys.getsizeof(valueMap) // 1024)  # kb
 
-        logger.debug(f"-= Channel Calibration({inputRange}, {outputRange}) created! =-")
+        logger.debug("-= Channel Calibration(%s, %s) created! =-", (inputRange, outputRange))
         logger.debug("    valueMap:")
-        logger.debug(f"        elements: {len(valueMap)}")
-        logger.debug(f"        unique values: {len(set(valueMap))}")
-        logger.debug(f"        mem footprint: {self.valueMapSize} Kb")
-        logger.debug(f"    isReversed: {reverse}")
-        logger.debug(f"    inputRange: {inputRange[2] - inputRange[0]} total elements")
-        logger.debug(f"        high: {inputRange[2]}")
-        logger.debug(f"        med: {inputRange[1]}")
-        logger.debug(f"        low: {inputRange[0]}")
-        logger.debug(f"    outputRange: {outputRange[2] - outputRange[0]} total elements")
-        logger.debug(f"        high: {outputRange[2]}")
-        logger.debug(f"        med: {outputRange[1]}")
-        logger.debug(f"        low: {outputRange[0]}")
+        logger.debug("        elements: %s", len(valueMap))
+        logger.debug("        unique values: %s", len(set(valueMap)))
+        logger.debug("        mem footprint: %s Kb", self.valueMapSize)
+        logger.debug("    isReversed: %s", reverse)
+        logger.debug("    inputRange: %s total elements", inputRange[2] - inputRange[0])
+        logger.debug("        high: %s", inputRange[2])
+        logger.debug("        med: %s", inputRange[1])
+        logger.debug("        low: %s", inputRange[0])
+        logger.debug("    outputRange: %s total elements", outputRange[2] - outputRange[0])
+        logger.debug("        high: %s", outputRange[2])
+        logger.debug("        med: %s", outputRange[1])
+        logger.debug("        low: %s", outputRange[0])
 
     def _generateValueMap(
         self,
