@@ -27,9 +27,9 @@ def cleanLogsDir():
             if item.is_dir():
                 shutil.rmtree(item)
         except Exception as e:
-            print(f"⚠️  WARNING: Unable to remove {item}")
+            print(f"WARNING: Unable to remove {item}")
             print(e)
-            print(f"⚠️  WARNING: Unable to remove {item}")
+            print(f"WARNING: Unable to remove {item}")
 
 
 def cleanBuildArtifacts():
@@ -46,9 +46,9 @@ def cleanBuildArtifacts():
             elif artifact.is_dir():
                 shutil.rmtree(artifact)
         except Exception as e:
-            print(f"⚠️  WARNING: Unable to remove {artifact}")
+            print(f"WARNING: Unable to remove {artifact}")
             print(e)
-            print(f"⚠️  WARNING: Unable to remove {artifact}")
+            print(f"WARNING: Unable to remove {artifact}")
 
     for path in Path('.').rglob("*.egg-info"):
         shutil.rmtree(path, ignore_errors=True)
@@ -88,5 +88,5 @@ if __name__ == "__main__":
     if ARGS.pycache:
         cleanPycache()
 
-    print("🧹 Removing previous artifacts...")
-    print("✨ Done!")
+    print("Removing previous artifacts...")
+    print("Done!")

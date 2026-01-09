@@ -41,8 +41,8 @@ if sys.prefix == sys.base_prefix:
             "  2: Make sure you are not specifying a python version when you are running this "
             "script. For example:"
         )
-        print("      ❌ /bin/usr/python3 ./tools/build.py")
-        print("      ✅ ./tools/build.py")
+        print("      incorrect /bin/usr/python3 ./tools/build.py")
+        print("      correct ./tools/build.py")
         print("=" * 80)
     sys.exit(1)
 

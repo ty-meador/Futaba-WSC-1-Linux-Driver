@@ -1,8 +1,8 @@
-[build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools~=61.0", "wheel", "nuitka~=2.7.12", "zstandard==0.25.0"]
-
 [project]
+name = "futaba-rc-driver"
+version = "1.4.1"
+description = "A Futaba RC Driver for Linux."
+requires-python = ">=3.11.0"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -12,18 +12,30 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Topic :: System :: Hardware :: Hardware Drivers",
 ]
-dependencies = ["pyusb==1.3.1", "python-uinput==1.0.1", "nuitka==2.7.14"]
-description = "A Futaba RC Driver for Linux."
-name = "futaba-rc-driver"
-requires-python = ">=3.11.0"
-version = "1.4.0"
+dependencies = ["nuitka==2.7.14", "python-uinput==1.0.1", "pyusb==1.3.1"]
 
 [project.urls]
+Distributables = "https://tylermeador.com/futaba-rc-driver/dist"
 Documentation = "https://tylermeador.com/futaba-rc-driver/docs"
 Homepage = "https://tylermeador.com/futaba-rc-driver"
-Distributables = "https://tylermeador.com/futaba-rc-driver/dist"
 Issues = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issues"
 Repository = "https://gitlab.com/Native-Coder/futaba-usb-driver/"
+
+[build-system]
+requires = ["nuitka~=2.7.12", "setuptools~=61.0", "wheel", "zstandard==0.25.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+target-version = ["py311"]
+line-length = 120
+skip-string-normalization = true
+skip-magic-trailing-comma = true
+force-exclude = '''
+/(
+  | docs
+  | setup.py
+)/
+'''
 
 [tool.build_tool]
 native_dependencies = ["usb", "uinput"]
@@ -36,20 +48,8 @@ package_dir = "dist"
 install_dir = "${HOME}/.local/opt/futaba-rc-driver"
 bin_dir = "${HOME}/.local/bin"
 
-[tool.black]
-target-version = ['py311']
-line-length = 120
-skip-string-normalization = true
-skip-magic-trailing-comma = true
-force-exclude = '''
-/(
-  | docs
-  | setup.py
-)/
-'''
-
 [tool.isort]
-py_version = 310
+py_version = 311
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 default_section = "THIRDPARTY"
 known_third_party = []
@@ -76,5 +76,5 @@ exclude = ["docs", "setup.py", ".venv", "build", "dist"]
 
 [[tool.pyright.executionEnvironments]]
 root = "."
-include = ["src/**"]         # All files in stubs directory
+include = ["src/**"]  # All files in stubs directory
 reportIncompleteStub = false

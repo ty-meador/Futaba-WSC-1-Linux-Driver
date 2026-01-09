@@ -71,17 +71,17 @@ def packageDistribution() -> None:  # noqa: PLR0915
         SystemExit: If build directory is not found or other critical errors occur
 
     """
-    print("📦 Creating standalone distribution package...")
+    print("Creating standalone distribution package...")
 
     version, buildDate = getVersionInfo()
-    print(f"📋 Version: {version}")
-    print(f"📅 Build: {buildDate}")
+    print(f"Version: {version}")
+    print(f"Build: {buildDate}")
 
     # Create package directory
     packageName = f"{EXECUTABLE_NAME}-{version}-linux-x86_64"
     packagePath = PACKAGE_DIR / packageName
 
-    print(f"📁 Creating package: {packageName}")
+    print(f"Creating package: {packageName}")
 
     # Clean and create dist directory
     if PACKAGE_DIR.exists():
@@ -89,7 +89,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     PACKAGE_DIR.mkdir(parents=True)
 
     # Copy the main executable and its dependencies
-    print("📋 Copying executable...")
+    print("Copying executable...")
     shutil.copytree(BUILD_DIR, packagePath / BUILD_DIR.name)
 
     # Create wrapper script that works from any location
@@ -102,7 +102,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
         packagePath / EXECUTABLE_NAME,
     )
 
-    print("📄 Creating documentation...")
+    print("Creating documentation...")
 
     # Create README
     renderTemplate(
@@ -119,7 +119,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
         packagePath / "README.md",
     )
 
-    print("🔧 Creating installation scripts...")
+    print("Creating installation scripts...")
 
     ##
     # create installer
@@ -162,7 +162,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     missing = [pkgFile for pkgFile in pkgCriticalFiles if not pkgFile.exists()]
     if missing:
         raise FileNotFoundError(
-            f"🚨UNABLE TO FIND >{', '.join(map(str, missing))}< REFUSING TO PACKAGE🚨"
+            f"ERROR: UNABLE TO FIND >{', '.join(map(str, missing))}< REFUSING TO PACKAGE"
         )
 
     for pkgFile in pkgCriticalFiles:
@@ -183,15 +183,15 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     # Create archives
     ##
-    print("📊 Calculating package size...")
+    print("Calculating package size...")
     duResult = runCommand(f"du -sh {packagePath}")
     if duResult:
         packageSize = duResult.split()[0]
-        print(f"📦 Package size: {packageSize}")
+        print(f"Package size: {packageSize}")
     else:
         packageSize = 0
 
-    print("🗜️  Creating compressed archives...")
+    print("Creating compressed archives...")
 
     # Create tar.gz outside the package dir first
     tarGzName = f"{packageName}.tar.gz"
@@ -224,7 +224,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
         tarXzSize = 0
 
     # Create checksums
-    print("🔐 Creating checksums...")
+    print("Creating checksums...")
     runCommand(f"cd {packagePath} && sha256sum {tarGzName} > {tarGzName}.sha256")
     runCommand(f"cd {packagePath} && sha256sum {tarXzName} > {tarXzName}.sha256")
 
@@ -239,14 +239,14 @@ def packageDistribution() -> None:  # noqa: PLR0915
     )
 
     # Summary
-    print("\n🎉 Distribution package created successfully!")
+    print("\nDistribution package created successfully!")
     print("=" * 50)
-    print(f"📦 Package: {packageName}")
-    print(f"📏 Uncompressed: {packageSize}")
-    print(f"🗜️  tar.gz: {tarGzSize}")
-    print(f"🗜️  tar.xz: {tarXzSize}")
-    print("📁 Location: dist/")
-    print("\n📋 Files created:")
+    print(f"Package: {packageName}")
+    print(f"Uncompressed: {packageSize}")
+    print(f"tar.gz: {tarGzSize}")
+    print(f"tar.xz: {tarXzSize}")
+    print("Location: dist/")
+    print("\nFiles created:")
 
     distFiles = list(packagePath.iterdir())
     for filePath in sorted(distFiles):
@@ -258,19 +258,19 @@ def packageDistribution() -> None:  # noqa: PLR0915
             else:
                 size = 0
 
-            print(f"  📄 {fileName} ({size})")
+            print(f"  {fileName} ({size})")
         else:
-            print(f"  📁 {fileName}/")
+            print(f"  {fileName}/")
 
-    print("\n🚀 Ready for distribution!")
-    print("📤 Upload these files for release:")
+    print("\nReady for distribution!")
+    print("Upload these files for release:")
     print(f"   • {tarGzName}")
     print(f"   • {tarXzName}")
     print(f"   • {tarGzName}.sha256")
     print(f"   • {tarXzName}.sha256")
     print(f"   • {WEB_INSTALL_SCRIPT_NAME}")
 
-    print("\n💡 Users can install with:")
+    print("\nUsers can install with:")
     print(
         f"   wget {DISTRIBUTABLES_PAGE}/{WEB_INSTALL_SCRIPT_NAME} "
         f"&& chmod +x {WEB_INSTALL_SCRIPT_NAME} && ./{WEB_INSTALL_SCRIPT_NAME}"
@@ -283,7 +283,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
 
 
 if __name__ == "__main__":
-    print("📦 Futaba RC Driver Packaging Tool")
+    print("Futaba RC Driver Packaging Tool")
     print("=" * 40)
     if ARGS.clean:
         cleanPackageArtifacts()

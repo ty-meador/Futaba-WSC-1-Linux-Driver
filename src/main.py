@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The main program - run with `sudo python3 main.py`.
 
-Futaba RC Driver  Copyright (C) 2025  Tyler Meador (gitlab="Native-Coder")
+Futaba RC Driver  Copyright (C) 2026  Tyler Meador (gitlab="Native-Coder")
 This program comes with ABSOLUTELY NO WARRANTY;.
 This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
@@ -240,7 +240,7 @@ def killRunningProcess():
     pidFile = findPidFile()
     if not pidFile:
         return
-    print("🔄 Reloading driver")
+    print("⟳ Reloading driver")
     [pid, _] = pidFile.name.split(".")
     os.kill(int(pid), signal.SIGTERM)
     time.sleep(1)  # Give it time to shut down
