@@ -1,7 +1,9 @@
 # Futaba RC USB Driver - Standalone Distribution
+
 ![gif of driver allowing device to show up in VRC-Pro](/screenshots/example.gif)
 
 ## Quick Install
+
 ```sh
 # The quick install script will automatically
 # download the latest release and install it.
@@ -40,15 +42,18 @@ The driver automatically detects connected Futaba receivers and creates virtual 
 ## Troubleshooting
 
 ### Permission Denied
+
 - Make sure you're running with sudo: `sudo ./{{executable_name}}`
 - Or add your user to input group: `sudo usermod -a -G input $USER`
 
 ### Device Not Detected
+
 - Check USB connection
 - Verify device with: `lsusb | grep Futaba`
 - Try a different USB port
 
 ### uinput Module Not Found
+
 ```bash
 # Load the module:
 sudo modprobe uinput
@@ -58,6 +63,7 @@ echo 'uinput' | sudo tee -a /etc/modules
 ```
 
 ### Still Having Issues?
+
 1. Check kernel logs: `dmesg | tail -20`
 2. Verify USB permissions: `ls -l /dev/bus/usb/*/*`
 3. Ensure no other drivers are conflicting
@@ -67,12 +73,11 @@ echo 'uinput' | sudo tee -a /etc/modules
 - This driver is optimized for real-time RC applications (frames are processed in O(1))
 - Low latency, high precision input processing
 
-
-
 ## Support
 
 For issues, updates, and documentation visit:
 {{repo_url}}
 
 ---
+
 Built with ❤️ for the RC community

@@ -33,7 +33,7 @@ ARGS = parser.parse_args()
 
 def build():
     """Main entry point."""
-    print("🎮 Futaba RC Driver Build Script")
+    print("Futaba RC Driver Build Script")
     print("=" * 35)
 
     installDependencies()
@@ -47,19 +47,19 @@ def build():
     setupExecutable(execPath)
 
     if testExecutable():
-        print("\n🎉 Build completed successfully!")
-        print(f"\n🚀 To run: sudo ./{EXECUTABLE_NAME}")
+        print("\nBuild completed successfully!")
+        print(f"\nTo run: sudo ./{EXECUTABLE_NAME}")
     else:
-        print("\n❌ Build completed but executable test failed")
+        print("\nBuild completed but executable test failed")
         sys.exit(1)
 
 
 def buildExecutable():
     """Build the executable with Nuitka."""
-    print("🔨 Building executable...")
+    print("Building executable...")
 
     if not SOURCE_MAIN.exists():
-        print(f"❌ Source file not found: {SOURCE_MAIN}")
+        print(f"Error: Source file not found: {SOURCE_MAIN}")
         sys.exit(1)
 
     jobs = min(os.cpu_count() or 4, 12)
@@ -99,7 +99,7 @@ def buildExecutable():
     try:
         util.runCommand(cmd, capture=False, shell=False)
     except CalledProcessError:
-        print("❌ Nuitka build failed")
+        print("Error: Nuitka build failed")
         return None
 
     # Find the executable
@@ -108,13 +108,13 @@ def buildExecutable():
         if execPath.exists():
             return execPath
 
-    print(f"❌ No executable found in {NUITKA_OUTPUT_DIR}")
+    print(f"Error: No executable found in {NUITKA_OUTPUT_DIR}")
     return None
 
 
 def findNativeLibraries():
     """Find native libraries to include."""
-    print("🔍 Locating native libraries...")
+    print("Locating native libraries...")
     # Hard-coded because the package name is "python-uinput"
     nuitkaArgs: list[str] = []
 
@@ -122,7 +122,7 @@ def findNativeLibraries():
     venvPath = PROJECT_ROOT / ".venv"
 
     if not venvPath.exists():
-        raise OSError(f"❌ Virtual environment not found at: {venvPath}")
+        raise OSError(f"Error: Virtual environment not found at: {venvPath}")
 
     # Find .so files in the virtual environment
     dependencyPatterns = [
@@ -135,21 +135,21 @@ def findNativeLibraries():
             print(f"        {libPath}")
             if libPath.is_file():
                 nuitkaArgs.append(f"--include-data-files={libPath}={libPath.name}")
-                print(f"📚 Found library: {libPath.name}")
+                print(f"Found library: {libPath.name}")
 
     return nuitkaArgs
 
 
 def installDependencies():
     """Install build dependencies."""
-    print("📦 Installing dependencies...")
+    print("Installing dependencies...")
     if util.runCommand("pip3 install .") is None:
         sys.exit(1)
 
 
 def setupExecutable(execPath: Path):
     """Set up the final executable distribution."""
-    print("🔧 Setting up executable...")
+    print("Setting up executable...")
 
     # Make executable
     execPath.chmod(0o755)
@@ -172,40 +172,40 @@ def setupExecutable(execPath: Path):
     # Show stats
     result = util.runCommand(f"du -sh {BUILD_DIR}")
     if result:
-        print(f"📦 Distribution size: {result.split()[0]}")
+        print(f"Distribution size: {result.split()[0]}")
 
 
 def testExecutable():
     """Test the built executable."""
-    print("🧪 Testing executable...")
+    print("Testing executable...")
     if util.runCommand(f"{BUILD_DIR / EXECUTABLE_NAME} --version") is not None:
-        print("✅ Executable test successful")
+        print("Executable test successful")
         return True
-    print("⚠️  Executable may have issues")
+    print("Warning: Executable may have issues")
     return False
 
 
 def validateEnvironment():
     """Check that required tools are available."""
-    print("🔍 Validating environment...")
+    print("Validating environment...")
 
     # Check Nuitka
     try:
         util.runCommand("python3 -m nuitka --version", capture=False)
     except (CalledProcessError, FileNotFoundError):
-        print("❌ Nuitka not found. Install with: pip3 install nuitka")
+        print("Error: Nuitka not found. Install with: pip3 install nuitka")
         sys.exit(1)
 
     # Check C compiler
     for compiler in ["gcc", "clang", "cc"]:
         try:
             util.runCommand(f"{compiler} --version", capture=False)
-            print(f"✅ Found C compiler: {compiler}")
+            print(f"Found C compiler: {compiler}")
             break
         except (CalledProcessError, FileNotFoundError):
             continue
     else:
-        print("❌ No C compiler found! Install with: sudo apt install build-essential")
+        print("Error: No C compiler found! Install with: sudo apt install build-essential")
         sys.exit(1)
 
 

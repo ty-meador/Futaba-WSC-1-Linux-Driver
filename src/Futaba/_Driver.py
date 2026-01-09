@@ -113,6 +113,7 @@ def run(
     frameSize = deviceConfig.frameSize
     rawData = bytearray(frameSize)  # Reusable buffer
     emit = virtualDevice.emit
+    sync = virtualDevice.syn
     fromBytes = int.from_bytes
     killswitchIsSet = controller.killswitch.is_set
     runFlagIsSet = controller.runFlag.is_set
@@ -155,7 +156,7 @@ def run(
                 rawValue = int(fromBytes(rawData[i:i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
-                maxInputVal = len(valueMap) - 1  # account for classic decimal to bin off-by-one
+                maxInputVal = len(valueMap) - 1
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
                 # The way that we generate the calibration table means there will always be an
@@ -168,7 +169,7 @@ def run(
                 emit(  # Pass our calibrated input to the virtual device
                     channelEventsMap[channel],
                     calibratedValue,
-                    syn=True,
+                    syn=False,
                 )
 
                 if echoFlagIsSet():  # Echo back the data frames info - useful for calibration
@@ -177,6 +178,8 @@ def run(
                         rawValue,
                         calibratedValue,
                     ))
+            # Fire all channel events at once
+            sync()
 
         except usb.core.USBTimeoutError:
             pass  # Ignore, happens if device doesn't send a frame for a bit

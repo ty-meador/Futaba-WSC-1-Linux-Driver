@@ -24,53 +24,23 @@ class ChannelCalibration:
     """Provides a class based representation of a single channels calibration.
 
     Args:
-        logger (logging.Logger): The logger you want this class to use
-        inputRange (t.t.Iterable, optional): An iterable of length 3 where each item represents
-        the low, middle, and high point respectively in increasing order.
-        defaults to DEFAULT_INPUT_RANGE
-        outputRange (t.t.Iterable, optional): An iterable of length 3 where each item represents
-        the low, middle, and high point respectively in increasing order.
-        defaults to DEFAULT_OUTPUT_RANGE
-        reverse (bool, optional): If reverse the calibrated values will be
-        inserted into the resulting array backwards. This will reverse the
-        direction of the input. Defaults to False.
+        inputRange (Iterable[int], optional): The range of input values. Defaults to DEFAULT_INPUT_RANGE.
+        outputRange (Iterable[int], optional): The range of output values. Defaults to DEFAULT_OUTPUT_RANGE.
+        indexOffset (int, optional): An offset for the index. Defaults to 0.
+        logger (Logger, optional): A logger instance. Defaults to a new logger named "ChannelCalibration".
+        reverse (bool, optional): Whether the calibration should be reversed. Defaults to False.
 
+    Attributes:
+        inputRange (Tuple[int]): The range of input values as a tuple.
+        outputRange (Tuple[int]): The range of output values as a tuple.
+        indexOffset (int): An offset for the index.
+        logger (Logger): A logger instance.
+        reverse (bool): Whether the calibration should be reversed.
+        valueMap (array[int]): A mapping array that calibrates input values to output values.
+        valueMapSize (int): The memory footprint of the value map in kilobytes.
 
-    Why:
-        - The range of values that is output on a given channel is different for
-         each device manufactured.
-        - To account for this difference, we use a process known as
-        "calibrating" the device. Calibrating a device is simply the process of
-        determining your devices unique range of values, and then mapping that
-        range of values to a standardized range of values.
-            - This requires a 1-d interpolation from the raw device values to
-            the standardized output values. This must be done every single time
-            we read data from the device (hundreds of times per second+).
-
-    What:
-        - Provide an interface that allows for on the fly interpolation of the
-        devices input range to the standardized output range
-
-    How:
-        - Interpolate all possible input values ahead of time
-        - Create an array with a length equal to that of the upper output limit
-        - For each value in the input range, interpolate the value and store the
-        interpolated_value at array[value]
-        - To prevent out of bounds errors and ensure output continuity:
-            - Fill all values below "min input value" with "min output value"
-            - Fill all values above "max input value" with "max output value"
-
-    Rationale:
-        - Assume the following:
-            - our calibration mapping array has already been generated and
-            is stored in a variable named "calMap".
-            - assume we have just read the raw input value from the device and
-            stored it to a variable named "rawV".
-        - Translating the raw value to the calibrated value is as simple as
-        calMap[rawV]
-        - Therefore, we are providing an interface with O(1) runtime at the
-        cost of 16kb of memory on an 8 channel device.
-
+    Methods:
+        _generateValueMap(inputRange, outputRange, reverse): Generates a mapping array based on the given input and output ranges.
     """
 
     inputRange: t.Iterable[int] = field(default_factory=lambda: DEFAULT_INPUT_RANGE)

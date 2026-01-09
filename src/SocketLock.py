@@ -58,7 +58,7 @@ class SocketLock:
 
         self.logger.debug("done!")
 
-    def __init__(self, port: int = 1962):  # 🥚
+    def __init__(self, port: int = 1962): # 🥚
         """Create a SocketLock instance
 
         Args:
