@@ -70,12 +70,12 @@ def run(
         # SCHED_FIFO with priority 99 (highest realtime priority)
         os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(99))
     except PermissionError:
-        print("Warning: Need CAP_SYS_NICE capability or root for realtime scheduling")
+        logger.warning("Warning: Need CAP_SYS_NICE capability or root for realtime scheduling")
         try:
             # Fallback to highest nice priority
             os.nice(-20)
         except PermissionError:
-            print("Warning: Cannot set process priority")
+            logger.warning("Warning: Cannot set process priority")
 
     channelEventsMap, channelValueMaps, channelIndexOffsets = zip(
         *[(
