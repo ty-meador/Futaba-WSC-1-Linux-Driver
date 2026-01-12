@@ -1,7 +1,4 @@
 # Makefile for Futaba RC Driver
-# Orchestrates Python build tools with Make's dependency tracking
-
-
 VENV_DIR := $(shell pwd)/.venv
 VENV_ACTIVATE := . $(VENV_DIR)/bin/activate
 
@@ -10,7 +7,6 @@ ifeq (,$(wildcard $(VENV_DIR)/bin/activate))
     $(error Virtual environment not found at $(VENV_DIR). Create it with: python3 -m venv .venv)
 endif
 
-# After activation, use plain python/pip commands
 PYTHON := python3
 PIP := pip3
 
@@ -27,13 +23,13 @@ SOURCE_MAIN := src/main.py
 SOURCES := $(shell find src -name '*.py' 2>/dev/null)
 BUILD_TOOLS := tools/build.py tools/package.py tools/clean.py tools/util.py tools/__config__.py
 
-# The final executable - this is what Make tracks
+
 EXECUTABLE := $(BUILD_DIR)/$(EXECUTABLE_NAME)
 
-# MAKE WAY: .PHONY declares targets that don't represent files
-.PHONY: help all build package install uninstall test clean clean-build clean-package clean-pycache clean-logs
 
-# Default target: show help
+.PHONY: help all build stubs package install uninstall test clean clean-build clean-package clean-pycache clean-logs
+
+
 help:
 	@echo "Futaba RC Driver - Build System"
 	@echo "================================"
@@ -64,6 +60,10 @@ $(EXECUTABLE): $(SOURCES) $(PYPROJECT) $(BUILD_TOOLS)
 	$(VENV_ACTIVATE) && tools/build.py
 
 build: $(EXECUTABLE)
+
+stubs:
+	@echo "Generating type stubs..."
+	$(VENV_ACTIVATE) && tools/build.py --type-stubs
 
 test: $(EXECUTABLE)
 	@echo "Testing executable..."

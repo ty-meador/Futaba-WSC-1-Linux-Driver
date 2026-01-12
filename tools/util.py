@@ -50,7 +50,7 @@ def runCommand(
         capture: Whether to capture and return output
 
     Returns:
-        Command output if capture=True and successful, empty string if capture=False and successful
+        Str: Command output if capture=True and successful, empty string if capture=False and successful
 
     """
     if capture:

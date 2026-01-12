@@ -21,8 +21,17 @@ Homepage = "https://tylermeador.com/futaba-rc-driver"
 Issues = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issues"
 Repository = "https://gitlab.com/Native-Coder/futaba-usb-driver/"
 
+[project.scripts]
+futaba-rc-driver = "main:main"  # Calls main() function in main.py
+
 [build-system]
-requires = ["nuitka~=2.7.12", "setuptools~=61.0", "wheel", "zstandard==0.25.0"]
+requires = [
+  "mypy==1.19.1",
+  "nuitka~=2.7.12",
+  "setuptools~=61.0",
+  "wheel",
+  "zstandard==0.25.0"
+]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
