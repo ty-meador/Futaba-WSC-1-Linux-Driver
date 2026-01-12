@@ -8,16 +8,6 @@ import sys
 
 from __config__ import BUILD_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT, LOGS_DIR, PROJECT_ROOT
 
-parser = ArgumentParser()
-parser.add_argument("--build", action="store_true", help="Remove previous build artifacts")
-parser.add_argument("--package", action="store_true", help="Remove previous package artifacts")
-parser.add_argument(
-    "--empty-log-dir", action="store_true", help="Remove everything inside src/Futaba/logs"
-)
-parser.add_argument("--pycache", action="store_true", help="Clean up pycache files")
-ARGS = parser.parse_args()
-
-
 def cleanLogsDir():
     """Remove any log files from the driver package."""
     for item in LOGS_DIR.iterdir():
@@ -75,6 +65,14 @@ def cleanAll():
 
 
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("--build", action="store_true", help="Remove previous build artifacts")
+    parser.add_argument("--package", action="store_true", help="Remove previous package artifacts")
+    parser.add_argument(
+        "--empty-log-dir", action="store_true", help="Remove everything inside src/Futaba/logs"
+    )
+    parser.add_argument("--pycache", action="store_true", help="Clean up pycache files")
+    ARGS = parser.parse_args()
     # If there were no arguments passed (except the script name, which is always passed)
     # assume that we need to clean *everything*
     if len(sys.argv) - 1 == 0:

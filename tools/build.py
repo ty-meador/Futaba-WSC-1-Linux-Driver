@@ -22,22 +22,14 @@ from __config__ import (
 
 import util
 
-parser = ArgumentParser()
-parser.add_argument(
-    "--clean",
-    action="store_true",
-    help="Clean up previously generated artifacts before building new ones."
-)
-ARGS = parser.parse_args()
-
-
-def build():
+def build() -> None:
     """Main entry point."""
     print("Futaba RC Driver Build Script")
     print("=" * 35)
 
     installDependencies()
     validateEnvironment()
+    generateTypeStubs()
     cleanBuildArtifacts()
 
     execPath = buildExecutable()
@@ -54,7 +46,7 @@ def build():
         sys.exit(1)
 
 
-def buildExecutable():
+def buildExecutable() -> None:
     """Build the executable with Nuitka."""
     print("Building executable...")
 
@@ -112,7 +104,7 @@ def buildExecutable():
     return None
 
 
-def findNativeLibraries():
+def findNativeLibraries() -> str:
     """Find native libraries to include."""
     print("Locating native libraries...")
     # Hard-coded because the package name is "python-uinput"
@@ -140,14 +132,14 @@ def findNativeLibraries():
     return nuitkaArgs
 
 
-def installDependencies():
+def installDependencies() -> None:
     """Install build dependencies."""
     print("Installing dependencies...")
     if util.runCommand("pip3 install .") is None:
         sys.exit(1)
 
 
-def setupExecutable(execPath: Path):
+def setupExecutable(execPath: Path) -> None:
     """Set up the final executable distribution."""
     print("Setting up executable...")
 
@@ -175,7 +167,7 @@ def setupExecutable(execPath: Path):
         print(f"Distribution size: {result.split()[0]}")
 
 
-def testExecutable():
+def testExecutable() -> bool:
     """Test the built executable."""
     print("Testing executable...")
     if util.runCommand(f"{BUILD_DIR / EXECUTABLE_NAME} --version") is not None:
@@ -185,7 +177,7 @@ def testExecutable():
     return False
 
 
-def validateEnvironment():
+def validateEnvironment() -> None:
     """Check that required tools are available."""
     print("Validating environment...")
 
@@ -209,7 +201,39 @@ def validateEnvironment():
         sys.exit(1)
 
 
+def generateTypeStubs() -> None:
+    """Generate python3 type stubs for the Futaba package
+
+    Raises:
+        RuntimeError: If the operation fails for any reason
+
+    Returns:
+        None:
+    """
+    try:
+        util.runCommand("stubgen src/Futaba/ -o typings/")
+    except Exception as e:
+        raise RuntimeError("Failed to generate type stubs!")
+
+
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Clean up previously generated artifacts before building new ones."
+    )
+    parser.add_argument(
+        "--type-stubs",
+        action="store_true",
+        help="Generate python3 type stubs and store them in typings/"
+    )
+    ARGS = parser.parse_args()
+
     if ARGS.clean:
         cleanBuildArtifacts()
-    build()
+
+    if ARGS.type_stubs:
+        generateTypeStubs()
+    else:
+        build()
