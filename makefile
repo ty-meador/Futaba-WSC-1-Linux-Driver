@@ -18,6 +18,10 @@ INSTALL_DIR := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open(
 BIN_DIR := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open('$(PYPROJECT)','rb'); d=tomllib.load(f); print(d['tool']['build_tool']['bin_dir'])")
 VERSION := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open('$(PYPROJECT)','rb'); d=tomllib.load(f); print(d['project']['version'])")
 
+GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null | grep -oP '\d+\.\d+\.\d+' || echo "$(VERSION)")
+PACKAGE_NAME := $(EXECUTABLE_NAME)-$(GIT_VERSION)-linux-x86_64
+PACKAGE_BUILD_DIR := $(PACKAGE_DIR)/$(PACKAGE_NAME)
+
 # Source files and dependencies
 SOURCE_MAIN := src/main.py
 SOURCES := $(shell find src -name '*.py' 2>/dev/null)
@@ -73,30 +77,25 @@ package: build
 	@echo "Creating distribution package..."
 	$(VENV_ACTIVATE) && tools/package.py
 
-install: build
-	@echo "Installing $(EXECUTABLE_NAME)..."
-	@if [ -f "$(BUILD_DIR)/install.sh" ]; then \
-		cd $(BUILD_DIR) && sudo ./install.sh; \
-	else \
-		sudo mkdir -p $(INSTALL_DIR); \
-		sudo cp -r $(BUILD_DIR)/* $(INSTALL_DIR)/; \
-		sudo mkdir -p $(BIN_DIR); \
-		echo '#!/bin/bash' | sudo tee $(BIN_DIR)/$(EXECUTABLE_NAME) > /dev/null; \
-		echo 'exec $(INSTALL_DIR)/$(EXECUTABLE_NAME) "$$@"' | sudo tee -a $(BIN_DIR)/$(EXECUTABLE_NAME) > /dev/null; \
-		sudo chmod +x $(BIN_DIR)/$(EXECUTABLE_NAME); \
-	fi
-	@echo "Installation complete. Run with: $(EXECUTABLE_NAME)"
-
-
 uninstall:
-	@echo "Uninstalling $(EXECUTABLE_NAME)..."
-	@if [ -f "$(BUILD_DIR)/uninstall.sh" ]; then \
-		cd $(BUILD_DIR) && sudo ./uninstall.sh; \
-	else \
-		sudo rm -rf $(INSTALL_DIR); \
-		sudo rm -f $(BIN_DIR)/$(EXECUTABLE_NAME); \
+	@echo "Uninstalling $(EXECUTABLE_NAME) from $(PACKAGE_BUILD_DIR)..."
+	@if [ ! -d "$(PACKAGE_BUILD_DIR)" ]; then \
+		echo "Error: Package directory not found: $(PACKAGE_BUILD_DIR)"; \
+		echo "Run 'make package' first or uninstall manually"; \
+		exit 1; \
 	fi
+	cd $(PACKAGE_BUILD_DIR) && ./uninstall.sh
 	@echo "Uninstall complete"
+
+install: package
+	@echo "Installing $(EXECUTABLE_NAME) from $(PACKAGE_BUILD_DIR)..."
+	@if [ ! -d "$(PACKAGE_BUILD_DIR)" ]; then \
+		echo "Error: Package directory not found: $(PACKAGE_BUILD_DIR)"; \
+		echo "Run 'make package' first"; \
+		exit 1; \
+	fi
+	cd $(PACKAGE_BUILD_DIR) && ./install.sh
+	@echo "Installation complete. Run with: $(EXECUTABLE_NAME)"
 
 clean-build:
 	$(VENV_ACTIVATE) && tools/clean.py --build
