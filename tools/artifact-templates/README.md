@@ -4,16 +4,6 @@
 
 A high-performance Linux driver for Futaba RC USB receivers, providing low-latency joystick input for simulators and games.
 
-## Quick Install
-
-```sh
-# The quick install script will automatically
-# download the latest release and install it.
-wget {{distributables_path}}/{{web_install_script_name}}
-chmod +x {{web_install_script_name}}
-./{{web_install_script_name}}
-```
-
 ## What's Included
 
 - `{{executable_name}}` - Main executable (requires sudo for uinput access)
@@ -38,9 +28,9 @@ chmod +x {{web_install_script_name}}
 
 ---
 
-## Installation
+# Installation
 
-### Manual Installation
+### Manual Installation (Be in Desktop mode for SteamDeck!)
 
 1. **Download the latest release:**
 
@@ -66,21 +56,6 @@ chmod +x {{web_install_script_name}}
     - Run initial calibration
 
 3. **Log out and back in** for group changes to take effect
-
-### Steam Deck Installation
-
-The installer automatically detects Steam Deck and uses optimized settings:
-
-- Installation survives SteamOS updates (user-space install)
-- Works best in Desktop Mode
-- Configures as user service
-
-```sh
-# In Desktop Mode (Konsole)
-wget {{distributables_path}}/{{web_install_script_name}}
-chmod +x {{web_install_script_name}}
-./{{web_install_script_name}}
-```
 
 ---
 

@@ -19,6 +19,7 @@ Distributables = "https://tylermeador.com/futaba-rc-driver/dist"
 Documentation = "https://tylermeador.com/futaba-rc-driver/docs"
 Homepage = "https://tylermeador.com/futaba-rc-driver"
 Issues = "https://gitlab.com/futaba-linux-support/futaba-rc-linux-driver/-/issues"
+LatestDistributable = "https://tylermeador.com/futaba-rc-driver/dist/latest"
 Repository = "https://gitlab.com/Native-Coder/futaba-usb-driver/"
 
 [project.scripts]
