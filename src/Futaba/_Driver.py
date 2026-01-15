@@ -172,24 +172,17 @@ def run(
                     syn=False,
                 )
 
-                if echoFlagIsSet():  # Echo back the data frames info - useful for calibration
-                    # Only send if there's space (non-blocking check)
-                    if not pipe.poll(0):  # Check if pipe has data waiting to be read
-                        try:
-                            pipe.send(DataFrame(
-                                channelEventsMap[channel],
-                                rawValue,
-                                calibratedValue,
-                            ))
-                        except BlockingIOError:
-                            # Pipe is full - nobody's reading, disable echo
-                            controller.echoFlag.clear()
-                            logger.warning("Echo disabled: pipe buffer full (no consumer)")
-                    # pipe.send(DataFrame(
-                    #     channelEventsMap[channel],
-                    #     rawValue,
-                    #     calibratedValue,
-                    # ))
+                if echoFlagIsSet() and not pipe.poll(0):  # Echo back the data frames info - useful for calibration
+                    try:
+                        pipe.send(DataFrame(
+                            channelEventsMap[channel],
+                            rawValue,
+                            calibratedValue,
+                        ))
+                    except BlockingIOError:
+                        # Pipe is full - nobody's reading, disable echo
+                        controller.echoFlag.clear()
+                        logger.warning("Echo disabled: pipe buffer full (no consumer)")
             # Fire all channel events at once
             sync()
 
