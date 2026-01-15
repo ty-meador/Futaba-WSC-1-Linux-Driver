@@ -6,7 +6,7 @@ set -e
 # Safely evaluate any environment variables that are stored in our settings
 INSTALL_DIR=$( echo "{{install_dir}}" | envsubst )
 BIN_DIR=$( echo "{{bin_dir}}" | envsubst )
-EXECUTABLE=$( echo "{{executable_name}}" | envsubst )
+EXECUTABLE=$( echo "{{executable_name}}" | envsubst )[0:15]
 
 echo "Futaba RC Driver System Uninstaller"
 echo "======================================"
@@ -24,7 +24,7 @@ echo "   Binary:  ${BIN_DIR}"
 
 # Stop any running instances
 echo "Stopping any running driver instances..."
-pkill -f "${EXECUTABLE}" || true
+pkill -f "${EXECUTABLE:0:15}" || true
 
 echo "Uninstalling Futaba RC Driver..."
 
