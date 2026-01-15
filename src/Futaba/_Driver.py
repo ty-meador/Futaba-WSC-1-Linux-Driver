@@ -67,8 +67,7 @@ def run(
 
     # Set realtime priority at the start of the process
     try:
-        # SCHED_FIFO with priority 99 (highest realtime priority)
-        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(99))
+        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(50))
     except PermissionError:
         logger.warning("Warning: Need CAP_SYS_NICE capability or root for realtime scheduling")
         try:
