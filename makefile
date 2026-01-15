@@ -37,9 +37,8 @@ $(PACKAGE_TARBALL): $(EXECUTABLE) $(BUILD_TOOLS) $(TEMPLATE_FILES)
 	@echo "Dependencies changed, repackaging..."
 	$(VENV_ACTIVATE) && tools/package.py
 
-
-.PHONY: help all build stubs package install uninstall test clean clean-build clean-package clean-pycache clean-logs
-
+.DEFAULT_GOAL := help
+.PHONY: help all build release stubs package install uninstall test clean clean-build clean-package clean-pycache clean-logs version
 
 help:
 	@echo "Futaba RC Driver - Build System"
@@ -47,6 +46,8 @@ help:
 	@echo ""
 	@echo "Available targets:"
 	@echo "  make build          - Build executable with Nuitka"
+	@echo "  make release        - Build a release"
+	@echo "  make stubs          - Regenerate type stubs"
 	@echo "  make package        - Create distribution package"
 	@echo "  make all            - Build and package (build + package)"
 	@echo "  make install        - Install the built executable to system"
@@ -71,6 +72,13 @@ $(EXECUTABLE): $(SOURCES) $(PYPROJECT) $(BUILD_TOOLS)
 	$(VENV_ACTIVATE) && tools/build.py
 
 build: $(EXECUTABLE)
+
+release:
+	@./tools/prep-release.sh
+	$(MAKE) all
+	@echo ""
+	@echo "Release complete! To publish:"
+	@echo "  git push && git push --tags"
 
 stubs:
 	@echo "Generating type stubs..."
