@@ -88,7 +88,7 @@ echo ""
 echo "Updating version in pyproject.toml..."
 
 # Update version in pyproject.toml
-sed -i "s/version = \"${CURRENT_VERSION}\"/version = \"${NEXT_VERSION}\"/g" pyproject.toml
+tools/utils.py --pyproject project.version=${NEXT_VERSION}
 
 # Verify the change
 NEW_VERSION_CHECK=$(tools/util.py --pyproject project.version)

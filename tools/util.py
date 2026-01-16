@@ -92,7 +92,8 @@ def _getNestedValue(dictionary: dict, path: str) -> any:
 
 
 if __name__ == "__main__":
-    from __config__ import PYPROJECT
+    from __config__ import PYPROJECT, PYPROJECT_PATH
+    import re
     from argparse import ArgumentParser
     from sys import stderr, argv
 
@@ -108,6 +109,22 @@ if __name__ == "__main__":
 
     if ARGS.pyproject:
         try:
-            print(_getNestedValue(PYPROJECT, ARGS.pyproject))
+            # @fixme this won't handle anything beyond a simple key/value search and replace
+            if '=' in ARGS.pyproject:
+                keys, value = ARGS.pyproject.split('=', 1)
+
+                with open(PYPROJECT_PATH, 'r') as f:
+                    content = f.read()
+
+                lastKey = keys.split('.')[-1]
+                pattern = rf'^{lastKey}\s*=\s*"[^"]*"'
+                replacement = f'{lastKey} = "{value}"'
+                newContent = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+
+                with open(PYPROJECT_PATH, 'w') as f:
+                    f.write(newContent)
+                print(f"Set {keys} = {value}")
+            else:
+                print(_getNestedValue(pyproject, ARGS.pyproject))
         except Exception as e:
-            print(e)
+            print(f"Error: {e}", file=stderr)
