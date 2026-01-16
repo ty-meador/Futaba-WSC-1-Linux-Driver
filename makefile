@@ -100,7 +100,6 @@ install: $(PACKAGE_TARBALL)
 		exit 1; \
 	fi
 	cd $(PACKAGE_BUILD_DIR) && ./install.sh
-	@echo "Installation complete"
 
 uninstall:
 	@echo "Uninstalling $(EXECUTABLE_NAME)..."
@@ -113,7 +112,6 @@ uninstall:
 	else \
 		echo "No install detected! Nothing to do!"; \
 	fi
-	@echo "Uninstall complete"
 
 clean-build:
 	$(VENV_ACTIVATE) && tools/clean.py --build
