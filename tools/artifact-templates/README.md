@@ -35,126 +35,6 @@ Transform your Futaba RC transmitter into a high-precision game controller for r
 Experience precise, visual feedback during calibration:
 
 ```
-┌─────────────────────── Calibration Mode ────────────────────────┐
-│                                                                  │
-│                      制 ███████▌                                 │
-│                ──────────人──────────                            │
-│                  ████ 速                                         │
-│                                                                  │
-│  Move all controls through their full range of motion           │
-│  Press SPACE to capture center positions                        │
-│  Press ENTER when complete                                      │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-The intuitive UI shows real-time input visualization with precise center-point capture for accurate control mapping.
-
----
-
-## Quick Start
-
-### Copy/paste into terminal, press enter, then follow prompts
-
-```shell
-wget {{distributables_path}}/{{package_name}}.tar.gz && tar -xzf {{package_name}}.tar.gz && cd {{package_name}} && ./{{install_script_name}}
-```
-
-### Initial Setup
-
-#### Make sure to bind your transmitter to the USB receiver and plug in the reciever.
-
-```text
-...
-Installation complete!
-
-If you are using a wireless transmitter please bind it to USB receiver now.
-Press Enter to continue...
-
-Turn on your transmitter and prepare to perform initial calibration.
-Press Enter to continue...
-```
-
-### Calibration
-
-#### 1: Choose your transmitter
-
-```text
-┌──────────────( Which receiver is your transmitter paired to? )───────────────┐
-│                                                                              │
-│                              Futaba WSC-1(135)                               │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-#### 2: Center all inputs on your transmitter
-
-```text
-┌───────────────────( Center all inputs, then press enter )────────────────────┐
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-#### 3: Driver will calculate zero points for your channels
-
-```text
-┌────────────────────────────────( STANDBY... )────────────────────────────────┐
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-#### 4: Move all channels to each of their extremes
-
-```text
-
 ┌───( Slowly move each channel to each of their extremes, then press enter )───┐
 │                                                                              │
 │                                                                              │
@@ -177,24 +57,21 @@ Press Enter to continue...
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 5: Boot up your favorite R/C sim and have fun!
+The intuitive UI shows real-time input visualization with precise center-point capture for accurate control mapping.
 
-```text
-
-Calibration complete!
-
-Usage:
-  futaba-rc-driver  # Run the driver manually
-The driver will now start automatically when you log in
-Test installation: futaba-rc-driver --help
-Driver runs continuously in the background and prevents duplicate instances
-Driver started, good luck!
-
-Installation complete
-
-```
+---
 
 ## Install
+
+> Both install scripts are identical, the top one is just easier to copy and paste for non-technical users
+
+### Easy Install
+
+```shell
+wget {{distributables_path}}/{{package_name}}.tar.gz && tar -xzf {{package_name}}.tar.gz && cd {{package_name}} && ./{{install_script_name}}
+```
+
+### Manual Install
 
 ```shell
 # Download the latest release
