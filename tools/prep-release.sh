@@ -33,7 +33,7 @@ if ! git diff-index --quiet HEAD --; then
 fi
 
 # Get current version from pyproject.toml
-CURRENT_VERSION=$(python3 -c "import tomllib; f=open('$PYPROJECT','rb'); d=tomllib.load(f); print(d['project']['version'])" 2>/dev/null)
+CURRENT_VERSION=$(tools/util.py --pyproject project.version 2>/dev/null)
 [ -n "$CURRENT_VERSION" ] || error "Could not read current version from pyproject.toml"
 
 echo "Current version: $CURRENT_VERSION"
@@ -107,7 +107,7 @@ with open('$PYPROJECT', 'w') as f:
 EOF
 
 # Verify the change
-NEW_VERSION_CHECK=$(python3 -c "import tomllib; f=open('$PYPROJECT','rb'); d=tomllib.load(f); print(d['project']['version'])")
+NEW_VERSION_CHECK=$(tools/util.py --pyproject project.version)
 if [ "$NEW_VERSION_CHECK" != "$NEXT_VERSION" ]; then
     error "Version update verification failed. Expected $NEXT_VERSION, got $NEW_VERSION_CHECK"
 fi
