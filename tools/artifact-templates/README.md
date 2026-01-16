@@ -19,7 +19,7 @@ Transform your Futaba RC transmitter into a high-precision game controller for r
 
 **Built for Performance**
 
-- Real-time scheduling (SCHED_FIFO) for minimal latency
+- Real-time scheduling for minimal latency
 - O(1) frame processing - constant time regardless of input complexity
 - Pre-calculated calibration maps eliminate runtime computation
 - Optimized for racing and flight simulators where timing matters
@@ -201,7 +201,7 @@ Installation complete
 wget {{distributables_path}}/{{package_name}}.tar.gz
 
 # Extract the archive
-tar -xzf {{package_name}}.tar.gz
+tar -xvzf {{package_name}}.tar.gz
 
 # Run the installer
 cd {{package_name}}
@@ -279,7 +279,7 @@ The driver starts automatically when you log in. Manual operation:
 
 The calibration is saved per-device and persists across sessions.
 
-### Multiple Transmitters
+### Multiple Transmitters (needs more testing)
 
 The driver automatically handles multiple connected transmitters:
 

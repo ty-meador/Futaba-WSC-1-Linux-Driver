@@ -115,6 +115,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
             "web_install_script_name": WEB_INSTALL_SCRIPT_NAME,
             "distributables_path": DISTRIBUTABLES_PAGE,
             "repository": REPOSITORY,
+            "package_name": packageName
         },
         packagePath / "README.md",
     )

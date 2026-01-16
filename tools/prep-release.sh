@@ -88,23 +88,7 @@ echo ""
 echo "Updating version in pyproject.toml..."
 
 # Update version in pyproject.toml
-python3 << EOF
-import re
-
-with open('$PYPROJECT', 'r') as f:
-    content = f.read()
-
-# Replace version line
-new_content = re.sub(
-    r'^version = "[^"]*"',
-    'version = "$NEXT_VERSION"',
-    content,
-    flags=re.MULTILINE
-)
-
-with open('$PYPROJECT', 'w') as f:
-    f.write(new_content)
-EOF
+sed -i "s/version = \"${CURRENT_VERSION}\"/version = \"${NEXT_VERSION}\"/g" pyproject.toml
 
 # Verify the change
 NEW_VERSION_CHECK=$(tools/util.py --pyproject project.version)
