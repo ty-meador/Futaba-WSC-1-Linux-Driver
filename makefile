@@ -11,12 +11,12 @@ PYTHON := python3
 PIP := pip3
 
 PYPROJECT := pyproject.toml
-EXECUTABLE_NAME := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open('$(PYPROJECT)','rb'); d=tomllib.load(f); print(d['tool']['build_tool']['executable_name'])")
-BUILD_DIR := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open('$(PYPROJECT)','rb'); d=tomllib.load(f); print(d['tool']['build_tool']['build_dir'])")
-PACKAGE_DIR := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open('$(PYPROJECT)','rb'); d=tomllib.load(f); print(d['tool']['build_tool']['package_dir'])")
-INSTALL_DIR := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open('$(PYPROJECT)','rb'); d=tomllib.load(f); print(d['tool']['build_tool']['install_dir'])")
-BIN_DIR := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open('$(PYPROJECT)','rb'); d=tomllib.load(f); print(d['tool']['build_tool']['bin_dir'])")
-VERSION := $(shell $(VENV_ACTIVATE) && $(PYTHON) -c "import tomllib; f=open('$(PYPROJECT)','rb'); d=tomllib.load(f); print(d['project']['version'])")
+EXECUTABLE_NAME := $(shell $(VENV_ACTIVATE) && tools/util.py --pyproject tool.build_tool.executable_name)
+BUILD_DIR := $(shell $(VENV_ACTIVATE) && tools/util.py --pyproject tool.build_tool.build_dir)
+PACKAGE_DIR := $(shell $(VENV_ACTIVATE) && tools/util.py --pyproject tool.build_tool.package_dir)
+INSTALL_DIR := $(shell $(VENV_ACTIVATE) && tools/util.py --pyproject tool.build_tool.install_dir)
+BIN_DIR := $(shell $(VENV_ACTIVATE) && tools/util.py --pyproject tool.build_tool.bin_dir)
+VERSION := $(shell $(VENV_ACTIVATE) && tools/util.py --pyproject project.version)
 
 GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null | grep -oP '\d+\.\d+\.\d+' || echo "$(VERSION)")
 PACKAGE_NAME := $(EXECUTABLE_NAME)-$(GIT_VERSION)-linux-x86_64
@@ -74,7 +74,8 @@ $(EXECUTABLE): $(SOURCES) $(PYPROJECT) $(BUILD_TOOLS)
 build: $(EXECUTABLE)
 
 release:
-	@./tools/prep-release.sh
+	@echo "Prepping new release"
+	$(VENV_ACTIVATE) && tools/prep-release.sh
 	$(MAKE) all
 	@echo ""
 	@echo "Release complete! To publish:"

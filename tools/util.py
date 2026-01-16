@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Utilities and constants for the build system."""
 
 import subprocess
@@ -66,3 +67,47 @@ def runCommand(
     else:
         subprocess.run(cmd, shell=shell, check=check, cwd=cwd)
         return ""
+
+
+def _getNestedValue(dictionary: dict, path: str) -> any:
+    """
+    Retrieve a value from a nested dictionary using dot notation.
+
+    Args:
+        dictionary: The dictionary to search
+        path: String with dot notation (e.g., "my.value")
+
+    Returns:
+        The value at the path, or None if not found
+    """
+    keys = path.split('.')
+    value = dictionary
+
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return None
+    return value
+
+
+if __name__ == "__main__":
+    from __config__ import PYPROJECT
+    from argparse import ArgumentParser
+    from sys import stderr, argv
+
+    parser = ArgumentParser()
+    parser.add_argument("--pyproject", action="store", help="Print a value from pyproject.toml")
+    ARGS = parser.parse_args()
+
+    # Script name is always passed
+    if len(argv) == 1:
+        print("Futaba RC Driver Development Utilities")
+        print("=" * 40)
+        parser.print_help(stderr)
+
+    if ARGS.pyproject:
+        try:
+            print(_getNestedValue(PYPROJECT, ARGS.pyproject))
+        except Exception as e:
+            print(e)
