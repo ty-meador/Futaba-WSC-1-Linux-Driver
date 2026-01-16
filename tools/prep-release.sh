@@ -89,7 +89,7 @@ echo "Updating version in pyproject.toml..."
 
 
 # Update version in pyproject.toml
-$(toosls/utils.py --pyproject project.version=${NEXT_VERSION})
+tools/utils.py --pyproject "project.version=${NEXT_VERSION}"
 
 # Verify the change
 NEW_VERSION_CHECK=$(tools/util.py --pyproject project.version)
