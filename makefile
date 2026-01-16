@@ -92,6 +92,7 @@ test: $(EXECUTABLE)
 package: $(PACKAGE_TARBALL)
 
 install: $(PACKAGE_TARBALL)
+	@$(MAKE) uninstall
 	@echo "Installing $(EXECUTABLE_NAME) from $(PACKAGE_BUILD_DIR)..."
 	@if [ ! -d "$(PACKAGE_BUILD_DIR)" ]; then \
 		echo "Error: Package directory not found: $(PACKAGE_BUILD_DIR)"; \
@@ -103,13 +104,14 @@ install: $(PACKAGE_TARBALL)
 
 uninstall:
 	@echo "Uninstalling $(EXECUTABLE_NAME)..."
-	@if [ -f "$(PACKAGE_BUILD_DIR)/uninstall.sh" ]; then \
-		cd $(PACKAGE_BUILD_DIR) && ./uninstall.sh; \
+	@if [ -f "$(INSTALL_DIR)/uninstall.sh" ]; then \
+		cd "$(INSTALL_DIR)" && ./uninstall.sh; \
+	elif [ -f "$(PACKAGE_BUILD_DIR)/uninstall.sh" ]; then \
+		cd "$(PACKAGE_BUILD_DIR)" && ./uninstall.sh; \
 	elif [ -f "$(BUILD_DIR)/uninstall.sh" ]; then \
-		cd $(BUILD_DIR) && ./uninstall.sh; \
+		cd "$(BUILD_DIR)" && ./uninstall.sh; \
 	else \
-		sudo rm -rf $(INSTALL_DIR); \
-		sudo rm -f $(BIN_DIR)/$(EXECUTABLE_NAME); \
+		echo "No install detected! Nothing to do!"; \
 	fi
 	@echo "Uninstall complete"
 
