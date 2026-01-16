@@ -87,6 +87,7 @@ read -p "Continue? (yes/no): " CONFIRM
 echo ""
 echo "Updating version in pyproject.toml..."
 
+
 # Update version in pyproject.toml
 tools/utils.py --pyproject project.version=${NEXT_VERSION}
 

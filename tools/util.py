@@ -106,6 +106,7 @@ if __name__ == "__main__":
         print("Futaba RC Driver Development Utilities")
         print("=" * 40)
         parser.print_help(stderr)
+        sys.exit(1)
 
     if ARGS.pyproject:
         try:
@@ -123,8 +124,7 @@ if __name__ == "__main__":
 
                 with open(PYPROJECT_PATH, 'w') as f:
                     f.write(newContent)
-                print(f"Set {keys} = {value}")
             else:
-                print(_getNestedValue(pyproject, ARGS.pyproject))
+                print(_getNestedValue(PYPROJECT, ARGS.pyproject))
         except Exception as e:
             print(f"Error: {e}", file=stderr)
