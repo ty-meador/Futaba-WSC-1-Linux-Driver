@@ -67,8 +67,7 @@ def run(
 
     # Set realtime priority at the start of the process
     try:
-        # SCHED_FIFO with priority 99 (highest realtime priority)
-        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(99))
+        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(50))
     except PermissionError:
         logger.warning("Warning: Need CAP_SYS_NICE capability or root for realtime scheduling")
         try:
@@ -172,12 +171,17 @@ def run(
                     syn=False,
                 )
 
-                if echoFlagIsSet():  # Echo back the data frames info - useful for calibration
-                    pipe.send(DataFrame(
-                        channelEventsMap[channel],
-                        rawValue,
-                        calibratedValue,
-                    ))
+                if echoFlagIsSet() and not pipe.poll(0):  # Echo back the data frames info - useful for calibration
+                    try:
+                        pipe.send(DataFrame(
+                            channelEventsMap[channel],
+                            rawValue,
+                            calibratedValue,
+                        ))
+                    except BlockingIOError:
+                        # Pipe is full - nobody's reading, disable echo
+                        controller.echoFlag.clear()
+                        logger.warning("Echo disabled: pipe buffer full (no consumer)")
             # Fire all channel events at once
             sync()
 

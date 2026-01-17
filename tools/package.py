@@ -115,6 +115,8 @@ def packageDistribution() -> None:  # noqa: PLR0915
             "web_install_script_name": WEB_INSTALL_SCRIPT_NAME,
             "distributables_path": DISTRIBUTABLES_PAGE,
             "repository": REPOSITORY,
+            "package_name": packageName,
+            "install_dir": INSTALL_DIR
         },
         packagePath / "README.md",
     )
@@ -227,16 +229,6 @@ def packageDistribution() -> None:  # noqa: PLR0915
     print("Creating checksums...")
     runCommand(f"cd {packagePath} && sha256sum {tarGzName} > {tarGzName}.sha256")
     runCommand(f"cd {packagePath} && sha256sum {tarXzName} > {tarXzName}.sha256")
-
-    # Create web installer
-    renderTemplate(
-        SCRIPTS_TEMPLATES_DIR / WEB_INSTALL_SCRIPT_NAME,
-        {
-            "package_name": packageName,
-            "download_url": f"{DISTRIBUTABLES_PAGE}/{packageName}/{tarGzName}",
-        },
-        packagePath / WEB_INSTALL_SCRIPT_NAME,
-    )
 
     # Summary
     print("\nDistribution package created successfully!")
