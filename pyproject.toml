@@ -1,6 +1,6 @@
 [project]
 name = "futaba-rc-driver"
-version = "1.4.5"
+version = "1.4.6"
 description = "A Futaba RC Driver for Linux."
 requires-python = ">=3.11.0"
 classifiers = [
