@@ -27,16 +27,13 @@ def run(
         interruptEndpoint (int): The usb interrupt endpoint of the device that you want to start a
         driver for.
 
-    NOTE main event loop optimization:
-        we initialize a local version of everything that will be used inside the main event loop.
-        The optimization works because:
+    NOTE:
+        Main event loop optimization
 
-        - Attribute lookups (like obj.method) generate LOAD_ATTR bytecode instructions that are
-        slower than the LOAD_FAST instructions that are used for local variables.
-        - By storing method references in local variables before the loop, the interpreter uses
-        faster local variable access instead of attribute resolution
-        - This reduces the number of bytecode instructions and eliminates repeated attribute
-        traversal
+        - we initialize a local version of everything that will be used inside the main event loop. The optimization works because:
+            - Attribute lookups (like obj.method) generate LOAD_ATTR bytecode instructions that are slower than the LOAD_FAST instructions that are used for local variables.
+            - By storing method references in local variables before the loop, the interpreter uses faster local variable access instead of attribute resolution
+            - This reduces the number of bytecode instructions and eliminates repeated attribute traversal
 
     """
     import os

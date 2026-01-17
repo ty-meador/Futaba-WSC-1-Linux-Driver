@@ -1,4 +1,5 @@
 import usb
+from . import DriverSubproc as DriverSubproc
 from .IPC import WorkerControl as WorkerControl
 from .InputChannel import InputChannel as InputChannel
 from .__config__ import CALIBRATION_PATH as CALIBRATION_PATH, CONFIG_PATH as CONFIG_PATH, DEFAULT_CALIBRATION as DEFAULT_CALIBRATION, DEFAULT_CONFIG as DEFAULT_CONFIG, DeviceConfig as DeviceConfig, FUTABA_VENDOR_ID as FUTABA_VENDOR_ID

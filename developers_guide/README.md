@@ -81,8 +81,8 @@ futaba-usb-driver/
 │   │   │   └── _WSC-1.json             # WSC-1 channel mapping & settings
 │   │   │
 │   │   ├── __config__.py               # Package configuration constants
-│   │   ├── _Driver.py                  # Legacy/alternate driver implementation (?)
-│   │   ├── Driver.py                   # Main USB driver logic
+│   │   ├── DriverSubproc.py            # Main driver logic - Meant to be executed as a subprocess
+│   │   ├── Driver.py                   # Programmatic device / driver interface
 │   │   ├── Error.py                    # Custom exception classes
 │   │   ├── __init__.py                 # Package initialization
 │   │   ├── InputChannel.py             # Individual RC channel processing

@@ -10,6 +10,7 @@ from __config__ import (
     BIN_DIR,
     BUILD_DIR,
     DISTRIBUTABLES_PAGE,
+    DOCS_DIR,
     EXECUTABLE_NAME,
     INSTALL_DIR,
     INSTALL_SCRIPT_NAME,
@@ -56,6 +57,7 @@ def getVersionInfo() -> tuple[str, str]:
 
     buildDate = datetime.now().strftime("%Y%m%d_%H%M%S")
     return version, buildDate
+
 
 
 def packageDistribution() -> None:  # noqa: PLR0915
@@ -154,21 +156,34 @@ def packageDistribution() -> None:  # noqa: PLR0915
         packagePath / UNINSTALL_SCRIPT_NAME,
     )
 
+    ##
+    # Copy critical static project files
+    ##
     pkgCriticalFiles = [
         PROJECT_ROOT / "LICENSE",
         TEMPLATES_DIR / "udev.rules",
         PROJECT_ROOT / "NOTICE",
         PROJECT_ROOT / "pyproject.toml",
     ]
-
     missing = [pkgFile for pkgFile in pkgCriticalFiles if not pkgFile.exists()]
     if missing:
         raise FileNotFoundError(
             f"ERROR: UNABLE TO FIND >{', '.join(map(str, missing))}< REFUSING TO PACKAGE"
         )
-
     for pkgFile in pkgCriticalFiles:
         shutil.copy2(pkgFile, packagePath)
+
+    ##
+    # Copy project critical subdirectories (such as the generated docs...)
+    ##
+    pkgCriticalDirs = [ DOCS_DIR / "build/html" ]
+    missing = [pkgDir for pkgDir in pkgCriticalFiles if not pkgDir.exists()]
+    if missing:
+        raise FileNotFoundError(
+            f"ERROR: UNABLE TO FIND >{', '.join(map(str, missing))}< REFUSING TO PACKAGE"
+        )
+    for pkgSubdir in pkgCriticalDirs:
+        shutil.copytree(pkgSubdir, packagePath / "docs",dirs_exist_ok=True)
 
     ##
     # Create version info file
