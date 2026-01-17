@@ -10,6 +10,7 @@ import sys
 from clean import cleanBuildArtifacts
 from __config__ import (
     BUILD_DIR,
+    DOCS_DIR,
     EXECUTABLE_NAME,
     INSTALL_DIR,
     NUITKA_OUTPUT_DIR,
@@ -29,8 +30,8 @@ def build() -> None:
 
     installDependencies()
     validateEnvironment()
-    generateTypeStubs()
     cleanBuildArtifacts()
+    generateTypeStubs()
 
     execPath = buildExecutable()
     if not execPath:
@@ -104,6 +105,7 @@ def buildExecutable() -> None:
     return None
 
 
+
 def findNativeLibraries() -> str:
     """Find native libraries to include."""
     print("Locating native libraries...")
@@ -132,11 +134,13 @@ def findNativeLibraries() -> str:
     return nuitkaArgs
 
 
+
 def installDependencies() -> None:
     """Install build dependencies."""
     print("Installing dependencies...")
-    if util.runCommand("pip3 install .") is None:
+    if util.runCommand("pip3 install -e .") is None:
         sys.exit(1)
+
 
 
 def setupExecutable(execPath: Path) -> None:
@@ -222,6 +226,11 @@ if __name__ == "__main__":
         "--clean",
         action="store_true",
         help="Clean up previously generated artifacts before building new ones."
+    )
+    parser.add_argument(
+        "--docs",
+        action="store_true",
+        help="Generate sphinx documentation and store the output in docs/build"
     )
     parser.add_argument(
         "--type-stubs",

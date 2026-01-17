@@ -23,22 +23,34 @@ PACKAGE_NAME := $(EXECUTABLE_NAME)-$(GIT_VERSION)-linux-x86_64
 PACKAGE_BUILD_DIR := $(PACKAGE_DIR)/$(PACKAGE_NAME)
 PACKAGE_TARBALL := $(PACKAGE_BUILD_DIR)/$(PACKAGE_NAME).tar.gz
 
+# Documentation
+DOCS_DIR := docs
+DOCS_SOURCE_DIR := $(DOCS_DIR)/source
+DOCS_BUILD_DIR := $(DOCS_DIR)/build
+SPHINX_BUILD := $(VENV_DIR)/bin/python -m sphinx
+SPHINX_OPTS :=
+
 # Source files and dependencies
 SOURCE_MAIN := src/main.py
 SOURCES := $(shell find src -name '*.py' 2>/dev/null)
 BUILD_TOOLS := tools/build.py tools/package.py tools/clean.py tools/util.py tools/__config__.py
 TEMPLATE_FILES := $(shell find tools/artifact-templates -type f 2>/dev/null)
 
-# The executable depends on source and build tool changes
+
 EXECUTABLE := $(BUILD_DIR)/$(EXECUTABLE_NAME)
 
 # Package depends on executable, build tools, and template changes
-$(PACKAGE_TARBALL): $(EXECUTABLE) $(BUILD_TOOLS) $(TEMPLATE_FILES)
+$(PACKAGE_TARBALL): $(EXECUTABLE) $(BUILD_TOOLS) $(DOCS_DIR) $(TEMPLATE_FILES)
 	@echo "Dependencies changed, repackaging..."
 	$(VENV_ACTIVATE) && tools/package.py
 
+# The executable depends on source and build tool changes
+$(EXECUTABLE): $(SOURCES) $(PYPROJECT)
+	@echo "Source files changed, rebuilding..."
+	$(VENV_ACTIVATE) && tools/build.py
+
 .DEFAULT_GOAL := help
-.PHONY: help all build release stubs package install uninstall test clean clean-build clean-package clean-pycache clean-logs version
+.PHONY: help all build release stubs docs package install uninstall test clean clean-build clean-package clean-pycache clean-logs version
 
 help:
 	@echo "Futaba RC Driver - Build System"
@@ -48,6 +60,7 @@ help:
 	@echo "  make build          - Build executable with Nuitka"
 	@echo "  make release        - Build a release"
 	@echo "  make stubs          - Regenerate type stubs"
+	@echo "  make docs           - Generate Sphinx documentation"
 	@echo "  make package        - Create distribution package"
 	@echo "  make all            - Build and package (build + package)"
 	@echo "  make install        - Install the built executable to system"
@@ -67,10 +80,6 @@ help:
 
 all: build package
 
-$(EXECUTABLE): $(SOURCES) $(PYPROJECT) $(BUILD_TOOLS)
-	@echo "Source files changed, rebuilding..."
-	$(VENV_ACTIVATE) && tools/build.py
-
 build: $(EXECUTABLE)
 
 release:
@@ -84,6 +93,14 @@ release:
 stubs:
 	@echo "Generating type stubs..."
 	$(VENV_ACTIVATE) && tools/build.py --type-stubs
+
+docs: $(SOURCES) $(PYPROJECT)
+	@echo "Building Sphinx documentation..."
+	@$(VENV_ACTIVATE) && tools/clean.py --docs
+	@$(VENV_ACTIVATE) && sphinx-apidoc -f -o $(DOCS_SOURCE_DIR) src/Futaba/ --tocfile index
+	@$(VENV_ACTIVATE) && $(SPHINX_BUILD) -M html "$(DOCS_SOURCE_DIR)" "$(DOCS_BUILD_DIR)" $(SPHINX_OPTS)
+	@echo ""
+	@echo "Documentation built: $(DOCS_BUILD_DIR)/html/index.html"
 
 test: $(EXECUTABLE)
 	@echo "Testing executable..."
