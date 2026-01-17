@@ -8,7 +8,7 @@
 - Python 3.11 or higher
 - GCC or Clang compiler
 - Make utility
-- Git (optional, for version tracking)
+- Git
 
 #### Initial Setup
 
@@ -51,6 +51,8 @@
     ```
 
 #### Project Structure
+
+> API documentation can be found [here](https://tylermeador.com/futaba-rc-driver/docs/)
 
 ```
 futaba-usb-driver/
