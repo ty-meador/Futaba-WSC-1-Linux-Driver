@@ -44,10 +44,18 @@ class CalibrationUI(Window):
         # ⠀⠀⠀⠀⠀⠀⠀⠹⠋⣤⣾⣿⣷⡌⠛⠛⢡⣾⣿⣷⣤⠙⠏⠀⠀⠀⠀⠀⠀⠀
         # ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠰⠶⣶⣶⣶⣶⣶⣶⣶⣶⠶⠆⠀⠀⠀⠀⠀⠀⠀⠀⠀
         # ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+        #
+        #
+        # 制 人 速
+        #
+        # Precision → Mastery → Excellence
+        #
+        # 匠の精神 (takumi no seishin) - The Spirit of Craftsmanship
+        # 敬意を込めて
         ##
-        self.chi = " 制 "  # "control"
-        self.hito = "──────人──────"  # "human/person" - the operator at the center of control
-        self.haya = " 速 "  # "speed"
+        self.chi = " 制 "
+        self.hito = "──────人──────"
+        self.haya = " 速 "
 
     def setBoth(self, steeringPos: int, throttlePos: int) -> None:
         """Update both the steering and throttle position in a single render.

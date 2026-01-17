@@ -362,4 +362,4 @@ See `LICENSE` file for details.
 
 **Built with ❤️ for the RC community**
 
-_Making Linux the premier platform for RC simulation_
+_敬意を込めて_

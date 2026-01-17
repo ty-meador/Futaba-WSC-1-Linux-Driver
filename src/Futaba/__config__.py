@@ -48,8 +48,8 @@ DEFAULT_OUTPUT_RANGE: tuple[int, ...] = tuple([
 ])
 
 FUTABA_VENDOR_ID: int = 4104  # 0x1008
-HID_INTERFACE: int = 0x3  # conincidence
-INTERRUPT_ENDPOINT_ATTRIBUTE: int = 0x3  # conincidence
+HID_INTERFACE: int = 0x3  # coincidence
+INTERRUPT_ENDPOINT_ATTRIBUTE: int = 0x3  # coincidence
 
 LOGLEVEL: int = logging.DEBUG
 DRIVER_PATH: Path = Path(__file__).resolve().parent
