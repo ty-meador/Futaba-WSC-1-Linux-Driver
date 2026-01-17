@@ -6,14 +6,6 @@ Transform your Futaba RC transmitter into a high-precision game controller for r
 
 ![Driver demonstration in VRC-Pro](/screenshots/example.gif)
 
-# Futaba RC USB Driver
-
-### Professional-grade Linux driver for Futaba RC transmitters
-
-Transform your Futaba RC transmitter into a high-precision game controller for racing simulators, flight sims, and more. Purpose-built for Linux with zero dependency hassles.
-
-![Driver demonstration in VRC-Pro](/screenshots/example.gif)
-
 ---
 
 ## Why This Driver?
@@ -342,30 +334,6 @@ grep -r "futaba-rc-driver" ~/.profile ~/.bashrc ~/.zshrc
 # Manual start for this session:
 futaba-rc-driver --daemonize &
 ```
-
-### Driver Not Auto-Starting
-
-```bash
-# Verify profile configuration:
-grep -r "futaba-rc-driver" ~/.profile ~/.bashrc ~/.zshrc
-
-# Manual start for this session:
-futaba-rc-driver --daemonize &
-```
-
-### Steam Deck Specific Issues
-
-**"Device not detected" in Desktop Mode:**
-
-- Try different USB ports (the side port works best)
-- Ensure you're in Desktop Mode, not Gaming Mode
-- Check `journalctl --user -u futaba-rc-driver -f` for errors
-
-**Auto-start not working:**
-
-- Verify installation: `systemctl --user status futaba-rc-driver`
-- Enable if needed: `systemctl --user enable futaba-rc-driver`
-- Check logs: `~/.futaba-rc-driver-logs.txt`
 
 ### Steam Deck Specific Issues
 
