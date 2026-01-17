@@ -1,6 +1,6 @@
 [project]
 name = "futaba-rc-driver"
-version = "1.4.6"
+version = "1.5.1"
 description = "A Futaba RC Driver for Linux."
 requires-python = ">=3.11.0"
 classifiers = [
@@ -29,7 +29,7 @@ futaba-rc-driver = "main:main"  # Calls main() function in main.py
 requires = [
   "mypy==1.19.1",
   "nuitka~=2.7.12",
-  "setuptools~=61.0",
+  "setuptools~=64.0",
   "wheel",
   "zstandard==0.25.0"
 ]
@@ -88,3 +88,9 @@ exclude = ["docs", "setup.py", ".venv", "build", "dist"]
 root = "."
 include = ["src/**"]  # All files in stubs directory
 reportIncompleteStub = false
+
+[tool.setuptools]
+packages = ["Futaba"]
+
+[tool.setuptools.package-dir]
+"" = "src"

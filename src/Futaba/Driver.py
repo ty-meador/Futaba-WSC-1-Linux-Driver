@@ -9,7 +9,7 @@ from typing import Any
 import usb
 
 from . import Util as utils
-from . import _Driver
+from . import DriverSubproc
 from .__config__ import (
     CALIBRATION_PATH,
     CONFIG_PATH,
@@ -74,7 +74,7 @@ class FutabaDeviceDriver:
 
         self.subProc = multiprocessing.Process(
             name=f"{self.name} Driver",
-            target=_Driver.run,
+            target=DriverSubproc.run,
             args=self._workerParams,
         )
 

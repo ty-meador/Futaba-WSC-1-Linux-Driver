@@ -11,6 +11,11 @@ PWD = Path(__file__).parent.resolve()
 PROJECT_ROOT = PWD.parent.parent
 PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 
+# For installed packages, look in the package directory for pyproject.toml
+if not PYPROJECT_PATH.exists():
+    # When installed via pip, pyproject.toml is in the package data
+    PYPROJECT_PATH = PWD / "pyproject.toml"
+
 # Load project configuration
 with open(PYPROJECT_PATH, "rb") as f:
     toml_data = tomllib.load(f)
