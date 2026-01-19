@@ -112,10 +112,17 @@ def run(
     sync = virtualDevice.syn
     fromBytes = int.from_bytes
     killswitchIsSet = controller.killswitch.is_set
+    setKillswitch = controller.killswitch.set
     runFlagIsSet = controller.runFlag.is_set
     echoFlagIsSet = controller.echoFlag.is_set
+    clearEchoFlag = controller.echoFlag.clear
     pipe = controller.pipe
+    pipePoll = pipe.poll
+    pipeSend = pipe.send
     readDevice = coreDevice.read
+
+    usbTimeoutError = usb.core.USBTimeoutError
+    usbError = usb.core.USBError
 
     if coreDevice.is_kernel_driver_active(0):
         coreDevice.detach_kernel_driver(0)
@@ -162,38 +169,35 @@ def run(
 
                 calibratedValue = valueMap[rawValue + indexOffset]
 
-                emit(  # Pass our calibrated input to the virtual device
-                    channelEventsMap[channel],
-                    calibratedValue,
-                    syn=False,
-                )
+                # Pass our calibrated input to the virtual device
+                emit(channelEventsMap[channel], calibratedValue, syn=False)
 
-                if echoFlagIsSet() and not pipe.poll(0):  # Echo back the data frames info - useful for calibration
+                if echoFlagIsSet() and not pipePoll(0):  # Echo back the data frames info - useful for calibration
                     try:
-                        pipe.send(DataFrame(
+                        pipeSend(DataFrame(
                             channelEventsMap[channel],
                             rawValue,
                             calibratedValue,
                         ))
                     except BlockingIOError:
                         # Pipe is full - nobody's reading, disable echo
-                        controller.echoFlag.clear()
+                        clearEchoFlag()
                         logger.warning("Echo disabled: pipe buffer full (no consumer)")
             # Fire all channel events at once
             sync()
 
-        except usb.core.USBTimeoutError:
+        except usbTimeoutError:
             pass  # Ignore, happens if device doesn't send a frame for a bit
-        except usb.core.USBError as e:
+        except usbError as e:
             if e.errno == 19:  # Device disconnected
                 logger.warning("device disconnected: %s", product)
                 # Set our own killswitch and exit gracefully
-                controller.killswitch.set()
+                setKillswitch()
             else:
                 logger.warning(e)
         except KeyboardInterrupt:
             # Set our own killswitch and exit gracefully
-            controller.killswitch.set()
+            setKillswitch()
         except Exception as e:
             # We want to capture everything and log it to a file and then re-raise it.
             # This is because this will be running in a seperate process and as such
@@ -201,6 +205,7 @@ def run(
             logger.critical(e)
             raise e
 
+    # No need to cache these methods as we are out of the main event loop by this point
     logger.debug("Releasing the USB interface...")
     try:
         usb.util.release_interface(coreDevice, 0)

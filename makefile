@@ -78,9 +78,9 @@ help:
 	@echo "  Build dir: $(BUILD_DIR)"
 	@echo "  Package dir: $(PACKAGE_DIR)"
 
-all: build package
+all: stubs docs build package
 
-build: $(EXECUTABLE)
+build: stubs $(EXECUTABLE)
 
 release:
 	@echo "Prepping new release"
