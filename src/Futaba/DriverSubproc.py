@@ -114,6 +114,7 @@ def run(
     killswitchIsSet = controller.killswitch.is_set
     runFlagIsSet = controller.runFlag.is_set
     echoFlagIsSet = controller.echoFlag.is_set
+    clearEchoFlag = controller.echoFlag.clear
     pipe = controller.pipe
     readDevice = coreDevice.read
 
@@ -177,7 +178,7 @@ def run(
                         ))
                     except BlockingIOError:
                         # Pipe is full - nobody's reading, disable echo
-                        controller.echoFlag.clear()
+                        clearEchoFlag()
                         logger.warning("Echo disabled: pipe buffer full (no consumer)")
             # Fire all channel events at once
             sync()
