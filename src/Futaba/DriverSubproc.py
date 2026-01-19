@@ -112,6 +112,7 @@ def run(
     sync = virtualDevice.syn
     fromBytes = int.from_bytes
     killswitchIsSet = controller.killswitch.is_set
+    setKillswitch = controller.killswitch.set
     runFlagIsSet = controller.runFlag.is_set
     echoFlagIsSet = controller.echoFlag.is_set
     clearEchoFlag = controller.echoFlag.clear
@@ -189,12 +190,12 @@ def run(
             if e.errno == 19:  # Device disconnected
                 logger.warning("device disconnected: %s", product)
                 # Set our own killswitch and exit gracefully
-                controller.killswitch.set()
+                setKillswitch()
             else:
                 logger.warning(e)
         except KeyboardInterrupt:
             # Set our own killswitch and exit gracefully
-            controller.killswitch.set()
+            setKillswitch()
         except Exception as e:
             # We want to capture everything and log it to a file and then re-raise it.
             # This is because this will be running in a seperate process and as such
