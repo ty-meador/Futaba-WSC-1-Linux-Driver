@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Package Futaba RC Driver into a standalone distribution."""
-from argparse import ArgumentParser
-from datetime import datetime
 import re
 import shutil
 import tarfile
+from argparse import ArgumentParser
+from datetime import datetime
 
 from __config__ import (
     BIN_DIR,

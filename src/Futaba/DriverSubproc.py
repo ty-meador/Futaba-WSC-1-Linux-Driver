@@ -1,10 +1,11 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # pylint: disable=import-outside-toplevel
 
+from .__config__ import DeviceConfig
+
 # Importing these is thread safe
 from .InputChannel import InputChannel
 from .IPC import WorkerControl
-from .__config__ import DeviceConfig
 
 
 def run(

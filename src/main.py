@@ -12,15 +12,14 @@ import os
 import signal
 import sys
 import time
+import tomllib
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
 
-import tomllib
-from SocketLock import LockNotAcquired, SocketLock
-
 import Futaba
 import UI
+from SocketLock import LockNotAcquired, SocketLock
 
 # Project structure
 PWD = Path(__file__).parent.resolve()

@@ -1,8 +1,13 @@
 import logging
-import usb
-from .__config__ import FUTABA_VENDOR_ID as FUTABA_VENDOR_ID, INTERRUPT_ENDPOINT_ATTRIBUTE as INTERRUPT_ENDPOINT_ATTRIBUTE, LOG_PATH as LOG_PATH, PWD as PWD
 from array import array
 from typing import Any
+
+import usb
+
+from .__config__ import FUTABA_VENDOR_ID as FUTABA_VENDOR_ID
+from .__config__ import INTERRUPT_ENDPOINT_ATTRIBUTE as INTERRUPT_ENDPOINT_ATTRIBUTE
+from .__config__ import LOG_PATH as LOG_PATH
+from .__config__ import PWD as PWD
 
 def findEndpointDevice(endpoint: int) -> usb.core.Device | None: ...
 def findInterruptEndpoint(device: usb.core.Device) -> int | None: ...

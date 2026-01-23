@@ -1,15 +1,16 @@
 """Module provides a simple interface to spawn and manage multiple Futaba RC to USB adapters."""
 
 from __future__ import annotations
+
 import atexit
 from contextlib import suppress
 from multiprocessing.connection import Connection
 from typing import Any
+
 import usb
 
 from . import Util as utils
-from .Driver import DriverState
-from .Driver import FutabaDeviceDriver
+from .Driver import DriverState, FutabaDeviceDriver
 from .Error import DeviceNotFoundError
 
 

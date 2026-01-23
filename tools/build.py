@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Build script to create standalone executable for Futaba RC Driver."""
-from argparse import ArgumentParser
 import os
-from pathlib import Path
 import shutil
-from subprocess import CalledProcessError
 import sys
+from argparse import ArgumentParser
+from pathlib import Path
+from subprocess import CalledProcessError
 
-from clean import cleanBuildArtifacts
+import util
 from __config__ import (
     BUILD_DIR,
     DOCS_DIR,
@@ -20,8 +20,8 @@ from __config__ import (
     SOURCE_MAIN,
     WRAPPER_SCRIPT,
 )
+from clean import cleanBuildArtifacts
 
-import util
 
 def build() -> None:
     """Main entry point."""

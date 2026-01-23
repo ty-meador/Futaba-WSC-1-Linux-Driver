@@ -1,16 +1,19 @@
 """Contains atomic utility functions for the project."""
 from __future__ import annotations
-from array import array
+
 import bisect
-from contextlib import suppress
 import json
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import re
+from array import array
+from contextlib import suppress
+from logging.handlers import RotatingFileHandler
 from typing import Any
+
 import usb
-from .__config__ import FUTABA_VENDOR_ID, LOG_PATH, PWD, INTERRUPT_ENDPOINT_ATTRIBUTE
+
+from .__config__ import FUTABA_VENDOR_ID, INTERRUPT_ENDPOINT_ATTRIBUTE, LOG_PATH, PWD
 
 
 def findEndpointDevice(endpoint: int) -> usb.core.Device | None:

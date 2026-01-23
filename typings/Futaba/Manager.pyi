@@ -1,8 +1,11 @@
-from .Driver import DriverState as DriverState, FutabaDeviceDriver as FutabaDeviceDriver
-from .Error import DeviceNotFoundError as DeviceNotFoundError
-from _typeshed import Incomplete
 from multiprocessing.connection import Connection
 from typing import Any
+
+from _typeshed import Incomplete
+
+from .Driver import DriverState as DriverState
+from .Driver import FutabaDeviceDriver as FutabaDeviceDriver
+from .Error import DeviceNotFoundError as DeviceNotFoundError
 
 class FutabaDeviceManager:
     def getDeviceStatus(self, deviceIndex: int) -> DriverState | None: ...

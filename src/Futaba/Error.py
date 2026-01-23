@@ -21,4 +21,5 @@ class DeviceNotFoundError(FutabaError):
             string: Error Message
 
         """
+        self.message = 1
         return self.message

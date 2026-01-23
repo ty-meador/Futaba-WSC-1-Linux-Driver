@@ -1,9 +1,12 @@
 import typing as t
-from .__config__ import DEFAULT_INPUT_RANGE as DEFAULT_INPUT_RANGE, DEFAULT_OUTPUT_RANGE as DEFAULT_OUTPUT_RANGE
-from _typeshed import Incomplete
 from array import array
 from dataclasses import dataclass, field
 from logging import Logger
+
+from _typeshed import Incomplete
+
+from .__config__ import DEFAULT_INPUT_RANGE as DEFAULT_INPUT_RANGE
+from .__config__ import DEFAULT_OUTPUT_RANGE as DEFAULT_OUTPUT_RANGE
 
 class ChannelDict(t.TypedDict):
     eventName: str

@@ -1,11 +1,18 @@
-import usb
-from . import DriverSubproc as DriverSubproc
-from .IPC import WorkerControl as WorkerControl
-from .InputChannel import InputChannel as InputChannel
-from .__config__ import CALIBRATION_PATH as CALIBRATION_PATH, CONFIG_PATH as CONFIG_PATH, DEFAULT_CALIBRATION as DEFAULT_CALIBRATION, DEFAULT_CONFIG as DEFAULT_CONFIG, DeviceConfig as DeviceConfig, FUTABA_VENDOR_ID as FUTABA_VENDOR_ID
-from _typeshed import Incomplete
 from enum import Enum
 from multiprocessing.connection import Connection
+
+import usb
+from _typeshed import Incomplete
+
+from . import DriverSubproc as DriverSubproc
+from .__config__ import CALIBRATION_PATH as CALIBRATION_PATH
+from .__config__ import CONFIG_PATH as CONFIG_PATH
+from .__config__ import DEFAULT_CALIBRATION as DEFAULT_CALIBRATION
+from .__config__ import DEFAULT_CONFIG as DEFAULT_CONFIG
+from .__config__ import FUTABA_VENDOR_ID as FUTABA_VENDOR_ID
+from .__config__ import DeviceConfig as DeviceConfig
+from .InputChannel import InputChannel as InputChannel
+from .IPC import WorkerControl as WorkerControl
 
 class DriverState(Enum):
     RUNNING = ...

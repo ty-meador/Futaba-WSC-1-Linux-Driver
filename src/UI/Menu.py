@@ -3,8 +3,9 @@
 # Allow dangling imports for re-export purposes
 # ruff: noqa: F401
 import curses
-from dataclasses import dataclass
 import typing
+from dataclasses import dataclass
+
 from .Window import Window, WindowCoords
 
 

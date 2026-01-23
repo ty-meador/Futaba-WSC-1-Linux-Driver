@@ -1,15 +1,16 @@
 """Driver for Futaba RC USB devices."""
 
 import atexit
-from enum import auto, Enum
 import multiprocessing
-from multiprocessing.connection import Connection
 import os
+from enum import Enum, auto
+from multiprocessing.connection import Connection
 from typing import Any
+
 import usb
 
-from . import Util as utils
 from . import DriverSubproc
+from . import Util as utils
 from .__config__ import (
     CALIBRATION_PATH,
     CONFIG_PATH,

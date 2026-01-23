@@ -2,7 +2,9 @@
 # python-uinput version: 0.11.2+
 # This file is based on python-uinput API as of 2024
 from __future__ import annotations
-from typing import Union, List, Tuple, Optional, Any
+
+from typing import Any, List, Optional, Tuple, Union
+
 from typing_extensions import Self
 
 # Exception classes
@@ -20,21 +22,21 @@ class Device:
         bustype: int = 0x3,
         devnode: Optional[str] = None
     ) -> None: ...
-    
+
     def emit(
-        self, 
-        event: int, 
-        value: int, 
+        self,
+        event: int,
+        value: int,
         syn: bool = True
     ) -> None: ...
-    
+
     def emit_click(self, button: int) -> None: ...
     def emit_combo(self, events: List[Tuple[int, int]]) -> None: ...
-    
+
     def syn(self) -> None: ...
-    
+
     def close(self) -> None: ...
-    
+
     def __enter__(self) -> Self: ...
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None: ...
 

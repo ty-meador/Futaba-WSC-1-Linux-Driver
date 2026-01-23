@@ -116,7 +116,6 @@ futaba-usb-driver/
 │   │   ├── udev.rules                 # USB device permissions template
 │   │   └── VERSION                    # Version info file template
 │   │
-│   ├── build-all                       # Convenience script - full build pipeline
 │   ├── build.py                        # Nuitka compilation script (Python → native binary)
 │   ├── clean.py                        # Cleanup script (removes build artifacts)
 │   ├── __config__.py                   # Build system configuration (loads from pyproject.toml)

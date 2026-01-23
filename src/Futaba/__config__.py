@@ -1,10 +1,10 @@
 """Contains atomic utility functions for the project."""
 
-from dataclasses import dataclass, field
 import json
 import logging
-from pathlib import Path
 import tomllib
+from dataclasses import dataclass, field
+from pathlib import Path
 
 # Project structure
 PWD = Path(__file__).parent.resolve()

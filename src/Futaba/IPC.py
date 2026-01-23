@@ -1,11 +1,13 @@
 """Inter-process communication tools."""
 
 from __future__ import annotations
+
+from dataclasses import dataclass, field
 from multiprocessing import Event
+from multiprocessing.connection import Connection  # typing
+
 # multiprocessing.Event is of data type multiprocessing.synchronize.Event
 from multiprocessing.synchronize import Event as MultiprocessingEvent  # typing
-from multiprocessing.connection import Connection  # typing
-from dataclasses import dataclass, field
 
 
 # Data Classes

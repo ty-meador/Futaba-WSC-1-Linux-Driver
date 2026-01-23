@@ -2,6 +2,7 @@
 """Utilities and constants for the build system."""
 
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -92,10 +93,11 @@ def _getNestedValue(dictionary: dict, path: str) -> any:
 
 
 if __name__ == "__main__":
-    from __config__ import PYPROJECT, PYPROJECT_PATH
     import re
     from argparse import ArgumentParser
-    from sys import stderr, argv
+    from sys import argv, stderr
+
+    from __config__ import PYPROJECT, PYPROJECT_PATH
 
     parser = ArgumentParser()
     parser.add_argument("--pyproject", action="store", help="Print a value from pyproject.toml")

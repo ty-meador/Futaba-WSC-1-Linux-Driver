@@ -1,12 +1,21 @@
 #!./.venv/bin/python
 """Cleans up build and packaging artifacts."""
 
-from argparse import ArgumentParser
-from pathlib import Path
 import shutil
 import sys
+from argparse import ArgumentParser
+from pathlib import Path
 
-from __config__ import BUILD_DIR, DOCS_DIR, NUITKA_OUTPUT_DIR, PACKAGE_DIR, WRAPPER_SCRIPT, LOGS_DIR, PROJECT_ROOT
+from __config__ import (
+    BUILD_DIR,
+    DOCS_DIR,
+    LOGS_DIR,
+    NUITKA_OUTPUT_DIR,
+    PACKAGE_DIR,
+    PROJECT_ROOT,
+    WRAPPER_SCRIPT,
+)
+
 
 def _unlink(path: Path) -> bool:
     """Attempt to remove the given artifact with safe degredation.
