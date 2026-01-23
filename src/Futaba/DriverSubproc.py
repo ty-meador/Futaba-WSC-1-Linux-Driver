@@ -1,6 +1,7 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # pylint: disable=import-outside-toplevel
 
+# Importing these is thread safe
 from .InputChannel import InputChannel
 from .IPC import WorkerControl
 from .__config__ import DeviceConfig
@@ -68,7 +69,7 @@ def run(
     except PermissionError:
         logger.warning("Warning: Need CAP_SYS_NICE capability or root for realtime scheduling")
         try:
-            # Fallback to highest nice priority
+            # Fallback to nice priority
             os.nice(-20)
         except PermissionError:
             logger.warning("Warning: Cannot set process priority")

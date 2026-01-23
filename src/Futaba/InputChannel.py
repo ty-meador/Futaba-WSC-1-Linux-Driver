@@ -21,7 +21,7 @@ class ChannelDict(t.TypedDict):
 
 @dataclass(frozen=True, slots=True)
 class ChannelCalibration:
-    """Provides a class based representation of a single channels calibration.
+    """Provides a pickleable class based representation of a single channels calibration.
 
     Args:
         inputRange (Iterable[int], optional): The range of input values. Defaults to DEFAULT_INPUT_RANGE.
@@ -150,7 +150,7 @@ class ChannelCalibration:
 
 @dataclass(frozen=True, slots=True)
 class InputChannel:
-    """Provides a class based representation of a single input channel."""
+    """Provides a pickleable class based representation of a single input channel."""
 
     eventName: str
     calibrationRange: t.Iterable[int]
