@@ -19,7 +19,14 @@ class MenuItem:
 
 class Menu(Window):
     """UI element that contains multiple options for the user to choose from."""
-    def __init__(self, windowCoords: WindowCoords, title: str, options: list[MenuItem]):
+
+    def __init__(
+        self,
+        windowCoords: WindowCoords,
+        title: str,
+        options: list[MenuItem],
+        disable: bool = False,
+    ):
         """Create a MainMenu window object.
 
         Args:

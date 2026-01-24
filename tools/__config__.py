@@ -26,7 +26,9 @@ PYPROJECT = toml_data
 if sys.prefix == sys.base_prefix:
     if not (PROJECT_ROOT / ".venv").exists():
         print("Script must be run from a venv. Try the following first.")
-        print(f"NOTE: Python version requirement -> {PYPROJECT['project']['requires-python']}")
+        print(
+            f"NOTE: Python version requirement -> {PYPROJECT['project']['requires-python']}"
+        )
         print("python3 -m venv .venv")
     else:
         print(

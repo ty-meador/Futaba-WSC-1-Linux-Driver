@@ -16,6 +16,7 @@ from .Error import DeviceNotFoundError
 
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
+
     def getDeviceStatus(self, deviceIndex: int) -> DriverState | None:
         """Get the status of the device at the given index.
 
@@ -72,7 +73,8 @@ class FutabaDeviceManager:
 
         # Find all devices
         foundDevices = [
-            device for device in usb.core.find(find_all=True)
+            device
+            for device in usb.core.find(find_all=True)
             if FutabaDeviceDriver.deviceIsSupported(device)
         ]
 
@@ -100,7 +102,9 @@ class FutabaDeviceManager:
         self.logger.debug("Attempting to start device at index %s", deviceIndex)
         driver = self._drivers[deviceIndex]
         if driver.getState() == DriverState.RUNNING:
-            self.logger.debug("usb.core.Device at index %s is already running!", deviceIndex)
+            self.logger.debug(
+                "usb.core.Device at index %s is already running!", deviceIndex
+            )
             return
 
         if driver.start():
@@ -160,7 +164,8 @@ class FutabaDeviceManager:
 
         """
         self._devices = [
-            device for device in usb.core.find(find_all=True)
+            device
+            for device in usb.core.find(find_all=True)
             if FutabaDeviceDriver.deviceIsSupported(device)
         ]
         self._drivers = [FutabaDeviceDriver(device) for device in self._devices]
@@ -175,7 +180,9 @@ class FutabaDeviceManager:
         """Enter."""
         return self
 
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> FutabaDeviceManager:
+    def __exit__(
+        self, exc_type: Any, exc_value: Any, traceback: Any
+    ) -> FutabaDeviceManager:
         """Exit."""
         self.stopAll()
         return self

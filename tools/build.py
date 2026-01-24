@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build script to create standalone executable for Futaba RC Driver."""
+
 import os
 import shutil
 import sys
@@ -105,7 +106,6 @@ def buildExecutable() -> None:
     return None
 
 
-
 def findNativeLibraries() -> str:
     """Find native libraries to include."""
     print("Locating native libraries...")
@@ -120,7 +120,10 @@ def findNativeLibraries() -> str:
 
     # Find .so files in the virtual environment
     dependencyPatterns = [
-        *[f"*{dep}*.so" for dep in PYPROJECT["tool"]["build_tool"]["native_dependencies"]]
+        *[
+            f"*{dep}*.so"
+            for dep in PYPROJECT["tool"]["build_tool"]["native_dependencies"]
+        ]
     ]
 
     for pattern in dependencyPatterns:
@@ -134,13 +137,11 @@ def findNativeLibraries() -> str:
     return nuitkaArgs
 
 
-
 def installDependencies() -> None:
     """Install build dependencies."""
     print("Installing dependencies...")
     if util.runCommand("pip3 install -e .") is None:
         sys.exit(1)
-
 
 
 def setupExecutable(execPath: Path) -> None:
@@ -160,7 +161,7 @@ def setupExecutable(execPath: Path) -> None:
         {
             "build_dir": os.path.basename(BUILD_DIR),
             "executable_name": EXECUTABLE_NAME,
-            "install_dir": INSTALL_DIR
+            "install_dir": INSTALL_DIR,
         },
         WRAPPER_SCRIPT,
     )
@@ -201,7 +202,9 @@ def validateEnvironment() -> None:
         except (CalledProcessError, FileNotFoundError):
             continue
     else:
-        print("Error: No C compiler found! Install with: sudo apt install build-essential")
+        print(
+            "Error: No C compiler found! Install with: sudo apt install build-essential"
+        )
         sys.exit(1)
 
 
@@ -225,17 +228,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--clean",
         action="store_true",
-        help="Clean up previously generated artifacts before building new ones."
+        help="Clean up previously generated artifacts before building new ones.",
     )
     parser.add_argument(
         "--docs",
         action="store_true",
-        help="Generate sphinx documentation and store the output in docs/build"
+        help="Generate sphinx documentation and store the output in docs/build",
     )
     parser.add_argument(
         "--type-stubs",
         action="store_true",
-        help="Generate python3 type stubs and store them in typings/"
+        help="Generate python3 type stubs and store them in typings/",
     )
     ARGS = parser.parse_args()
 

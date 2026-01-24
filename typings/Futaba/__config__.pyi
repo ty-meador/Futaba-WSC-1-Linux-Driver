@@ -1,7 +1,6 @@
+from _typeshed import Incomplete
 from dataclasses import dataclass, field
 from pathlib import Path
-
-from _typeshed import Incomplete
 
 PWD: Incomplete
 PROJECT_ROOT: Incomplete

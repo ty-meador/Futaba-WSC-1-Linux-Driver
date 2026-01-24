@@ -68,7 +68,9 @@ def run(
     try:
         os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(50))
     except PermissionError:
-        logger.warning("Warning: Need CAP_SYS_NICE capability or root for realtime scheduling")
+        logger.warning(
+            "Warning: Need CAP_SYS_NICE capability or root for realtime scheduling"
+        )
         try:
             # Fallback to nice priority
             os.nice(-20)
@@ -76,11 +78,14 @@ def run(
             logger.warning("Warning: Cannot set process priority")
 
     channelEventsMap, channelValueMaps, channelIndexOffsets = zip(
-        *[(
-            getattr(uinput, channel.eventName),
-            channel.valueMap,
-            channel.indexOffset,
-        ) for channel in deviceChannels],
+        *[
+            (
+                getattr(uinput, channel.eventName),
+                channel.valueMap,
+                channel.indexOffset,
+            )
+            for channel in deviceChannels
+        ],
         strict=True,
     )
 
@@ -95,10 +100,12 @@ def run(
     # Create a virtual device for the found device
     channelEventsMap = tuple(channelEventsMap)
     virtualDevice = uinput.Device(
-        tuple([
-            event + (EVENT_MIN_VAL, EVENT_MAX_VAL, deadZone, noiseFilter)
-            for event in channelEventsMap
-        ]),
+        tuple(
+            [
+                event + (EVENT_MIN_VAL, EVENT_MAX_VAL, deadZone, noiseFilter)
+                for event in channelEventsMap
+            ]
+        ),
         name,
         vendor=FUTABA_VENDOR_ID,
     )
@@ -158,7 +165,7 @@ def run(
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
                 indexOffset = channelIndexOffsets[channel]
-                rawValue = int(fromBytes(rawData[i:i + 2], byteorder="little"))
+                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
                 maxInputVal = len(valueMap) - 1
@@ -174,13 +181,17 @@ def run(
                 # Pass our calibrated input to the virtual device
                 emit(channelEventsMap[channel], calibratedValue, syn=False)
 
-                if echoFlagIsSet() and not pipePoll(0):  # Echo back the data frames info - useful for calibration
+                if echoFlagIsSet() and not pipePoll(
+                    0
+                ):  # Echo back the data frames info - useful for calibration
                     try:
-                        pipeSend(DataFrame(
-                            channelEventsMap[channel],
-                            rawValue,
-                            calibratedValue,
-                        ))
+                        pipeSend(
+                            DataFrame(
+                                channelEventsMap[channel],
+                                rawValue,
+                                calibratedValue,
+                            )
+                        )
                     except BlockingIOError:
                         # Pipe is full - nobody's reading, disable echo
                         clearEchoFlag()

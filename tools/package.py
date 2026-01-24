@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Package Futaba RC Driver into a standalone distribution."""
+
 import re
 import shutil
 import tarfile
@@ -30,7 +31,7 @@ parser = ArgumentParser()
 parser.add_argument(
     "--clean",
     action="store_true",
-    help="Clean up previously generated artifacts before building new ones."
+    help="Clean up previously generated artifacts before building new ones.",
 )
 ARGS = parser.parse_args()
 
@@ -57,7 +58,6 @@ def getVersionInfo() -> tuple[str, str]:
 
     buildDate = datetime.now().strftime("%Y%m%d_%H%M%S")
     return version, buildDate
-
 
 
 def packageDistribution() -> None:  # noqa: PLR0915
@@ -97,10 +97,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     # Create wrapper script that works from any location
     renderTemplate(
         SCRIPTS_TEMPLATES_DIR / "wrapper.sh",
-        {
-            "executable_name": EXECUTABLE_NAME,
-            "install_dir": INSTALL_DIR
-        },
+        {"executable_name": EXECUTABLE_NAME, "install_dir": INSTALL_DIR},
         packagePath / EXECUTABLE_NAME,
     )
 
@@ -118,7 +115,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
             "distributables_path": DISTRIBUTABLES_PAGE,
             "repository": REPOSITORY,
             "package_name": packageName,
-            "install_dir": INSTALL_DIR
+            "install_dir": INSTALL_DIR,
         },
         packagePath / "README.md",
     )
@@ -176,24 +173,21 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     # Copy project critical subdirectories (such as the generated docs...)
     ##
-    pkgCriticalDirs = [ DOCS_DIR / "build/html" ]
+    pkgCriticalDirs = [DOCS_DIR / "build/html"]
     missing = [pkgDir for pkgDir in pkgCriticalFiles if not pkgDir.exists()]
     if missing:
         raise FileNotFoundError(
             f"ERROR: UNABLE TO FIND >{', '.join(map(str, missing))}< REFUSING TO PACKAGE"
         )
     for pkgSubdir in pkgCriticalDirs:
-        shutil.copytree(pkgSubdir, packagePath / "docs",dirs_exist_ok=True)
+        shutil.copytree(pkgSubdir, packagePath / "docs", dirs_exist_ok=True)
 
     ##
     # Create version info file
     ##
     renderTemplate(
         TEMPLATES_DIR / "VERSION",
-        {
-            "version": version,
-            "build_date": buildDate
-        },
+        {"version": version, "build_date": buildDate},
         packagePath / "VERSION",
     )
 

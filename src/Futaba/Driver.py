@@ -34,6 +34,7 @@ class DriverState(Enum):
 
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device."""
+
     def disableEcho(self):
         """Disable input echoing."""
         if self.workerCtl.echoFlag.is_set():
@@ -87,15 +88,24 @@ class FutabaDeviceDriver:
         """Stop the driver and kill the subprocess."""
         # It's possible for the constructor to fail before one or any of these are instantiated
         if (
-            hasattr(self, "workerCtl") and hasattr(self.workerCtl, "killswitch")
+            hasattr(self, "workerCtl")
+            and hasattr(self.workerCtl, "killswitch")
             and not self.workerCtl.killswitch.is_set()
         ):
             self.workerCtl.killswitch.set()
         # Give the worker up to 1 second to shut down gracefully
-        if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
+        if (
+            hasattr(self, "subProc")
+            and self.subProc is not None
+            and self.subProc.is_alive()
+        ):
             self.subProc.join(timeout=1.0)
         # Force shutdown
-        if hasattr(self, "subProc") and self.subProc is not None and self.subProc.is_alive():
+        if (
+            hasattr(self, "subProc")
+            and self.subProc is not None
+            and self.subProc.is_alive()
+        ):
             self.subProc.terminate()
             self.subProc.join()
         self.subProc = None
@@ -144,7 +154,9 @@ class FutabaDeviceDriver:
         self.logger.debug("config=%s", config)
         return config
 
-    def _loadCalibration(self, productName: str, deviceUUID: str) -> list[tuple[int, ...]]:
+    def _loadCalibration(
+        self, productName: str, deviceUUID: str
+    ) -> list[tuple[int, ...]]:
         """Load the calibration file for the given product.
 
         Args:

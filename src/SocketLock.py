@@ -1,4 +1,5 @@
 """Module for preventing duplicate application instances."""
+
 import atexit
 import errno
 import os
@@ -13,6 +14,7 @@ PWD = Path(__file__).parent.resolve()
 
 class LockNotAcquired(Exception):
     """Exception which represents a failure to acquire a socket lock"""
+
     def __init__(self, message: str):
         super().__init__(message)
 
@@ -23,6 +25,7 @@ class DuplicateProcess(LockNotAcquired):
 
 class SocketLock:
     """Create a lock that prevents multiple application instances."""
+
     def lock(self) -> None:
         """Create a socket lock to prevent multiple application instances."""
         self.logger.debug("attempting to lock...")
@@ -31,7 +34,9 @@ class SocketLock:
             self.lockSocket.bind(("127.0.0.1", self.lockPort))
             self.pidFile.touch()
         except OSError as e:
-            self.logger.warning("Unable to obtain socket lock, driver is likely already running")
+            self.logger.warning(
+                "Unable to obtain socket lock, driver is likely already running"
+            )
             if e.errno == errno.EADDRINUSE:
                 raise DuplicateProcess(
                     "Unable to obtain socket lock, driver is likely already running"
@@ -58,7 +63,7 @@ class SocketLock:
 
         self.logger.debug("done!")
 
-    def __init__(self, port: int = 1962): # 🥚
+    def __init__(self, port: int = 1962):  # 🥚
         """Create a SocketLock instance
 
         Args:

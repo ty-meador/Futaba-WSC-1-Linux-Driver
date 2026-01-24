@@ -6,16 +6,18 @@ This program comes with ABSOLUTELY NO WARRANTY;.
 This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
+
 import asyncio
 import curses
 import os
 import signal
 import sys
 import time
-import tomllib
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
+
+import tomllib
 
 import Futaba
 import UI
@@ -39,11 +41,17 @@ parser = ArgumentParser()
 parser.add_argument(
     "--calibrate", action="store_true", help="Calibrate a transmitter to a receiver"
 )
-parser.add_argument("--daemonize", action="store_true", help="Run as a background daemon")
-parser.add_argument("--reload", action="store_true", help="Restart the running background daemon")
+parser.add_argument(
+    "--daemonize", action="store_true", help="Run as a background daemon"
+)
+parser.add_argument(
+    "--reload", action="store_true", help="Restart the running background daemon"
+)
 parser.add_argument("--version", action="store_true", help="Get driver version")
 parser.add_argument(
-    "--setup", action="store_true", help="Setup a new device or reconfigure an existing one"
+    "--setup",
+    action="store_true",
+    help="Setup a new device or reconfigure an existing one",
 )
 ARGS = parser.parse_args()
 # No reason to proceed if all they want is the version.
@@ -161,7 +169,9 @@ def calibrationMode(
     while not pipe.poll():
         time.sleep(0.1)
 
-    centerInputs.setTitle("( Center all inputs, then press enter )")
+    centerInputs.setTitle(
+        "( Center all inputs, Set expo to 0%, set dual rates to 100%, then press enter )"
+    )
     centerInputs.render()
     # Flush the input buffer to clear any characters typed prior to now
     curses.flushinp()
@@ -180,7 +190,7 @@ def calibrationMode(
     # calibration UI elements
     calibrationUI = UI.CalibrationUI(
         UI.WindowCoords(x=xMid, y=yMid, width=width, height=height),
-        "( Slowly move each channel to each of their extremes, then press enter )"
+        "( Slowly move each channel to each of their extremes, then press enter )",
     )
     calibrationUI.nodelay(True)
     calibrationUI.render()
@@ -223,7 +233,7 @@ async def daemonMode(mgr: Futaba.DeviceManager) -> None:
     while True:
         mgr.scanForDevices()  # scan for devices,
         mgr.startAll()  # start new ones.
-        await asyncio.sleep(.1)  # yield to event loop for at least .1 second
+        await asyncio.sleep(0.1)  # yield to event loop for at least .1 second
 
 
 def findPidFile():

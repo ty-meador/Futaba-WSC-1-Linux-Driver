@@ -17,6 +17,7 @@ MAX = 32767
 ##
 class CalibrationUI(Window):
     """Draw the status UI element."""
+
     def __init__(self, windowCoords: WindowCoords, title: str):
         """Create a calibration feedback UI element."""
         super().__init__(windowCoords, title)

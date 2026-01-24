@@ -7,6 +7,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class WindowCoords:
     """Store all the necessary coordinate metadata for a single window."""
+
     x: int
     y: int
     width: int
@@ -15,6 +16,7 @@ class WindowCoords:
 
 class Window:
     """Represents a single window."""
+
     def __init__(self, windowCoords: WindowCoords, title: str | None = None):
         """Create and render a window."""
         curses.curs_set(0)
@@ -70,6 +72,7 @@ class Window:
 
 class TitleOnlyWindow(Window):
     """Draw the main options."""
+
     def __init__(self, windowCoords: WindowCoords, text: str):
         """Create a MainMenu window object.
 
@@ -79,7 +82,6 @@ class TitleOnlyWindow(Window):
 
         """
         super().__init__(windowCoords, text)
-        self.selected = 0
 
     def _render(self) -> None:
         pass

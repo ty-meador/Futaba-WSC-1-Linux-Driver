@@ -2,9 +2,10 @@
 
 import json
 import logging
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import tomllib
 
 # Project structure
 PWD = Path(__file__).parent.resolve()
@@ -40,17 +41,21 @@ EVENT_MIN_VAL: int = -32768
 EVENT_MID_VAL: int = 0
 EVENT_MAX_VAL: int = 32767
 
-DEFAULT_INPUT_RANGE: tuple[int, ...] = tuple([
-    DEFAULT_DEVICE_MIN_VAL,
-    DEFAULT_DEVICE_MID_VAL,
-    DEFAULT_DEVICE_MAX_VAL,
-])
+DEFAULT_INPUT_RANGE: tuple[int, ...] = tuple(
+    [
+        DEFAULT_DEVICE_MIN_VAL,
+        DEFAULT_DEVICE_MID_VAL,
+        DEFAULT_DEVICE_MAX_VAL,
+    ]
+)
 
-DEFAULT_OUTPUT_RANGE: tuple[int, ...] = tuple([
-    EVENT_MIN_VAL,
-    EVENT_MID_VAL,
-    EVENT_MAX_VAL,
-])
+DEFAULT_OUTPUT_RANGE: tuple[int, ...] = tuple(
+    [
+        EVENT_MIN_VAL,
+        EVENT_MID_VAL,
+        EVENT_MAX_VAL,
+    ]
+)
 
 FUTABA_VENDOR_ID: int = 4104  # 0x1008
 HID_INTERFACE: int = 0x3  # coincidence
