@@ -49,10 +49,10 @@ def getVersionInfo() -> tuple[str, str]:
     version = "UNKNOWN"  # Default version
 
     # Try to get version from git
-    gitVersion = runCommand("git describe --tags --always --dirty 2>/dev/null")
-    if gitVersion:
+    gitDescribe = runCommand("git describe --tags --always --dirty 2>/dev/null")
+    if gitDescribe:
         # Extract the semantic-versioning number
-        gitVersion = re.search(r".*(\d+\.\d+\.\d+).*", gitVersion)
+        gitVersion = re.search(r".*(\d+\.\d+\.\d+).*", gitDescribe)
         if gitVersion:
             version = gitVersion.group(1)
 
