@@ -196,11 +196,10 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     print("Calculating package size...")
     duResult = runCommand(f"du -sh {packagePath}")
+    packageSize = 0
     if duResult:
-        packageSize = duResult.split()[0]
+        packageSize = int(duResult.split()[0])
         print(f"Package size: {packageSize}")
-    else:
-        packageSize = 0
 
     print("Creating compressed archives...")
 
@@ -222,17 +221,15 @@ def packageDistribution() -> None:  # noqa: PLR0915
     shutil.move(tempTarXz, finalTarXz)
 
     # Get archive sizes
-    tarGzSize = runCommand(f"du -sh {finalTarGz}")
-    if tarGzSize:
-        tarGzSize = tarGzSize.split()[0]
-    else:
-        tarGzSize = 0
+    tgzResult = runCommand(f"du -sh {finalTarGz}")
+    tarGzSize = 0
+    if tgzResult is not None:
+        tarGzSize = int(tgzResult.split()[0])
 
-    tarXzSize = runCommand(f"du -sh {finalTarXz}")
-    if tarXzSize is not None:
-        tarXzSize = tarXzSize.split()[0]
-    else:
-        tarXzSize = 0
+    txzResult = runCommand(f"du -sh {finalTarXz}")
+    tarXzSize = 0
+    if txzResult is not None:
+        tarXzSize = int(txzResult.split()[0])
 
     # Create checksums
     print("Creating checksums...")
@@ -253,11 +250,10 @@ def packageDistribution() -> None:  # noqa: PLR0915
     for filePath in sorted(distFiles):
         fileName = filePath.name
         if filePath.is_file():
-            size = runCommand(f"du -sh {filePath}")
-            if size is not None:
-                size = size.split()[0]
-            else:
-                size = 0
+            duResult = runCommand(f"du -sh {filePath}")
+            size = 0
+            if duResult is not None:
+                size = int(duResult.split()[0])
 
             print(f"  {fileName} ({size})")
         else:
