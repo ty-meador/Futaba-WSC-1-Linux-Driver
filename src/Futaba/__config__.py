@@ -4,6 +4,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import tomllib
 
@@ -67,8 +68,8 @@ CONFIG_PATH: Path = DRIVER_PATH / "configs"
 CALIBRATION_PATH: Path = DRIVER_PATH / "calibrations"
 LOG_PATH: Path = DRIVER_PATH / "logs"
 
-with open(CONFIG_PATH / "_default.json", encoding="utf-8") as f:
-    DEFAULT_CONFIG = json.load(f)
+with open(CONFIG_PATH / "_default.json", encoding="utf-8") as cfg_file:
+    DEFAULT_CONFIG = json.load(cfg_file)
 
 DEFAULT_CALIBRATION: list[tuple[int, ...]] = [
     DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])

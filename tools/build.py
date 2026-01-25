@@ -48,7 +48,7 @@ def build() -> None:
         sys.exit(1)
 
 
-def buildExecutable() -> None:
+def buildExecutable() -> Path | None:
     """Build the executable with Nuitka."""
     print("Building executable...")
 
@@ -98,7 +98,7 @@ def buildExecutable() -> None:
 
     # Find the executable
     for execName in [EXECUTABLE_NAME, "main"]:
-        execPath = NUITKA_OUTPUT_DIR / execName
+        execPath = NUITKA_OUTPUT_DIR / str(execName)
         if execPath.exists():
             return execPath
 
@@ -106,11 +106,11 @@ def buildExecutable() -> None:
     return None
 
 
-def findNativeLibraries() -> str:
+def findNativeLibraries() -> list[str]:
     """Find native libraries to include."""
     print("Locating native libraries...")
     # Hard-coded because the package name is "python-uinput"
-    nuitkaArgs: list[str] = []
+    nuitkaArgs = []
 
     # Define the virtual environment path
     venvPath = PROJECT_ROOT / ".venv"

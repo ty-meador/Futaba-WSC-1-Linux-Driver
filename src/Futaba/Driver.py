@@ -35,6 +35,89 @@ class DriverState(Enum):
 class FutabaDeviceDriver:
     """Provides a class based interface for a single Futaba USB device."""
 
+    def __init__(self, device: usb.core.Device) -> None:
+        """Create an object that drives a single device on it's own process.
+
+        Args:
+            device (usb.core.usb.core.Device): The device you want to spawn a driver for
+
+        Raises:
+            TypeError: If device is not of type usb.core.usb.core.Device
+
+        """
+        ##
+        # meta-stuff
+        ##
+        self.state: DriverState = DriverState.INITIALIZING
+        self.endpoint: int | None = utils.findInterruptEndpoint(device)
+        if self.endpoint is None:
+            raise TypeError("Unable to find interrupt endpoint for device")
+
+        self.logger = utils.newLogger(f"{device.product}_driver")
+        ##
+        # Worker subproc stuff
+        ##
+        self.subProc: multiprocessing.Process | None = None
+        self._frontPipe, self._backPipe = multiprocessing.Pipe()
+        self.workerCtl: WorkerControl = WorkerControl(pipe=self._backPipe)
+
+        ##
+        # Device stuff
+        ##
+        config = self._loadConfig(device.product)
+        self.channelEvents: tuple[str, ...] = tuple(config["channel_events"])
+        self.deadZone: int = config["dead_zone"]
+        self.deviceUUID: str = f"{device.idProduct:04X}-{device.serial_number}"
+        self.frameSize: int = config["frame_size"]
+        self.manufacturer: str = device.manufacturer
+        self.name: str = f"Futaba {device.product}({self.endpoint})"
+        self.noiseFilter: int = config["noise_filter"]
+        self.pipe: Connection = self._frontPipe
+        self.product: str = device.product
+        self.productID: int = device.idProduct
+        self.speed: int | None = device.speed
+        self.serialNumber: str = device.serial_number
+
+        self.deviceChannels = (
+            InputChannel(eventName, calibration, False, logger=self.logger)
+            for eventName, calibration in zip(
+                config["channel_events"],
+                self._loadCalibration(self.product, self.deviceUUID),
+                strict=True,  # 1 event name and 1 calibration per channel
+            )
+        )
+
+        atexit.register(self.stop)
+
+    def __eq__(self, other: object) -> bool:
+        """Compare instances based on what USB endpoint they are using.
+
+        Args:
+            other (object): The device to compare to
+
+        Returns:
+            bool: True if the devices have the same interrupt endpoint address
+
+        """
+        return isinstance(other, FutabaDeviceDriver) and self.endpoint == other.endpoint
+
+    def __hash__(self) -> int:
+        """Generate a has for this object.
+
+        Returns:
+            hash: The hash.
+
+        """
+        return hash(self.endpoint)
+
+    def __str__(self) -> str:
+        """Generate a string representation of this device driver."""
+        return f"{self.name} Driver({self.deviceUUID})"
+
+    def __del__(self) -> None:
+        """Destructor."""
+        self.stop()
+
     def disableEcho(self):
         """Disable input echoing."""
         if self.workerCtl.echoFlag.is_set():
@@ -216,89 +299,6 @@ class FutabaDeviceDriver:
             self.name,
             self.endpoint,
         )
-
-    def __init__(self, device: usb.core.Device) -> None:
-        """Create an object that drives a single device on it's own process.
-
-        Args:
-            device (usb.core.usb.core.Device): The device you want to spawn a driver for
-
-        Raises:
-            TypeError: If device is not of type usb.core.usb.core.Device
-
-        """
-        ##
-        # meta-stuff
-        ##
-        self.state: DriverState = DriverState.INITIALIZING
-        self.endpoint: int | None = utils.findInterruptEndpoint(device)
-        if self.endpoint is None:
-            raise TypeError("Unable to find interrupt endpoint for device")
-
-        self.logger = utils.newLogger(f"{device.product}_driver")
-        ##
-        # Worker subproc stuff
-        ##
-        self.subProc: multiprocessing.Process | None = None
-        self._frontPipe, self._backPipe = multiprocessing.Pipe()
-        self.workerCtl: WorkerControl = WorkerControl(pipe=self._backPipe)
-
-        ##
-        # Device stuff
-        ##
-        config = self._loadConfig(device.product)
-        self.channelEvents: tuple[str, ...] = tuple(config["channel_events"])
-        self.deadZone: int = config["dead_zone"]
-        self.deviceUUID: str = f"{device.idProduct:04X}-{device.serial_number}"
-        self.frameSize: int = config["frame_size"]
-        self.manufacturer: str = device.manufacturer
-        self.name: str = f"Futaba {device.product}({self.endpoint})"
-        self.noiseFilter: int = config["noise_filter"]
-        self.pipe: Connection = self._frontPipe
-        self.product: str = device.product
-        self.productID: int = device.idProduct
-        self.speed: int | None = device.speed
-        self.serialNumber: str = device.serial_number
-
-        self.deviceChannels = (
-            InputChannel(eventName, calibration, False, logger=self.logger)
-            for eventName, calibration in zip(
-                config["channel_events"],
-                self._loadCalibration(self.product, self.deviceUUID),
-                strict=True,  # 1 event name and 1 calibration per channel
-            )
-        )
-
-        atexit.register(self.stop)
-
-    def __eq__(self, other: object) -> bool:
-        """Compare instances based on what USB endpoint they are using.
-
-        Args:
-            other (object): The device to compare to
-
-        Returns:
-            bool: True if the devices have the same interrupt endpoint address
-
-        """
-        return isinstance(other, FutabaDeviceDriver) and self.endpoint == other.endpoint
-
-    def __hash__(self) -> int:
-        """Generate a has for this object.
-
-        Returns:
-            hash: The hash.
-
-        """
-        return hash(self.endpoint)
-
-    def __str__(self) -> str:
-        """Generate a string representation of this device driver."""
-        return f"{self.name} Driver({self.deviceUUID})"
-
-    def __del__(self) -> None:
-        """Destructor."""
-        self.stop()
 
     @staticmethod
     def deviceIsSupported(coreDevice: usb.core.Device) -> bool:

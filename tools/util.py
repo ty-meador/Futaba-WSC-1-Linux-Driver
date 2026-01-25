@@ -4,6 +4,7 @@
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 
 def renderTemplate(
@@ -70,7 +71,7 @@ def runCommand(
         return ""
 
 
-def _getNestedValue(dictionary: dict, path: str) -> any:
+def _getNestedValue(dictionary: dict, path: str) -> Any:
     """
     Retrieve a value from a nested dictionary using dot notation.
 

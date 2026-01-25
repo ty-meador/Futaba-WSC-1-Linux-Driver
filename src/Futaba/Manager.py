@@ -17,6 +17,37 @@ from .Error import DeviceNotFoundError
 class FutabaDeviceManager:
     """Provides a class-based interface for starting and stopping Futaba USB device drivers."""
 
+    def __init__(self) -> None:
+        """Create an object that manages Futaba drivers.
+
+        Raises:
+            RuntimeError: Raised if no Futaba USB devices are detected
+
+        """
+        self._devices = [
+            device
+            for device in usb.core.find(find_all=True)
+            if FutabaDeviceDriver.deviceIsSupported(device)
+        ]
+        self._drivers = [FutabaDeviceDriver(device) for device in self._devices]
+
+        if len(self._drivers) == 0:
+            raise DeviceNotFoundError
+
+        self.logger = utils.newLogger("FutabaDeviceManager")
+        atexit.register(self.stopAll)
+
+    def __enter__(self):
+        """Enter."""
+        return self
+
+    def __exit__(
+        self, exc_type: Any, exc_value: Any, traceback: Any
+    ) -> FutabaDeviceManager:
+        """Exit."""
+        self.stopAll()
+        return self
+
     def getDeviceStatus(self, deviceIndex: int) -> DriverState | None:
         """Get the status of the device at the given index.
 
@@ -155,37 +186,6 @@ class FutabaDeviceManager:
             if driver.getState() == DriverState.RUNNING:
                 driver.stop()
             self._removeDevice(device)
-
-    def __init__(self) -> None:
-        """Create an object that manages Futaba drivers.
-
-        Raises:
-            RuntimeError: Raised if no Futaba USB devices are detected
-
-        """
-        self._devices = [
-            device
-            for device in usb.core.find(find_all=True)
-            if FutabaDeviceDriver.deviceIsSupported(device)
-        ]
-        self._drivers = [FutabaDeviceDriver(device) for device in self._devices]
-
-        if len(self._drivers) == 0:
-            raise DeviceNotFoundError
-
-        self.logger = utils.newLogger("FutabaDeviceManager")
-        atexit.register(self.stopAll)
-
-    def __enter__(self):
-        """Enter."""
-        return self
-
-    def __exit__(
-        self, exc_type: Any, exc_value: Any, traceback: Any
-    ) -> FutabaDeviceManager:
-        """Exit."""
-        self.stopAll()
-        return self
 
     @staticmethod
     def _deviceIsRunning(driver: FutabaDeviceDriver) -> bool:
