@@ -7,6 +7,7 @@ This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
 
+import argparse
 import asyncio
 import curses
 import os
@@ -14,7 +15,6 @@ import signal
 import sys
 import time
 import traceback
-from argparse import ArgumentParser
 from pathlib import Path
 
 import tomllib
@@ -22,42 +22,6 @@ import tomllib
 import Futaba
 import UI
 from SocketLock import LockNotAcquired, SocketLock
-
-# Project structure
-PWD = Path(__file__).parent.resolve()
-PARENT = PWD.parent
-
-PYPROJECT_PATH = PARENT / "pyproject.toml"
-if not PYPROJECT_PATH.exists():
-    raise FileNotFoundError("Unable to locate pyproject.toml")
-
-# Load project configuration
-with open(PYPROJECT_PATH, "rb") as f:
-    toml_data = tomllib.load(f)
-PYPROJECT = toml_data
-CALIBRATIONS_PATH = PWD / "Futaba/calibrations"
-EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
-parser = ArgumentParser()
-parser.add_argument(
-    "--calibrate", action="store_true", help="Calibrate a transmitter to a receiver"
-)
-parser.add_argument(
-    "--daemonize", action="store_true", help="Run as a background daemon"
-)
-parser.add_argument(
-    "--reload", action="store_true", help="Restart the running background daemon"
-)
-parser.add_argument("--version", action="store_true", help="Get driver version")
-parser.add_argument(
-    "--setup",
-    action="store_true",
-    help="Setup a new device or reconfigure an existing one",
-)
-ARGS = parser.parse_args()
-# No reason to proceed if all they want is the version.
-if ARGS.version:
-    print(PYPROJECT["project"]["version"])
-    sys.exit(0)
 
 
 def main():
@@ -256,7 +220,60 @@ def killRunningProcess():
     pidFile.unlink()
 
 
+def parseArgs() -> argparse.Namespace:
+    """Parses the CLI arguments passed to this script
+
+    Returns:
+        Namespace: The resulting namespace
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--calibrate",
+        action="store_true",
+        help="Calibrate a transmitter to a receiver",
+    )
+    parser.add_argument(
+        "--daemonize",
+        action="store_true",
+        help="Run as a background daemon",
+    )
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Restart the running background daemon",
+    )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Get driver version",
+    )
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="Setup a new device or reconfigure an existing one",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    # Project structure
+    PWD = Path(__file__).parent.resolve()
+    PARENT = PWD.parent
+
+    PYPROJECT_PATH = PARENT / "pyproject.toml"
+    if not PYPROJECT_PATH.exists():
+        raise FileNotFoundError("Unable to locate pyproject.toml")
+
+    # Load project configuration
+    with open(PYPROJECT_PATH, "rb") as f:
+        toml_data = tomllib.load(f)
+    PYPROJECT = toml_data
+    ARGS = parseArgs()
+    # No reason to proceed if all they want is the version.
+    if ARGS.version:
+        print(PYPROJECT["project"]["version"])
+        sys.exit(0)
+
     try:
         with SocketLock():
             main()
