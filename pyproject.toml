@@ -29,7 +29,7 @@ futaba-rc-driver = "main:main"  # Calls main() function in main.py
 requires = [
   "mypy==1.19.1",
   "nuitka~=2.7.12",
-  "setuptools~=64.0",
+  "setuptools>=68",  # 64.x breaks on Python 3.12 (pkgutil.ImpImporter removed)
   "wheel",
   "zstandard==0.25.0"
 ]
@@ -51,7 +51,6 @@ force-exclude = '''
 native_dependencies = ["usb", "uinput"]
 install_script_name = "install.sh"
 uninstall_script_name = "uninstall.sh"
-web_install_script_name = "web-installer.sh"
 executable_name = "futaba-rc-driver"
 build_dir = "build"
 package_dir = "dist"
@@ -158,4 +157,9 @@ docstring-code-format = false
 docstring-code-line-length = "dynamic"
 
 [tool.setuptools]
-packages = ["Futaba"]
+package-dir = { "" = "src" }
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["Futaba*"]

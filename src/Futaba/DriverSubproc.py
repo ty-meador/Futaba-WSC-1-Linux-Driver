@@ -168,7 +168,7 @@ def run(
                 rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
-                maxInputVal = len(valueMap) - 1
+                maxInputVal = len(valueMap) - 1 - indexOffset
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
                 # The way that we generate the calibration table means there will always be an

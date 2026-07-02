@@ -14,7 +14,12 @@ from typing import Any
 
 import usb
 
-from .__config__ import FUTABA_VENDOR_ID, INTERRUPT_ENDPOINT_ATTRIBUTE, LOG_PATH, PWD
+from .__config__ import (
+    CALIBRATION_PATH,
+    FUTABA_VENDOR_ID,
+    INTERRUPT_ENDPOINT_ATTRIBUTE,
+    LOG_PATH,
+)
 
 
 def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
@@ -211,7 +216,9 @@ class CalibrationWidget:
             fileName (str): The name to use for the generated file.
         """
         calibration = self._generateCalibrationBreakpoints()
-        calibrationFile = PWD / "calibrations" / fileName
+        # Same path the Driver reads calibrations from (see Driver._loadCalibration)
+        calibrationFile = CALIBRATION_PATH / fileName
+        calibrationFile.parent.mkdir(parents=True, exist_ok=True)
         calibrationFile.write_text(json.dumps(calibration, indent=4))
 
     def __init__(self) -> None:

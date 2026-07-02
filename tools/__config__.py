@@ -60,7 +60,6 @@ INSTALL_DIR: Path = build_config["install_dir"]
 INSTALL_SCRIPT_NAME: Path = build_config["install_script_name"]
 PACKAGE_DIR: Path = PROJECT_ROOT / build_config["package_dir"]
 UNINSTALL_SCRIPT_NAME: Path = build_config["uninstall_script_name"]
-WEB_INSTALL_SCRIPT_NAME: Path = build_config["web_install_script_name"]
 
 # Project metadata
 HOMEPAGE: Path = project_config["urls"]["Homepage"]

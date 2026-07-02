@@ -22,7 +22,6 @@ from __config__ import (
     TEMPLATES_DIR,
     UNINSTALL_SCRIPT_NAME,
     VERSION,
-    WEB_INSTALL_SCRIPT_NAME,
 )
 from clean import cleanPackageArtifacts
 from util import renderTemplate, runCommand
@@ -111,7 +110,6 @@ def packageDistribution() -> None:  # noqa: PLR0915
             "executable_name": EXECUTABLE_NAME,
             "repo_url": REPOSITORY,
             "install_script_name": INSTALL_SCRIPT_NAME,
-            "web_install_script_name": WEB_INSTALL_SCRIPT_NAME,
             "distributables_path": DISTRIBUTABLES_PAGE,
             "repository": REPOSITORY,
             "package_name": packageName,
@@ -196,9 +194,9 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     print("Calculating package size...")
     duResult = runCommand(f"du -sh {packagePath}")
-    packageSize = 0
+    packageSize = ""
     if duResult:
-        packageSize = int(duResult.split()[0])
+        packageSize = duResult.split()[0]
         print(f"Package size: {packageSize}")
 
     print("Creating compressed archives...")
@@ -222,14 +220,14 @@ def packageDistribution() -> None:  # noqa: PLR0915
 
     # Get archive sizes
     tgzResult = runCommand(f"du -sh {finalTarGz}")
-    tarGzSize = 0
+    tarGzSize = ""
     if tgzResult is not None:
-        tarGzSize = int(tgzResult.split()[0])
+        tarGzSize = tgzResult.split()[0]
 
     txzResult = runCommand(f"du -sh {finalTarXz}")
-    tarXzSize = 0
+    tarXzSize = ""
     if txzResult is not None:
-        tarXzSize = int(txzResult.split()[0])
+        tarXzSize = txzResult.split()[0]
 
     # Create checksums
     print("Creating checksums...")
@@ -251,32 +249,19 @@ def packageDistribution() -> None:  # noqa: PLR0915
         fileName = filePath.name
         if filePath.is_file():
             duResult = runCommand(f"du -sh {filePath}")
-            size = 0
+            size = ""
             if duResult is not None:
-                size = int(duResult.split()[0])
+                size = duResult.split()[0]
 
             print(f"  {fileName} ({size})")
         else:
             print(f"  {fileName}/")
 
-    print("\nReady for distribution!")
-    print("Upload these files for release:")
-    print(f"   • {tarGzName}")
-    print(f"   • {tarXzName}")
-    print(f"   • {tarGzName}.sha256")
-    print(f"   • {tarXzName}.sha256")
-    print(f"   • {WEB_INSTALL_SCRIPT_NAME}")
-
-    print("\nUsers can install with:")
-    print(
-        f"   wget {DISTRIBUTABLES_PAGE}/{WEB_INSTALL_SCRIPT_NAME} "
-        f"&& chmod +x {WEB_INSTALL_SCRIPT_NAME} && ./{WEB_INSTALL_SCRIPT_NAME}"
-    )
-    print("   # OR")
-    print(f"   wget {DISTRIBUTABLES_PAGE}/{tarGzName}")
-    print(f"   tar -xzf {tarGzName}")
-    print(f"   cd {packageName}")
-    print(f"   ./{INSTALL_SCRIPT_NAME}")
+    print("\nDistributables:")
+    print(f"    {tarGzName}")
+    print(f"    {tarXzName}")
+    print(f"    {tarGzName}.sha256")
+    print(f"    {tarXzName}.sha256\n")
 
 
 if __name__ == "__main__":

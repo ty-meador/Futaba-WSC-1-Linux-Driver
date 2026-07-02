@@ -78,7 +78,7 @@ class FutabaDeviceDriver:
         self.speed: int | None = device.speed
         self.serialNumber: str = device.serial_number
 
-        self.deviceChannels = (
+        self.deviceChannels = tuple(
             InputChannel(eventName, calibration, False, logger=self.logger)
             for eventName, calibration in zip(
                 config["channel_events"],
