@@ -22,18 +22,19 @@ import tomllib
 import Futaba
 import UI
 from SocketLock import LockNotAcquired, SocketLock
+from UI.Emojis import BLACK_FLAG, CHECKERED_FLAG, RED_FLAG, WHITE_FLAG
 
 
-def main():
+def main(args: argparse.ArgumentParser):
     """Project entrypoint."""
     mgr = Futaba.DeviceManager()
     # Daemon mode tolerates an empty bus (it hot-plugs); interactive modes need
     # at least one device up front.
-    if not ARGS.daemonize and not mgr.listDevices():
+    if not args.daemonize and not mgr.listDevices():
         print("No Futaba devices found. Is the receiver plugged in?")
         sys.exit(1)
     try:
-        if ARGS.calibrate:
+        if args.calibrate:
             try:
                 curses.wrapper(calibrationMode, mgr)
                 print("Calibration complete!")
@@ -42,7 +43,7 @@ def main():
                 # Make sure we get a stack trace from curses
                 traceback.print_exc()
                 raise
-        elif ARGS.daemonize:
+        elif args.daemonize:
             # asyncio.run propagates exceptions from daemonMode, so a crash
             # kills the process visibly instead of leaving a dead task behind
             asyncio.run(daemonMode(mgr))
@@ -59,13 +60,13 @@ def main():
                 choice = int(input("Choice: "))
 
             mgr.start(choice)
-            print("🏳️  Driver running, ctrl+c to quit")
+            print(f"{WHITE_FLAG}  Driver running, ctrl+c to quit")
 
             while True:
                 time.sleep(0.1)  # Prevent busy waiting
     except KeyboardInterrupt:
         mgr.stopAll()
-        print("🏴 Driver stopped")
+        print(f"{BLACK_FLAG} Driver stopped")
 
 
 def calibrationMode(
@@ -201,20 +202,22 @@ async def daemonMode(mgr: Futaba.DeviceManager) -> None:
     while True:
         mgr.scanForDevices()  # scan for devices,
         mgr.startAll()  # start new ones.
-        await asyncio.sleep(1)  # full USB re-enumeration is not free; once a second is plenty
+        await asyncio.sleep(
+            1
+        )  # full USB re-enumeration is not free; once a second is plenty
 
 
-def findPidFile():
+def findPidFile(pwd: Path):
     """Find the pid file if one exists"""
-    search = list(PWD.glob("*.pid"))
+    search = list(pwd.glob("*.pid"))
     if len(search) == 0:
         return None
     return search[0]
 
 
-def killRunningProcess():
+def killRunningProcess(pwd: Path):
     """Reload the driver."""
-    pidFile = findPidFile()
+    pidFile = findPidFile(pwd)
     if not pidFile:
         return
     print("⟳ Reloading driver")
@@ -237,7 +240,9 @@ def killRunningProcess():
         except ProcessLookupError:
             break
     else:
-        print(f"⚠ Driver (pid {pid}) did not exit after SIGTERM, leaving its pid file in place")
+        print(
+            f"⚠ Driver (pid {pid}) did not exit after SIGTERM, leaving its pid file in place"
+        )
         return
 
     # The old process normally unlinks this itself; clean up if it couldn't
@@ -300,13 +305,14 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(0))
     # Start or reload device manager
+    if ARGS.reload:
+        killRunningProcess(PWD)
     try:
         with SocketLock():
-            main()
+            main(ARGS)
     except LockNotAcquired:
         if ARGS.reload:
-            killRunningProcess()
-            with SocketLock():
-                main()
+            print(f"{RED_FLAG} Reload failed: the old driver is still running")
+            sys.exit(1)
         else:
-            print("🏁 Driver already running. Have Fun!")
+            print(f"{CHECKERED_FLAG} Driver already running. Have Fun!")

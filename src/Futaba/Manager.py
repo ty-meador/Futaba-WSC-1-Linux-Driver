@@ -37,9 +37,7 @@ class FutabaDeviceManager:
         """Enter."""
         return self
 
-    def __exit__(
-        self, exc_type: Any, exc_value: Any, traceback: Any
-    ) -> None:
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         """Exit."""
         self.stopAll()
 
