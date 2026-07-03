@@ -79,11 +79,13 @@ echo "Setting up USB permissions (requires sudo)..."
 sudo mkdir -p /etc/udev/rules.d
 sudo cp ./udev.rules /etc/udev/rules.d/99-${EXECUTABLE}.rules
 
+# Allow the driver to raise its own scheduling priority
+sudo setcap cap_sys_nice+ep "${INSTALL_DIR}/${EXECUTABLE}"
+
 # Ensure user is in input group
 if ! groups | grep -q input; then
     echo "Adding user to input group (requires sudo)..."
     sudo usermod -a -G input "$USER"
-    sudo setcap cap_sys_nice+ep "${INSTALL_DIR}/${EXECUTABLE}"
     echo "   WARNING: You'll need to log out and back in for group changes to take effect"
     GROUP_CHANGE_NEEDED=true
 fi

@@ -77,6 +77,8 @@ class FutabaDeviceDriver:
         self.productID: int = device.idProduct
         self.speed: int | None = device.speed
         self.serialNumber: str = device.serial_number
+        self.bus: int = device.bus
+        self.address: int = device.address
 
         self.deviceChannels = tuple(
             InputChannel(eventName, calibration, False, logger=self.logger)
@@ -90,25 +92,34 @@ class FutabaDeviceDriver:
         atexit.register(self.stop)
 
     def __eq__(self, other: object) -> bool:
-        """Compare instances based on what USB endpoint they are using.
+        """Compare instances based on the device they are driving.
+
+        Descriptor values (endpoint address, product ID, even serial number —
+        the WSC-1 reports a placeholder '000000000') are shared by identical
+        adapters, so identity also includes the USB bus/address the device is
+        currently plugged into, matching how pyusb distinguishes devices.
 
         Args:
             other (object): The device to compare to
 
         Returns:
-            bool: True if the devices have the same interrupt endpoint address
+            bool: True if both drive the same physical device on the same port
 
         """
-        return isinstance(other, FutabaDeviceDriver) and self.endpoint == other.endpoint
+        return isinstance(other, FutabaDeviceDriver) and (
+            self.bus,
+            self.address,
+            self.deviceUUID,
+        ) == (other.bus, other.address, other.deviceUUID)
 
     def __hash__(self) -> int:
-        """Generate a has for this object.
+        """Generate a hash for this object.
 
         Returns:
             hash: The hash.
 
         """
-        return hash(self.endpoint)
+        return hash((self.bus, self.address, self.deviceUUID))
 
     def __str__(self) -> str:
         """Generate a string representation of this device driver."""

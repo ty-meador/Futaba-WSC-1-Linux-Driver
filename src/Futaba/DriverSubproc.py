@@ -63,19 +63,12 @@ def run(
         raise DeviceNotFoundError
 
     logger.debug("Subprocess started")
-
-    # Set realtime priority at the start of the process
     try:
-        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(50))
+        os.nice(-10)
     except PermissionError:
         logger.warning(
-            "Warning: Need CAP_SYS_NICE capability or root for realtime scheduling"
+            "Warning: Cannot set process priority (Need CAP_SYS_NICE capability)"
         )
-        try:
-            # Fallback to nice priority
-            os.nice(-20)
-        except PermissionError:
-            logger.warning("Warning: Cannot set process priority")
 
     channelEventsMap, channelValueMaps, channelIndexOffsets = zip(
         *[
