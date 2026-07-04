@@ -7,7 +7,9 @@ set -e
 INSTALL_DIR=$( echo "{{install_dir}}" | envsubst )
 BIN_DIR=$( echo "{{bin_dir}}" | envsubst )
 EXECUTABLE=$( echo "{{executable_name}}" | envsubst )
-EXECUTABLE="${EXECUTABLE:0:15}"
+# pgrep/pkill -x match the kernel comm name, which is truncated to 15 chars;
+# everything else (symlinks, udev rules, logs) needs the full name
+COMM_NAME="${EXECUTABLE:0:15}"
 
 echo "Futaba RC Driver System Uninstaller"
 echo "======================================"
@@ -25,9 +27,16 @@ echo "   Binary:  ${BIN_DIR}"
 
 # Stop any running instances
 echo "Stopping any running driver instances..."
-# Match the actual binary path, not just the name
-if pgrep -x "${EXECUTABLE:0:15}" >/dev/null 2>&1; then
-    pkill -x "${EXECUTABLE:0:15}" 2>/dev/null || true
+if pgrep -x "${COMM_NAME}" >/dev/null 2>&1; then
+    pkill -x "${COMM_NAME}" 2>/dev/null || true
+    for _ in $(seq 1 50); do
+        pgrep -x "${COMM_NAME}" >/dev/null 2>&1 || break
+        sleep 0.1
+    done
+    if pgrep -x "${COMM_NAME}" >/dev/null 2>&1; then
+        echo "   WARNING: Some driver processes did not exit (stuck in kernel I/O)."
+        echo "            They will only disappear after a reboot."
+    fi
 fi
 
 
@@ -68,11 +77,12 @@ fi
 
 # Remove USB permissions (requires sudo)
 echo "Removing USB permissions (requires sudo)..."
-UDEV_RULE="/etc/udev/rules.d/99-${EXECUTABLE}.rules"
-if [ -f "${UDEV_RULE}" ]; then
-    sudo rm -f "${UDEV_RULE}"
-    echo "   Removed udev rule"
-fi
+for UDEV_RULE in "/etc/udev/rules.d/70-${EXECUTABLE}.rules" "/etc/udev/rules.d/99-${EXECUTABLE}.rules"; do
+    if [ -f "${UDEV_RULE}" ]; then
+        sudo rm -f "${UDEV_RULE}"
+        echo "   Removed udev rule ${UDEV_RULE}"
+    fi
+done
 
 # Remove uinput module configuration
 echo "Removing uinput module configuration (requires sudo)..."

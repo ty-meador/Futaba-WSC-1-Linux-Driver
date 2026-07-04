@@ -77,7 +77,10 @@ done
 # Setup USB permissions (requires sudo)
 echo "Setting up USB permissions (requires sudo)..."
 sudo mkdir -p /etc/udev/rules.d
-sudo cp ./udev.rules /etc/udev/rules.d/99-${EXECUTABLE}.rules
+# Must sort before 73-seat-late-uaccess.rules or TAG+="uaccess" never
+# generates ACLs on hotplug (only logind's login-time sweep applies them)
+sudo cp ./udev.rules /etc/udev/rules.d/70-${EXECUTABLE}.rules
+sudo rm -f /etc/udev/rules.d/99-${EXECUTABLE}.rules
 
 # Allow the driver to raise its own scheduling priority
 sudo setcap cap_sys_nice+ep "${INSTALL_DIR}/${EXECUTABLE}"
@@ -120,12 +123,34 @@ echo ""
 echo "If you are using a wireless transmitter please bind it to USB receiver now."
 read -p "Press Enter to continue..."
 
+# Stop any already-running driver (e.g. a previous install's login autostart):
+# calibration and the fresh daemon below both need the single-instance lock.
+# pgrep/pkill -x match the kernel comm name, which is truncated to 15 chars.
+COMM_NAME="${EXECUTABLE:0:15}"
+if pgrep -x "${COMM_NAME}" > /dev/null 2>&1; then
+    echo "Stopping running driver instance..."
+    pkill -x "${COMM_NAME}" 2>/dev/null || true
+    for _ in $(seq 1 50); do
+        pgrep -x "${COMM_NAME}" > /dev/null 2>&1 || break
+        sleep 0.1
+    done
+    if pgrep -x "${COMM_NAME}" > /dev/null 2>&1; then
+        echo "ERROR: An old driver instance is stuck in kernel I/O and cannot be stopped."
+        echo "       Reboot your machine, then re-run this installer."
+        exit 1
+    fi
+fi
+
 echo ""
 echo "Turn on your transmitter and prepare to perform initial calibration."
 read -p "Press Enter to continue..."
 
 
-${INSTALL_DIR}/${EXECUTABLE} --calibrate
+if ! ${INSTALL_DIR}/${EXECUTABLE} --calibrate; then
+    echo ""
+    echo "WARNING: Calibration did not complete; the driver will use defaults."
+    echo "         You can calibrate at any time with: ${EXECUTABLE} --calibrate"
+fi
 
 echo ""
 echo "Usage:"

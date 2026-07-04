@@ -32,6 +32,8 @@ class FutabaDeviceDriver:
     productID: int
     speed: int | None
     serialNumber: str
+    bus: int
+    address: int
     deviceChannels: Incomplete
     def __init__(self, device: usb.core.Device) -> None: ...
     def __eq__(self, other: object) -> bool: ...

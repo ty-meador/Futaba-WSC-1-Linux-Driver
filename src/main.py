@@ -314,5 +314,10 @@ if __name__ == "__main__":
         if ARGS.reload:
             print(f"{RED_FLAG} Reload failed: the old driver is still running")
             sys.exit(1)
+        elif ARGS.calibrate:
+            # Exit non-zero so the installer.sh notices calibration never ran
+            print(f"{RED_FLAG} cannot calibrate: a driver instance is already running")
+            print("stop it (pkill -f futaba-rc-driver), then run --calibrate again.")
+            sys.exit(1)
         else:
             print(f"{CHECKERED_FLAG} Driver already running. Have Fun!")

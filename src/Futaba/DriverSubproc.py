@@ -154,6 +154,14 @@ def run(
             # while remaining reasonable for process shutdown timing
             rawData = readDevice(interruptEndpoint, frameSize, timeout=250)
 
+            ##
+            # Usage Page (Generic Desktop) → Usage (Joystick)
+            # Usages: X, Y, Z, Rx, Ry, Rz, Dial, Slider   ← 8 channels
+            # Logical range 0–4096
+            # Report Size 16 bits × Report Count 8 → Input (Data,Var,Abs)
+            # The entire 46 bytes: exactly 8 × 16-bit axis values, nothing else.
+            # No vendor-defined fields, no status bytes, no buttons, not even padding.
+            ##
             for i in range(0, len(rawData), 2):
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
