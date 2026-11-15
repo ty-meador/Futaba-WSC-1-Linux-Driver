@@ -68,14 +68,14 @@ The intuitive UI shows real-time input visualization with precise center-point c
 ### Easy Install
 
 ```shell
-wget {{distributables_path}}/{{package_name}}.tar.gz && tar -xzf {{package_name}}.tar.gz && cd {{package_name}} && ./{{install_script_name}}
+wget {{download_url}}/{{package_name}}.tar.gz && tar -xzf {{package_name}}.tar.gz && cd {{package_name}} && ./{{install_script_name}}
 ```
 
 ### Manual Install
 
 ```shell
 # Download the latest release
-wget {{distributables_path}}/{{package_name}}.tar.gz
+wget {{download_url}}/{{package_name}}.tar.gz
 
 # Extract the archive
 tar -xvzf {{package_name}}.tar.gz

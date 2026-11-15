@@ -15,7 +15,7 @@
 1. **Clone or download the repository:**
 
     ```sh
-    git clone https://gitlab.com/Native-Coder/futaba-usb-driver/
+    git clone https://gitlab.com/Tyler-Meador/futaba-usb-driver/
     cd futaba-usb-driver
     ```
 
@@ -52,7 +52,7 @@
 
 #### Project Structure
 
-> API documentation can be found [here](https://tylermeador.com/futaba-rc-driver/docs/)
+> API documentation ships in the `docs/` directory of every [release archive](https://gitlab.com/Tyler-Meador/futaba-usb-driver/-/releases); build it locally with `make docs`
 
 ```
 futaba-usb-driver/
@@ -120,6 +120,7 @@ futaba-usb-driver/
 │   ├── clean.py                        # Cleanup script (removes build artifacts)
 │   ├── __config__.py                   # Build system configuration (loads from pyproject.toml)
 │   ├── package.py                      # Distribution packaging script (creates tar.gz/tar.xz)
+│   ├── publish.py                      # Release publishing script (uploads archives to a GitLab release)
 │   └── util.py                         # Build system utilities (template rendering, command execution)
 │
 └── typings/                            # Type hints for external libraries
@@ -197,7 +198,7 @@ These directories are created during build/runtime and should be in `.gitignore`
 1. **Development**: Edit code in `src/`, test with `./run.sh` or `make run`
 2. **Build**: `make build` → creates `build/futaba-rc-driver.dist/`
 3. **Package**: `make package` → creates `dist/futaba-rc-driver-X.Y.Z-linux-x86_64/`
-4. **Distribution**: Upload archives and web installer from `dist/`
+4. **Distribution**: `make publish` → uploads the archives from `dist/` to a GitLab release
 5. **Installation**: End users run `./install.sh` from extracted archive
 
 ### Development Workflow
@@ -445,8 +446,15 @@ Format: `v1.2.3` or `v1.2.3-5-gabcdef` (with commits ahead)
 3. Run full build: `make clean all`
 4. Test executable: `./build/futaba-rc-driver --version`
 5. Test installation: `./dist/*/install.sh`
-6. Create git tag: `git tag v1.2.3`
-7. Upload distribution files to release page
+6. Create git tag: `git tag release/1.2.3` (`make release` does steps 1, 3 and 6)
+7. Push the tag: `git push && git push --tags`
+8. Publish to GitLab: `GITLAB_TOKEN=<token with api scope> make publish`
+
+`make publish` uploads the archives and checksums to the project's package
+registry and creates the GitLab release for the tag. Releases are hosted at
+<https://gitlab.com/Tyler-Meador/futaba-usb-driver/-/releases>, and the install
+instructions download from
+`.../-/releases/release%2FX.Y.Z/downloads/futaba-rc-driver-X.Y.Z-linux-x86_64.tar.gz`.
 
 ### Troubleshooting Development Issues
 
@@ -477,7 +485,7 @@ Format: `v1.2.3` or `v1.2.3-5-gabcdef` (with commits ahead)
 ## Support
 
 For issues, updates, and documentation visit:
-https://gitlab.com/Native-Coder/futaba-usb-driver/
+https://gitlab.com/Tyler-Meador/futaba-usb-driver/
 
 ---
 

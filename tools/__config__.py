@@ -67,6 +67,19 @@ DISTRIBUTABLES_PAGE: Path = project_config["urls"]["Distributables"]
 REPOSITORY: Path = project_config["urls"]["Repository"]
 VERSION: Path = project_config["version"]
 
+# Release hosting (GitLab releases of the repository project)
+RELEASE_TAG_PREFIX = "release/"
+
+
+def releaseDownloadUrl(version: str) -> str:
+    """Base URL the release assets of a version are downloaded from.
+
+    GitLab serves every asset link of a release under
+    <project>/-/releases/<url-encoded tag>/downloads/<file name>.
+    """
+    tag = f"{RELEASE_TAG_PREFIX}{version}".replace("/", "%2F")
+    return f"{str(DISTRIBUTABLES_PAGE).rstrip('/')}/{tag}/downloads"
+
 # Template paths
 TEMPLATES_DIR: Path = PWD / "artifact-templates"
 SCRIPTS_TEMPLATES_DIR: Path = TEMPLATES_DIR / "scripts"

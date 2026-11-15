@@ -50,7 +50,7 @@ $(EXECUTABLE): $(SOURCES) $(PYPROJECT)
 	$(VENV_ACTIVATE) && tools/build.py
 
 .DEFAULT_GOAL := help
-.PHONY: help all build release stubs docs package install uninstall test clean clean-build clean-package clean-pycache clean-logs version
+.PHONY: help all build release publish stubs docs package install uninstall test clean clean-build clean-package clean-pycache clean-logs version
 
 help:
 	@echo "Futaba RC Driver - Build System"
@@ -59,6 +59,7 @@ help:
 	@echo "Available targets:"
 	@echo "  make build          - Build executable with Nuitka"
 	@echo "  make release        - Build a release"
+	@echo "  make publish        - Upload the packaged release to GitLab (needs GITLAB_TOKEN)"
 	@echo "  make stubs          - Regenerate type stubs"
 	@echo "  make docs           - Generate Sphinx documentation"
 	@echo "  make package        - Create distribution package"
@@ -89,6 +90,11 @@ release:
 	@echo ""
 	@echo "Release complete! To publish:"
 	@echo "  git push && git push --tags"
+	@echo "  make publish"
+
+publish: $(PACKAGE_TARBALL)
+	@echo "Publishing release to GitLab..."
+	$(VENV_ACTIVATE) && tools/publish.py
 
 stubs:
 	@echo "Generating type stubs..."

@@ -68,14 +68,14 @@ The intuitive UI shows real-time input visualization with precise center-point c
 ### Easy Install
 
 ```shell
-wget https://tylermeador.com/futaba-rc-driver/dist/futaba-rc-driver-1.5.4-linux-x86_64.tar.gz && tar -xzf futaba-rc-driver-1.5.4-linux-x86_64.tar.gz && cd futaba-rc-driver-1.5.4-linux-x86_64 && ./install.sh
+wget https://gitlab.com/Tyler-Meador/futaba-usb-driver/-/releases/release%2F1.5.4/downloads/futaba-rc-driver-1.5.4-linux-x86_64.tar.gz && tar -xzf futaba-rc-driver-1.5.4-linux-x86_64.tar.gz && cd futaba-rc-driver-1.5.4-linux-x86_64 && ./install.sh
 ```
 
 ### Manual Install
 
 ```shell
 # Download the latest release
-wget https://tylermeador.com/futaba-rc-driver/dist/futaba-rc-driver-1.5.4-linux-x86_64.tar.gz
+wget https://gitlab.com/Tyler-Meador/futaba-usb-driver/-/releases/release%2F1.5.4/downloads/futaba-rc-driver-1.5.4-linux-x86_64.tar.gz
 
 # Extract the archive
 tar -xvzf futaba-rc-driver-1.5.4-linux-x86_64.tar.gz
@@ -343,7 +343,7 @@ Edit device configs in `${HOME}/.local/opt/futaba-rc-driver/build/Futaba/configs
 ## Support & Development
 
 **Issues, updates, and documentation:**
-https://gitlab.com/Native-Coder/futaba-usb-driver/
+https://gitlab.com/Tyler-Meador/futaba-usb-driver/
 
 **Found a bug?** Please include:
 

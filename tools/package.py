@@ -22,6 +22,7 @@ from __config__ import (
     TEMPLATES_DIR,
     UNINSTALL_SCRIPT_NAME,
     VERSION,
+    releaseDownloadUrl,
 )
 from clean import cleanPackageArtifacts
 from util import renderTemplate, runCommand
@@ -111,6 +112,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
             "repo_url": REPOSITORY,
             "install_script_name": INSTALL_SCRIPT_NAME,
             "distributables_path": DISTRIBUTABLES_PAGE,
+            "download_url": releaseDownloadUrl(version),
             "repository": REPOSITORY,
             "package_name": packageName,
             "install_dir": INSTALL_DIR,
