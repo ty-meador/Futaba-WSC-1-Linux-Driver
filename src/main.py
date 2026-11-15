@@ -6,6 +6,8 @@ This program comes with ABSOLUTELY NO WARRANTY;.
 This is free software, and you are welcome to redistribute it
 under certain conditions; See GNU GPL V3 for more info.
 """
+
+import argparse
 import asyncio
 import curses
 import os
@@ -13,51 +15,26 @@ import signal
 import sys
 import time
 import traceback
-from argparse import ArgumentParser
 from pathlib import Path
 
 import tomllib
-from SocketLock import LockNotAcquired, SocketLock
 
 import Futaba
 import UI
-
-# Project structure
-PWD = Path(__file__).parent.resolve()
-PARENT = PWD.parent
-
-PYPROJECT_PATH = PARENT / "pyproject.toml"
-if not PYPROJECT_PATH.exists():
-    raise FileNotFoundError("Unable to locate pyproject.toml")
-
-# Load project configuration
-with open(PYPROJECT_PATH, "rb") as f:
-    toml_data = tomllib.load(f)
-PYPROJECT = toml_data
-CALIBRATIONS_PATH = PWD / "Futaba/calibrations"
-EXECUTABLE_NAME = PYPROJECT["tool"]["build_tool"]["executable_name"]
-parser = ArgumentParser()
-parser.add_argument(
-    "--calibrate", action="store_true", help="Calibrate a transmitter to a receiver"
-)
-parser.add_argument("--daemonize", action="store_true", help="Run as a background daemon")
-parser.add_argument("--reload", action="store_true", help="Restart the running background daemon")
-parser.add_argument("--version", action="store_true", help="Get driver version")
-parser.add_argument(
-    "--setup", action="store_true", help="Setup a new device or reconfigure an existing one"
-)
-ARGS = parser.parse_args()
-# No reason to proceed if all they want is the version.
-if ARGS.version:
-    print(PYPROJECT["project"]["version"])
-    sys.exit(0)
+from SocketLock import LockNotAcquired, SocketLock
+from UI.Emojis import BLACK_FLAG, CHECKERED_FLAG, RED_FLAG, WHITE_FLAG
 
 
-def main():
+def main(args: argparse.ArgumentParser):
     """Project entrypoint."""
     mgr = Futaba.DeviceManager()
+    # Daemon mode tolerates an empty bus (it hot-plugs); interactive modes need
+    # at least one device up front.
+    if not args.daemonize and not mgr.listDevices():
+        print("No Futaba devices found. Is the receiver plugged in?")
+        sys.exit(1)
     try:
-        if ARGS.calibrate:
+        if args.calibrate:
             try:
                 curses.wrapper(calibrationMode, mgr)
                 print("Calibration complete!")
@@ -66,10 +43,10 @@ def main():
                 # Make sure we get a stack trace from curses
                 traceback.print_exc()
                 raise
-        elif ARGS.daemonize:
-            loop = asyncio.new_event_loop()
-            loop.create_task(daemonMode(mgr))
-            loop.run_forever()
+        elif args.daemonize:
+            # asyncio.run propagates exceptions from daemonMode, so a crash
+            # kills the process visibly instead of leaving a dead task behind
+            asyncio.run(daemonMode(mgr))
         else:
             devList = mgr.listDevices()
             keyList = list(map(lambda device: device["key"], devList))
@@ -83,13 +60,13 @@ def main():
                 choice = int(input("Choice: "))
 
             mgr.start(choice)
-            print("🏳️  Driver running, ctrl+c to quit")
+            print(f"{WHITE_FLAG}  Driver running, ctrl+c to quit")
 
             while True:
                 time.sleep(0.1)  # Prevent busy waiting
     except KeyboardInterrupt:
         mgr.stopAll()
-        print("🏴 Driver stopped")
+        print(f"{BLACK_FLAG} Driver stopped")
 
 
 def calibrationMode(
@@ -115,7 +92,6 @@ def calibrationMode(
     xMid = xMaxOverTwo - width // 2
     yMid = yMaxOverTwo - height // 2
 
-    deviceManager = Futaba.DeviceManager()
     pipe = None
     selectedDevice = None
     inpt = None
@@ -132,7 +108,7 @@ def calibrationMode(
     menu = UI.Menu(
         windowCoords,
         "( Which receiver is your transmitter paired to? )",
-        [UI.MenuItem(device["name"], device) for device in deviceManager.listDevices()],
+        [UI.MenuItem(device["name"], device) for device in mgr.listDevices()],
     )
     menu.render()
     while inpt != ENTER:
@@ -144,8 +120,8 @@ def calibrationMode(
     inpt = None
 
     selectedDevice = menu.getItem().value
-    deviceManager.start(selectedDevice["key"])
-    pipe = deviceManager.getPipe(selectedDevice["key"])
+    mgr.start(selectedDevice["key"])
+    pipe = mgr.getPipe(selectedDevice["key"])
 
     menu.erase()
     parentScreen.refresh()
@@ -162,7 +138,9 @@ def calibrationMode(
     while not pipe.poll():
         time.sleep(0.1)
 
-    centerInputs.setTitle("( Center all inputs, then press enter )")
+    centerInputs.setTitle(
+        "( Center all inputs, Set expo to 0%, set dual rates to 100%, then press enter )"
+    )
     centerInputs.render()
     # Flush the input buffer to clear any characters typed prior to now
     curses.flushinp()
@@ -174,6 +152,7 @@ def calibrationMode(
     calibrationWidget = Futaba.CalibrationWidget()
     stopAfter = time.time() + 3  # seconds
     while time.time() < stopAfter:
+        time.sleep(0.01)  # Prevent busy-waiting
         while pipe.poll():
             [channel, rawV, calibV] = pipe.recv()
             calibrationWidget.mid(channel, rawV)
@@ -181,7 +160,7 @@ def calibrationMode(
     # calibration UI elements
     calibrationUI = UI.CalibrationUI(
         UI.WindowCoords(x=xMid, y=yMid, width=width, height=height),
-        "( Slowly move each channel to each of their extremes, then press enter )"
+        "( Slowly move each channel to each of their extremes, then press enter )",
     )
     calibrationUI.nodelay(True)
     calibrationUI.render()
@@ -191,18 +170,17 @@ def calibrationMode(
         mode = "minmax"
         while not done:
             time.sleep(0.01)  # Prevent busy-waiting
+            # Checked outside the pipe drain so enter still registers when the
+            # transmitter is idle and no frames are arriving
+            if calibrationUI.getch() == ENTER:
+                done = True
+                continue
             while pipe.poll():
                 [channel, rawV, calibV] = pipe.recv()
-                # move to next calibration step every time they press enter
-                if calibrationUI.getch() == ENTER:
-                    done = True
-                    break
                 if mode == "minmax":
                     calibrationWidget.minMax(channel, rawV)
                 calibrationUI.updateChannel(channel, calibV)
                 calibrationUI.render()
-        if not done:
-            raise RuntimeError("CALIBRATION DID NOT COMPLETE SUCCESSFULLY")
         calibrationWidget.generateFile(fileName)
     finally:
         mgr.stopAll()
@@ -219,42 +197,127 @@ async def daemonMode(mgr: Futaba.DeviceManager) -> None:
         RuntimeError: Raised if the specified device cannot be found
 
     """
-    print("Running in deamon mode: Scanning and starting new devices every second")
+    print("Running in daemon mode: Scanning and starting new devices every second")
 
     while True:
         mgr.scanForDevices()  # scan for devices,
         mgr.startAll()  # start new ones.
-        await asyncio.sleep(.1)  # yield to event loop for at least .1 second
+        await asyncio.sleep(
+            1
+        )  # full USB re-enumeration is not free; once a second is plenty
 
 
-def findPidFile():
+def findPidFile(pwd: Path):
     """Find the pid file if one exists"""
-    search = list(PWD.glob("*.pid"))
+    search = list(pwd.glob("*.pid"))
     if len(search) == 0:
         return None
     return search[0]
 
 
-def killRunningProcess():
+def killRunningProcess(pwd: Path):
     """Reload the driver."""
-    pidFile = findPidFile()
+    pidFile = findPidFile(pwd)
     if not pidFile:
         return
     print("⟳ Reloading driver")
     [pid, _] = pidFile.name.split(".")
-    os.kill(int(pid), signal.SIGTERM)
-    time.sleep(1)  # Give it time to shut down
-    pidFile.unlink()
+    pid = int(pid)
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        # Stale pid file left over from a process that is already gone
+        pidFile.unlink(missing_ok=True)
+        return
+
+    # Wait for the old process to exit so it can stop its driver
+    # subprocesses and remove its own pid file on the way out.
+    for _ in range(50):
+        time.sleep(0.1)
+        try:
+            os.kill(pid, 0)  # Raises ProcessLookupError once the process is gone
+        except ProcessLookupError:
+            break
+    else:
+        print(
+            f"⚠ Driver (pid {pid}) did not exit after SIGTERM, leaving its pid file in place"
+        )
+        return
+
+    # The old process normally unlinks this itself; clean up if it couldn't
+    pidFile.unlink(missing_ok=True)
+
+
+def parseArgs() -> argparse.Namespace:
+    """Parses the CLI arguments passed to this script
+
+    Returns:
+        Namespace: The resulting namespace
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--calibrate",
+        action="store_true",
+        help="Calibrate a transmitter to a receiver",
+    )
+    parser.add_argument(
+        "--daemonize",
+        action="store_true",
+        help="Run as a background daemon",
+    )
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Restart the running background daemon",
+    )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Get driver version",
+    )
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="Setup a new device or reconfigure an existing one",
+    )
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
+    # Project structure
+    PWD = Path(__file__).parent.resolve()
+    PARENT = PWD.parent
+    PYPROJECT_PATH = PARENT / "pyproject.toml"
+    assert PYPROJECT_PATH.exists(), "Unable to locate pyproject.toml"
+
+    # Load project configuration
+    PYPROJECT = None
+    with open(PYPROJECT_PATH, "rb") as f:
+        PYPROJECT = tomllib.load(f)
+
+    # Parse args
+    ARGS = parseArgs()
+    # No reason to proceed if all they want is the version.
+    if ARGS.version:
+        print(PYPROJECT["project"]["version"])
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(0))
+    # Start or reload device manager
+    if ARGS.reload:
+        killRunningProcess(PWD)
     try:
         with SocketLock():
-            main()
+            main(ARGS)
     except LockNotAcquired:
         if ARGS.reload:
-            killRunningProcess()
-            with SocketLock():
-                main()
+            print(f"{RED_FLAG} Reload failed: the old driver is still running")
+            sys.exit(1)
+        elif ARGS.calibrate:
+            # Exit non-zero so the installer.sh notices calibration never ran
+            print(f"{RED_FLAG} cannot calibrate: a driver instance is already running")
+            print("stop it (pkill -f futaba-rc-driver), then run --calibrate again.")
+            sys.exit(1)
         else:
-            print("🏁 Driver already running. Have Fun!")
+            print(f"{CHECKERED_FLAG} Driver already running. Have Fun!")

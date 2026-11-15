@@ -19,7 +19,7 @@ Transform your Futaba RC transmitter into a high-precision game controller for r
 
 **Built for Performance**
 
-- Real-time scheduling for minimal latency
+- Elevated scheduling priority keeps input responsive even on a fully loaded system
 - O(1) frame processing - constant time regardless of input complexity
 - Pre-calculated calibration maps eliminate runtime computation
 - Optimized for racing and flight simulators where timing matters
@@ -68,14 +68,14 @@ The intuitive UI shows real-time input visualization with precise center-point c
 ### Easy Install
 
 ```shell
-wget https://tylermeador.com/futaba-rc-driver/dist/futaba-rc-driver-1.5.4-linux-x86_64.tar.gz && tar -xzf futaba-rc-driver-1.5.4-linux-x86_64.tar.gz && cd futaba-rc-driver-1.5.4-linux-x86_64 && ./install.sh
+wget https://gitlab.com/Tyler-Meador/futaba-usb-driver/-/releases/release%2F1.5.4/downloads/futaba-rc-driver-1.5.4-linux-x86_64.tar.gz && tar -xzf futaba-rc-driver-1.5.4-linux-x86_64.tar.gz && cd futaba-rc-driver-1.5.4-linux-x86_64 && ./install.sh
 ```
 
 ### Manual Install
 
 ```shell
 # Download the latest release
-wget https://tylermeador.com/futaba-rc-driver/dist/futaba-rc-driver-1.5.4-linux-x86_64.tar.gz
+wget https://gitlab.com/Tyler-Meador/futaba-usb-driver/-/releases/release%2F1.5.4/downloads/futaba-rc-driver-1.5.4-linux-x86_64.tar.gz
 
 # Extract the archive
 tar -xvzf futaba-rc-driver-1.5.4-linux-x86_64.tar.gz
@@ -255,7 +255,7 @@ This driver is engineered for real-time RC applications:
 
 - **O(1) Frame Processing:** Constant-time input handling regardless of complexity
 - **Pre-calculated Calibration Maps:** Zero runtime computation overhead
-- **Real-time Priority Scheduling:** Minimizes input latency (requires CAP_SYS_NICE)
+- **Elevated Process Priority:** Workers run at nice -10 — above game/simulator threads, below system audio — so input stays responsive under full load (requires CAP_SYS_NICE)
 - **Optimized Memory Access:** Local variable caching eliminates attribute lookup overhead
 - **Process Isolation:** Each device runs independently for maximum reliability
 
@@ -343,7 +343,7 @@ Edit device configs in `${HOME}/.local/opt/futaba-rc-driver/build/Futaba/configs
 ## Support & Development
 
 **Issues, updates, and documentation:**
-https://gitlab.com/Native-Coder/futaba-usb-driver/
+https://gitlab.com/Tyler-Meador/futaba-usb-driver/
 
 **Found a bug?** Please include:
 

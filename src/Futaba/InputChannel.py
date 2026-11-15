@@ -1,11 +1,12 @@
 """Classes for handling input channels."""
 
 from __future__ import annotations
+
+import sys
+import typing as t
 from array import array
 from dataclasses import dataclass, field
 from logging import Logger
-import sys
-import typing as t
 
 from . import Util as utils
 from .__config__ import DEFAULT_INPUT_RANGE, DEFAULT_OUTPUT_RANGE
@@ -21,7 +22,7 @@ class ChannelDict(t.TypedDict):
 
 @dataclass(frozen=True, slots=True)
 class ChannelCalibration:
-    """Provides a class based representation of a single channels calibration.
+    """Provides a pickleable class based representation of a single channels calibration.
 
     Args:
         inputRange (Iterable[int], optional): The range of input values. Defaults to DEFAULT_INPUT_RANGE.
@@ -47,7 +48,9 @@ class ChannelCalibration:
     outputRange: t.Iterable[int] = field(default_factory=lambda: DEFAULT_OUTPUT_RANGE)
     indexOffset: int = 0
 
-    logger: Logger = field(default_factory=lambda: utils.newLogger("ChannelCalibration"))
+    logger: Logger = field(
+        default_factory=lambda: utils.newLogger("ChannelCalibration")
+    )
     reverse: bool = False
     valueMap: array[int] = field(init=False, repr=False)
     valueMapSize: int = field(init=False, repr=False)
@@ -71,7 +74,9 @@ class ChannelCalibration:
         object.__setattr__(self, "indexOffset", indexOffset)
         object.__setattr__(self, "valueMapSize", sys.getsizeof(valueMap) // 1024)  # kb
 
-        logger.debug("-= Channel Calibration(%s, %s) created! =-", (inputRange, outputRange))
+        logger.debug(
+            "-= Channel Calibration(%s, %s) created! =-", (inputRange, outputRange)
+        )
         logger.debug("    valueMap:")
         logger.debug("        elements: %s", len(valueMap))
         logger.debug("        unique values: %s", len(set(valueMap)))
@@ -81,7 +86,9 @@ class ChannelCalibration:
         logger.debug("        high: %s", inputRange[2])
         logger.debug("        med: %s", inputRange[1])
         logger.debug("        low: %s", inputRange[0])
-        logger.debug("    outputRange: %s total elements", outputRange[2] - outputRange[0])
+        logger.debug(
+            "    outputRange: %s total elements", outputRange[2] - outputRange[0]
+        )
         logger.debug("        high: %s", outputRange[2])
         logger.debug("        med: %s", outputRange[1])
         logger.debug("        low: %s", outputRange[0])
@@ -150,14 +157,14 @@ class ChannelCalibration:
 
 @dataclass(frozen=True, slots=True)
 class InputChannel:
-    """Provides a class based representation of a single input channel."""
+    """Provides a pickleable class based representation of a single input channel."""
 
     eventName: str
     calibrationRange: t.Iterable[int]
     isReversed: bool = False
 
     indexOffset: int = 0
-    valueMap: array[int] = field(default_factory=lambda: array('i'))
+    valueMap: array[int] = field(default_factory=lambda: array("i"))
     logger: Logger = field(default_factory=lambda: utils.newLogger("InputChannel"))
 
     def __post_init__(self) -> None:
@@ -181,7 +188,9 @@ class InputChannel:
         )
 
         self.logger.debug(f"-= InputChannel({self.eventName}) created =-")
-        self.logger.debug(f"    direction: {'reversed' if self.isReversed else 'normal'}")
+        self.logger.debug(
+            f"    direction: {'reversed' if self.isReversed else 'normal'}"
+        )
 
     def __eq__(self, other: object) -> bool:
         """Determine if the Input Channels are equal.
@@ -194,7 +203,8 @@ class InputChannel:
 
         """
         return (
-            isinstance(other, InputChannel) and hasattr(other, "eventName")
+            isinstance(other, InputChannel)
+            and hasattr(other, "eventName")
             and self.eventName == other.eventName
         )
 

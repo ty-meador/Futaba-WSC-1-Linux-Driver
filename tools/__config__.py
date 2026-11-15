@@ -26,7 +26,9 @@ PYPROJECT = toml_data
 if sys.prefix == sys.base_prefix:
     if not (PROJECT_ROOT / ".venv").exists():
         print("Script must be run from a venv. Try the following first.")
-        print(f"NOTE: Python version requirement -> {PYPROJECT['project']['requires-python']}")
+        print(
+            f"NOTE: Python version requirement -> {PYPROJECT['project']['requires-python']}"
+        )
         print("python3 -m venv .venv")
     else:
         print(
@@ -58,13 +60,25 @@ INSTALL_DIR: Path = build_config["install_dir"]
 INSTALL_SCRIPT_NAME: Path = build_config["install_script_name"]
 PACKAGE_DIR: Path = PROJECT_ROOT / build_config["package_dir"]
 UNINSTALL_SCRIPT_NAME: Path = build_config["uninstall_script_name"]
-WEB_INSTALL_SCRIPT_NAME: Path = build_config["web_install_script_name"]
 
 # Project metadata
 HOMEPAGE: Path = project_config["urls"]["Homepage"]
 DISTRIBUTABLES_PAGE: Path = project_config["urls"]["Distributables"]
 REPOSITORY: Path = project_config["urls"]["Repository"]
 VERSION: Path = project_config["version"]
+
+# Release hosting (GitLab releases of the repository project)
+RELEASE_TAG_PREFIX = "release/"
+
+
+def releaseDownloadUrl(version: str) -> str:
+    """Base URL the release assets of a version are downloaded from.
+
+    GitLab serves every asset link of a release under
+    <project>/-/releases/<url-encoded tag>/downloads/<file name>.
+    """
+    tag = f"{RELEASE_TAG_PREFIX}{version}".replace("/", "%2F")
+    return f"{str(DISTRIBUTABLES_PAGE).rstrip('/')}/{tag}/downloads"
 
 # Template paths
 TEMPLATES_DIR: Path = PWD / "artifact-templates"

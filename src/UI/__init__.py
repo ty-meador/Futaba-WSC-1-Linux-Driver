@@ -2,4 +2,4 @@
 
 from .Calibration import CalibrationUI
 from .Menu import Menu, MenuItem
-from .Window import Window, WindowCoords, TitleOnlyWindow
+from .Window import TitleOnlyWindow, Window, WindowCoords

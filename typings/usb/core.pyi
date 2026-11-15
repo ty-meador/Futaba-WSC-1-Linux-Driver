@@ -3,11 +3,24 @@
 #
 # Type stub for usb.core module
 
-from typing import Any, Iterator, Optional, Union, Callable, Tuple, Dict, Set, List, overload, Literal
-from typing_extensions import Self
 import array
 import threading
 from types import TracebackType
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    overload,
+)
+
+from typing_extensions import Self
 
 # Type aliases for better readability
 _BytesLike = Union[bytes, bytearray, array.array[int]]

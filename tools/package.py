@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Package Futaba RC Driver into a standalone distribution."""
-from argparse import ArgumentParser
-from datetime import datetime
+
 import re
 import shutil
 import tarfile
+from argparse import ArgumentParser
+from datetime import datetime
 
 from __config__ import (
     BIN_DIR,
@@ -21,7 +22,7 @@ from __config__ import (
     TEMPLATES_DIR,
     UNINSTALL_SCRIPT_NAME,
     VERSION,
-    WEB_INSTALL_SCRIPT_NAME,
+    releaseDownloadUrl,
 )
 from clean import cleanPackageArtifacts
 from util import renderTemplate, runCommand
@@ -30,7 +31,7 @@ parser = ArgumentParser()
 parser.add_argument(
     "--clean",
     action="store_true",
-    help="Clean up previously generated artifacts before building new ones."
+    help="Clean up previously generated artifacts before building new ones.",
 )
 ARGS = parser.parse_args()
 
@@ -48,16 +49,15 @@ def getVersionInfo() -> tuple[str, str]:
     version = "UNKNOWN"  # Default version
 
     # Try to get version from git
-    gitVersion = runCommand("git describe --tags --always --dirty 2>/dev/null")
-    if gitVersion:
+    gitDescribe = runCommand("git describe --tags --always --dirty 2>/dev/null")
+    if gitDescribe:
         # Extract the semantic-versioning number
-        gitVersion = re.search(r".*(\d+\.\d+\.\d+).*", gitVersion)
+        gitVersion = re.search(r".*(\d+\.\d+\.\d+).*", gitDescribe)
         if gitVersion:
             version = gitVersion.group(1)
 
     buildDate = datetime.now().strftime("%Y%m%d_%H%M%S")
     return version, buildDate
-
 
 
 def packageDistribution() -> None:  # noqa: PLR0915
@@ -97,10 +97,7 @@ def packageDistribution() -> None:  # noqa: PLR0915
     # Create wrapper script that works from any location
     renderTemplate(
         SCRIPTS_TEMPLATES_DIR / "wrapper.sh",
-        {
-            "executable_name": EXECUTABLE_NAME,
-            "install_dir": INSTALL_DIR
-        },
+        {"executable_name": EXECUTABLE_NAME, "install_dir": INSTALL_DIR},
         packagePath / EXECUTABLE_NAME,
     )
 
@@ -114,11 +111,11 @@ def packageDistribution() -> None:  # noqa: PLR0915
             "executable_name": EXECUTABLE_NAME,
             "repo_url": REPOSITORY,
             "install_script_name": INSTALL_SCRIPT_NAME,
-            "web_install_script_name": WEB_INSTALL_SCRIPT_NAME,
             "distributables_path": DISTRIBUTABLES_PAGE,
+            "download_url": releaseDownloadUrl(version),
             "repository": REPOSITORY,
             "package_name": packageName,
-            "install_dir": INSTALL_DIR
+            "install_dir": INSTALL_DIR,
         },
         packagePath / "README.md",
     )
@@ -176,24 +173,21 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     # Copy project critical subdirectories (such as the generated docs...)
     ##
-    pkgCriticalDirs = [ DOCS_DIR / "build/html" ]
+    pkgCriticalDirs = [DOCS_DIR / "build/html"]
     missing = [pkgDir for pkgDir in pkgCriticalFiles if not pkgDir.exists()]
     if missing:
         raise FileNotFoundError(
             f"ERROR: UNABLE TO FIND >{', '.join(map(str, missing))}< REFUSING TO PACKAGE"
         )
     for pkgSubdir in pkgCriticalDirs:
-        shutil.copytree(pkgSubdir, packagePath / "docs",dirs_exist_ok=True)
+        shutil.copytree(pkgSubdir, packagePath / "docs", dirs_exist_ok=True)
 
     ##
     # Create version info file
     ##
     renderTemplate(
         TEMPLATES_DIR / "VERSION",
-        {
-            "version": version,
-            "build_date": buildDate
-        },
+        {"version": version, "build_date": buildDate},
         packagePath / "VERSION",
     )
 
@@ -202,11 +196,10 @@ def packageDistribution() -> None:  # noqa: PLR0915
     ##
     print("Calculating package size...")
     duResult = runCommand(f"du -sh {packagePath}")
+    packageSize = ""
     if duResult:
         packageSize = duResult.split()[0]
         print(f"Package size: {packageSize}")
-    else:
-        packageSize = 0
 
     print("Creating compressed archives...")
 
@@ -228,17 +221,15 @@ def packageDistribution() -> None:  # noqa: PLR0915
     shutil.move(tempTarXz, finalTarXz)
 
     # Get archive sizes
-    tarGzSize = runCommand(f"du -sh {finalTarGz}")
-    if tarGzSize:
-        tarGzSize = tarGzSize.split()[0]
-    else:
-        tarGzSize = 0
+    tgzResult = runCommand(f"du -sh {finalTarGz}")
+    tarGzSize = ""
+    if tgzResult is not None:
+        tarGzSize = tgzResult.split()[0]
 
-    tarXzSize = runCommand(f"du -sh {finalTarXz}")
-    if tarXzSize is not None:
-        tarXzSize = tarXzSize.split()[0]
-    else:
-        tarXzSize = 0
+    txzResult = runCommand(f"du -sh {finalTarXz}")
+    tarXzSize = ""
+    if txzResult is not None:
+        tarXzSize = txzResult.split()[0]
 
     # Create checksums
     print("Creating checksums...")
@@ -259,34 +250,20 @@ def packageDistribution() -> None:  # noqa: PLR0915
     for filePath in sorted(distFiles):
         fileName = filePath.name
         if filePath.is_file():
-            size = runCommand(f"du -sh {filePath}")
-            if size is not None:
-                size = size.split()[0]
-            else:
-                size = 0
+            duResult = runCommand(f"du -sh {filePath}")
+            size = ""
+            if duResult is not None:
+                size = duResult.split()[0]
 
             print(f"  {fileName} ({size})")
         else:
             print(f"  {fileName}/")
 
-    print("\nReady for distribution!")
-    print("Upload these files for release:")
-    print(f"   • {tarGzName}")
-    print(f"   • {tarXzName}")
-    print(f"   • {tarGzName}.sha256")
-    print(f"   • {tarXzName}.sha256")
-    print(f"   • {WEB_INSTALL_SCRIPT_NAME}")
-
-    print("\nUsers can install with:")
-    print(
-        f"   wget {DISTRIBUTABLES_PAGE}/{WEB_INSTALL_SCRIPT_NAME} "
-        f"&& chmod +x {WEB_INSTALL_SCRIPT_NAME} && ./{WEB_INSTALL_SCRIPT_NAME}"
-    )
-    print("   # OR")
-    print(f"   wget {DISTRIBUTABLES_PAGE}/{tarGzName}")
-    print(f"   tar -xzf {tarGzName}")
-    print(f"   cd {packageName}")
-    print(f"   ./{INSTALL_SCRIPT_NAME}")
+    print("\nDistributables:")
+    print(f"    {tarGzName}")
+    print(f"    {tarXzName}")
+    print(f"    {tarGzName}.sha256")
+    print(f"    {tarXzName}.sha256\n")
 
 
 if __name__ == "__main__":

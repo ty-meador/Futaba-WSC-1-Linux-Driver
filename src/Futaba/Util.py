@@ -1,16 +1,25 @@
 """Contains atomic utility functions for the project."""
+
 from __future__ import annotations
-from array import array
+
 import bisect
-from contextlib import suppress
 import json
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import re
+from array import array
+from contextlib import suppress
+from logging.handlers import RotatingFileHandler
 from typing import Any
+
 import usb
-from .__config__ import FUTABA_VENDOR_ID, LOG_PATH, PWD, INTERRUPT_ENDPOINT_ATTRIBUTE
+
+from .__config__ import (
+    CALIBRATION_PATH,
+    FUTABA_VENDOR_ID,
+    INTERRUPT_ENDPOINT_ATTRIBUTE,
+    LOG_PATH,
+)
 
 
 def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
@@ -26,8 +35,10 @@ def findEndpointDevice(endpoint: int) -> usb.core.Device | None:
 
     """
     results = [
-        device for device in usb.core.find(find_all=True)
-        if device.idVendor == FUTABA_VENDOR_ID and findInterruptEndpoint(device) == endpoint
+        device
+        for device in usb.core.find(find_all=True)
+        if device.idVendor == FUTABA_VENDOR_ID
+        and findInterruptEndpoint(device) == endpoint
     ]
 
     if len(results) != 1:
@@ -53,7 +64,8 @@ def findInterruptEndpoint(device: usb.core.Device) -> int | None:
         for interface in config:
             for endpoint in interface:
                 if (
-                    usb.util.endpoint_direction(endpoint.bEndpointAddress) == usb.util.ENDPOINT_IN
+                    usb.util.endpoint_direction(endpoint.bEndpointAddress)
+                    == usb.util.ENDPOINT_IN
                     and endpoint.bmAttributes == INTERRUPT_ENDPOINT_ATTRIBUTE
                 ):
                     return endpoint.bEndpointAddress
@@ -89,7 +101,9 @@ def newLogger(
         maxBytes=5 * 1024 * 1024,  # 5 megabytes
         backupCount=5,
     )
-    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s"))
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(levelname)s\t: %(message)s")
+    )
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
@@ -150,7 +164,8 @@ def interpolate(
         y1, y2 = yPoints[i], yPoints[i + 1]
 
         interpolated = (
-            y1 if x2 == x1  # Avoid division by zero
+            y1
+            if x2 == x1  # Avoid division by zero
             else y1 + (y2 - y1) * (x - x1) / (x2 - x1)  # Linear interpolation
         )
 
@@ -160,6 +175,7 @@ def interpolate(
 
 class CalibrationWidget:
     """Generates a channel calibration for the running device."""
+
     def minMax(self, channel: Any, rawV: int) -> None:
         """Process value as min/max.
 
@@ -200,7 +216,9 @@ class CalibrationWidget:
             fileName (str): The name to use for the generated file.
         """
         calibration = self._generateCalibrationBreakpoints()
-        calibrationFile = PWD / "calibrations" / fileName
+        # Same path the Driver reads calibrations from (see Driver._loadCalibration)
+        calibrationFile = CALIBRATION_PATH / fileName
+        calibrationFile.parent.mkdir(parents=True, exist_ok=True)
         calibrationFile.write_text(json.dumps(calibration, indent=4))
 
     def __init__(self) -> None:
@@ -218,9 +236,12 @@ class CalibrationWidget:
             # We have to do this because the interpolation function used to generate the
             # calibrated value map requires an ascending input range to be considered "sane".
             if (
-                channelData["min"] == channelData["mid"] or channelData["mid"] == channelData["max"]
+                channelData["min"] == channelData["mid"]
+                or channelData["mid"] == channelData["max"]
             ):
                 channelData["min"] = channelData["mid"] - 1
                 channelData["max"] = channelData["mid"] + 1
-            channelList.append((channelData["min"], channelData["mid"], channelData["max"]))
+            channelList.append(
+                (channelData["min"], channelData["mid"], channelData["max"])
+            )
         return tuple(channelList)

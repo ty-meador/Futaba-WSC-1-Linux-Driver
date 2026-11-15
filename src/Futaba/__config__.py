@@ -1,9 +1,11 @@
 """Contains atomic utility functions for the project."""
 
-from dataclasses import dataclass, field
 import json
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
 import tomllib
 
 # Project structure
@@ -40,17 +42,21 @@ EVENT_MIN_VAL: int = -32768
 EVENT_MID_VAL: int = 0
 EVENT_MAX_VAL: int = 32767
 
-DEFAULT_INPUT_RANGE: tuple[int, ...] = tuple([
-    DEFAULT_DEVICE_MIN_VAL,
-    DEFAULT_DEVICE_MID_VAL,
-    DEFAULT_DEVICE_MAX_VAL,
-])
+DEFAULT_INPUT_RANGE: tuple[int, ...] = tuple(
+    [
+        DEFAULT_DEVICE_MIN_VAL,
+        DEFAULT_DEVICE_MID_VAL,
+        DEFAULT_DEVICE_MAX_VAL,
+    ]
+)
 
-DEFAULT_OUTPUT_RANGE: tuple[int, ...] = tuple([
-    EVENT_MIN_VAL,
-    EVENT_MID_VAL,
-    EVENT_MAX_VAL,
-])
+DEFAULT_OUTPUT_RANGE: tuple[int, ...] = tuple(
+    [
+        EVENT_MIN_VAL,
+        EVENT_MID_VAL,
+        EVENT_MAX_VAL,
+    ]
+)
 
 FUTABA_VENDOR_ID: int = 4104  # 0x1008
 HID_INTERFACE: int = 0x3  # coincidence
@@ -62,8 +68,8 @@ CONFIG_PATH: Path = DRIVER_PATH / "configs"
 CALIBRATION_PATH: Path = DRIVER_PATH / "calibrations"
 LOG_PATH: Path = DRIVER_PATH / "logs"
 
-with open(CONFIG_PATH / "_default.json", encoding="utf-8") as f:
-    DEFAULT_CONFIG = json.load(f)
+with open(CONFIG_PATH / "_default.json", encoding="utf-8") as cfg_file:
+    DEFAULT_CONFIG = json.load(cfg_file)
 
 DEFAULT_CALIBRATION: list[tuple[int, ...]] = [
     DEFAULT_INPUT_RANGE * len(DEFAULT_CONFIG["channel_events"])

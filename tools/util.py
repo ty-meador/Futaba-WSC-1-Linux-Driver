@@ -2,7 +2,9 @@
 """Utilities and constants for the build system."""
 
 import subprocess
+import sys
 from pathlib import Path
+from typing import Any
 
 
 def renderTemplate(
@@ -69,7 +71,7 @@ def runCommand(
         return ""
 
 
-def _getNestedValue(dictionary: dict, path: str) -> any:
+def _getNestedValue(dictionary: dict, path: str) -> Any:
     """
     Retrieve a value from a nested dictionary using dot notation.
 
@@ -80,7 +82,7 @@ def _getNestedValue(dictionary: dict, path: str) -> any:
     Returns:
         The value at the path, or None if not found
     """
-    keys = path.split('.')
+    keys = path.split(".")
     value = dictionary
 
     for key in keys:
@@ -92,13 +94,16 @@ def _getNestedValue(dictionary: dict, path: str) -> any:
 
 
 if __name__ == "__main__":
-    from __config__ import PYPROJECT, PYPROJECT_PATH
     import re
     from argparse import ArgumentParser
-    from sys import stderr, argv
+    from sys import argv, stderr
+
+    from __config__ import PYPROJECT, PYPROJECT_PATH
 
     parser = ArgumentParser()
-    parser.add_argument("--pyproject", action="store", help="Print a value from pyproject.toml")
+    parser.add_argument(
+        "--pyproject", action="store", help="Print a value from pyproject.toml"
+    )
     ARGS = parser.parse_args()
 
     # Script name is always passed
@@ -111,18 +116,18 @@ if __name__ == "__main__":
     if ARGS.pyproject:
         try:
             # @fixme this won't handle anything beyond a simple key/value search and replace
-            if '=' in ARGS.pyproject:
-                keys, value = ARGS.pyproject.split('=', 1)
+            if "=" in ARGS.pyproject:
+                keys, value = ARGS.pyproject.split("=", 1)
 
-                with open(PYPROJECT_PATH, 'r') as f:
+                with open(PYPROJECT_PATH, "r") as f:
                     content = f.read()
 
-                lastKey = keys.split('.')[-1]
+                lastKey = keys.split(".")[-1]
                 pattern = rf'^{lastKey}\s*=\s*"[^"]*"'
                 replacement = f'{lastKey} = "{value}"'
                 newContent = re.sub(pattern, replacement, content, flags=re.MULTILINE)
 
-                with open(PYPROJECT_PATH, 'w') as f:
+                with open(PYPROJECT_PATH, "w") as f:
                     f.write(newContent)
             else:
                 print(_getNestedValue(PYPROJECT, ARGS.pyproject))

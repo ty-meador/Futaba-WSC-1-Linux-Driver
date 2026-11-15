@@ -1,9 +1,11 @@
 """Worker module that contains the code which will run in a seperate process for each driver."""
 # pylint: disable=import-outside-toplevel
 
+from .__config__ import DeviceConfig
+
+# Importing these is thread safe
 from .InputChannel import InputChannel
 from .IPC import WorkerControl
-from .__config__ import DeviceConfig
 
 
 def run(
@@ -61,24 +63,22 @@ def run(
         raise DeviceNotFoundError
 
     logger.debug("Subprocess started")
-
-    # Set realtime priority at the start of the process
     try:
-        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(50))
+        os.nice(-10)
     except PermissionError:
-        logger.warning("Warning: Need CAP_SYS_NICE capability or root for realtime scheduling")
-        try:
-            # Fallback to highest nice priority
-            os.nice(-20)
-        except PermissionError:
-            logger.warning("Warning: Cannot set process priority")
+        logger.warning(
+            "Warning: Cannot set process priority (Need CAP_SYS_NICE capability)"
+        )
 
     channelEventsMap, channelValueMaps, channelIndexOffsets = zip(
-        *[(
-            getattr(uinput, channel.eventName),
-            channel.valueMap,
-            channel.indexOffset,
-        ) for channel in deviceChannels],
+        *[
+            (
+                getattr(uinput, channel.eventName),
+                channel.valueMap,
+                channel.indexOffset,
+            )
+            for channel in deviceChannels
+        ],
         strict=True,
     )
 
@@ -93,10 +93,12 @@ def run(
     # Create a virtual device for the found device
     channelEventsMap = tuple(channelEventsMap)
     virtualDevice = uinput.Device(
-        tuple([
-            event + (EVENT_MIN_VAL, EVENT_MAX_VAL, deadZone, noiseFilter)
-            for event in channelEventsMap
-        ]),
+        tuple(
+            [
+                event + (EVENT_MIN_VAL, EVENT_MAX_VAL, deadZone, noiseFilter)
+                for event in channelEventsMap
+            ]
+        ),
         name,
         vendor=FUTABA_VENDOR_ID,
     )
@@ -134,7 +136,7 @@ def run(
     # - Runs until main process sets the killswitch event
     # - if runFlag is not set then inputs will not be processed
     while not killswitchIsSet():
-        rawData = None
+        rawData = bytearray()
         try:
             # Prevent busy waiting if we aren't actively running
             if not runFlagIsSet():
@@ -152,14 +154,22 @@ def run(
             # while remaining reasonable for process shutdown timing
             rawData = readDevice(interruptEndpoint, frameSize, timeout=250)
 
+            ##
+            # Usage Page (Generic Desktop) → Usage (Joystick)
+            # Usages: X, Y, Z, Rx, Ry, Rz, Dial, Slider   ← 8 channels
+            # Logical range 0–4096
+            # Report Size 16 bits × Report Count 8 → Input (Data,Var,Abs)
+            # The entire 46 bytes: exactly 8 × 16-bit axis values, nothing else.
+            # No vendor-defined fields, no status bytes, no buttons, not even padding.
+            ##
             for i in range(0, len(rawData), 2):
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
                 indexOffset = channelIndexOffsets[channel]
-                rawValue = int(fromBytes(rawData[i:i + 2], byteorder="little"))
+                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
 
                 # Avoid index OOB errors
-                maxInputVal = len(valueMap) - 1
+                maxInputVal = len(valueMap) - 1 - indexOffset
                 if rawValue > maxInputVal:
                     rawValue = maxInputVal
                 # The way that we generate the calibration table means there will always be an
@@ -172,13 +182,17 @@ def run(
                 # Pass our calibrated input to the virtual device
                 emit(channelEventsMap[channel], calibratedValue, syn=False)
 
-                if echoFlagIsSet() and not pipePoll(0):  # Echo back the data frames info - useful for calibration
+                if echoFlagIsSet() and not pipePoll(
+                    0
+                ):  # Echo back the data frames info - useful for calibration
                     try:
-                        pipeSend(DataFrame(
-                            channelEventsMap[channel],
-                            rawValue,
-                            calibratedValue,
-                        ))
+                        pipeSend(
+                            DataFrame(
+                                channelEventsMap[channel],
+                                rawValue,
+                                calibratedValue,
+                            )
+                        )
                     except BlockingIOError:
                         # Pipe is full - nobody's reading, disable echo
                         clearEchoFlag()

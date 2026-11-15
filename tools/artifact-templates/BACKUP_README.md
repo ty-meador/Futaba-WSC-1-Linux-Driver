@@ -35,7 +35,7 @@ A high-performance Linux driver for Futaba RC USB receivers, providing low-laten
 1. **Download the latest release:**
 
     ```sh
-    wget {{distributables_path}}/{{executable_name}}-{{version}}-linux-x86_64.tar.gz
+    wget {{distributables_path}}/release%2F{{version}}/downloads/{{executable_name}}-{{version}}-linux-x86_64.tar.gz
     tar -xzf {{executable_name}}-{{version}}-linux-x86_64.tar.gz
     cd {{executable_name}}-{{version}}-linux-x86_64
     ```
