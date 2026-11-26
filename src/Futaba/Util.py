@@ -17,6 +17,7 @@ from hid_parser import ReportDescriptor, VariableItem
 
 from .__config__ import (
     CALIBRATION_PATH,
+    CHANNEL_SIZE_BITS,
     FUTABA_VENDOR_ID,
     GET_DESCRIPTOR_REQUEST,
     HID_MAX_REPORT_DESCRIPTOR_SIZE,
@@ -107,25 +108,49 @@ def readReportDescriptor(device: usb.core.Device, interfaceNumber: int) -> bytes
     )
 
 
-def parseAxisSignedness(reportDescriptor: bytes) -> tuple[bool, ...]:
-    """Determine which of a device's axes send signed values.
+def parseAxisSignedness(
+    reportDescriptor: bytes, channelCount: int
+) -> tuple[bool, ...]:
+    """Determine which of a device's channels send signed values.
+
+    A channel is matched to the axis the device describes at the channel's place in
+    a data frame. Whatever else the device describes, buttons for instance, sits
+    somewhere else in the frame and is ignored.
 
     Args:
         reportDescriptor (bytes): The device's raw HID report descriptor
         (see readReportDescriptor)
+        channelCount (int): How many channels the device's config maps
 
     Returns:
-        tuple[bool, ...]: One flag per axis, in the order the axes appear in a data
-        frame. True when the axis sends signed values.
+        tuple[bool, ...]: One flag per channel, in channel order. True when the
+        channel sends signed values.
+
+    Raises:
+        ValueError: The device describes no axis where a channel is mapped
 
     """
     # HID has no "signed" flag: an axis is signed when the lowest value it declares
     # it can send (its logical minimum) is negative.
-    return tuple(
-        axis.logical_min < 0
-        for axis in ReportDescriptor(reportDescriptor).get_input_items()
-        if isinstance(axis, VariableItem)
-    )
+    axisIsSignedAtBitOffset = {
+        int(item.offset): item.logical_min < 0
+        for item in ReportDescriptor(reportDescriptor).get_input_items()
+        if isinstance(item, VariableItem) and item.size == CHANNEL_SIZE_BITS
+    }
+
+    channelBitOffsets = range(0, channelCount * CHANNEL_SIZE_BITS, CHANNEL_SIZE_BITS)
+    undescribedBitOffsets = [
+        bitOffset
+        for bitOffset in channelBitOffsets
+        if bitOffset not in axisIsSignedAtBitOffset
+    ]
+    if undescribedBitOffsets:
+        raise ValueError(
+            f"The device describes no {CHANNEL_SIZE_BITS}-bit axis at bit "
+            f"{undescribedBitOffsets} of its data frame, where its config maps a channel"
+        )
+
+    return tuple(axisIsSignedAtBitOffset[bitOffset] for bitOffset in channelBitOffsets)
 
 
 def newLogger(

@@ -66,6 +66,8 @@ HID_INTERFACE_NUMBER: int = 0
 GET_DESCRIPTOR_REQUEST: int = 0x06  # USB standard request code
 HID_REPORT_DESCRIPTOR_TYPE: int = 0x22  # HID class descriptor type
 HID_MAX_REPORT_DESCRIPTOR_SIZE: int = 4096  # The largest the kernel itself accepts
+# Channels fill a data frame from its first bit, one after another, each this wide
+CHANNEL_SIZE_BITS: int = 16
 
 LOGLEVEL: int = logging.DEBUG
 DRIVER_PATH: Path = Path(__file__).resolve().parent

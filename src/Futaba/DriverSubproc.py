@@ -136,13 +136,9 @@ def run(
     coreDevice.set_configuration()
 
     channelIsSigned = utils.parseAxisSignedness(
-        utils.readReportDescriptor(coreDevice, HID_INTERFACE_NUMBER)
+        utils.readReportDescriptor(coreDevice, HID_INTERFACE_NUMBER),
+        len(deviceChannels),
     )
-    if len(channelIsSigned) != len(deviceChannels):
-        raise ValueError(
-            f"{name} describes {len(channelIsSigned)} axes but its config "
-            f"maps {len(deviceChannels)} channels"
-        )
 
     logger.info("Driver started: %s -> %s", interruptEndpoint, name)
 
