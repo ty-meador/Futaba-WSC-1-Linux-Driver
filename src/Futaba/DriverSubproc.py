@@ -109,7 +109,7 @@ def run(
     ##
     product = coreDevice.product
     frameSize = deviceConfig.frameSize
-    rawData = bytearray(frameSize)  # Reusable buffer
+    rawData = usb.util.create_buffer(frameSize)# Reusable buffer
     emit = virtualDevice.emit
     sync = virtualDevice.syn
     fromBytes = int.from_bytes
@@ -136,7 +136,6 @@ def run(
     # - Runs until main process sets the killswitch event
     # - if runFlag is not set then inputs will not be processed
     while not killswitchIsSet():
-        rawData = bytearray()
         try:
             # Prevent busy waiting if we aren't actively running
             if not runFlagIsSet():
