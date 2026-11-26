@@ -151,7 +151,12 @@ def run(
             # frequency of timeout exceptions, minimizing polling overhead
             # - 250ms timeout reduces exception frequency during idle periods
             # while remaining reasonable for process shutdown timing
-            rawData = readDevice(interruptEndpoint, frameSize, timeout=250)
+            bytesRead = readDevice(interruptEndpoint, rawData, timeout=250)
+
+            # rawData is a reusable buffer, which retains its old contents. This check
+            # ignores any reads that are less than the expected frame size to prevent
+            # dispatching a mix of old a new values to the kernel
+            if bytesRead != frameSize: continue
 
             ##
             # Usage Page (Generic Desktop) → Usage (Joystick)
@@ -165,7 +170,7 @@ def run(
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
                 indexOffset = channelIndexOffsets[channel]
-                rawValue = fromBytes(rawData[i : i + 2],byteorder="little",signed=axisIsSigned)
+                rawValue = fromBytes(rawData[i : i + 2],byteorder="little",signed=False)
 
                 calibratedValue = valueMap[
                     # Clamp both ends of the axis range
