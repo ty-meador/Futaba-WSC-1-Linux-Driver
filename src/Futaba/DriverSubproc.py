@@ -114,7 +114,7 @@ def run(
     ##
     product = coreDevice.product
     frameSize = deviceConfig.frameSize
-    rawData = usb.util.create_buffer(frameSize)# Reusable buffer
+    rawData = usb.util.create_buffer(frameSize) # Reusable buffer
     emit = virtualDevice.emit
     sync = virtualDevice.syn
     fromBytes = int.from_bytes
@@ -169,8 +169,9 @@ def run(
 
             # rawData is a reusable buffer, which retains its old contents. This check
             # ignores any reads that are less than the expected frame size to prevent
-            # dispatching a mix of old a new values to the kernel
-            if bytesRead != frameSize: continue
+            # dispatching a mix of old and new values to the kernel
+            if bytesRead != frameSize:
+                continue
 
             ##
             # Usage Page (Generic Desktop) → Usage (Joystick)
