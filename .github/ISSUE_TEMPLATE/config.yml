@@ -1,0 +1,10 @@
+# Issues filed on this push-only GitHub mirror are not seen. The project's one official, write-enabled
+# repository exists only on GitLab; these links take a visitor there.
+blank_issues_enabled: false
+contact_links:
+  - name: Report a bug or propose a change (GitLab)
+    url: https://gitlab.com/Tyler-Meador/futaba-usb-driver/-/issues/new
+    about: Issues are tracked on GitLab, the project's only write-enabled repository. This GitHub repository is a push-only mirror.
+  - name: Report a security problem (GitLab, confidential)
+    url: https://gitlab.com/Tyler-Meador/futaba-usb-driver/-/blob/main/SECURITY.md
+    about: Security reports go in a confidential GitLab issue. Read the security policy first.
