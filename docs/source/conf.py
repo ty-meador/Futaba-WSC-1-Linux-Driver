@@ -5,7 +5,10 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-import os, sys
+import os, sys, tomllib
+from pathlib import Path
+
+PYPROJECT_PATH = Path(__file__).resolve().parents[2] / 'pyproject.toml'
 
 # Add project root for pyproject.toml and build tools
 sys.path.insert(0, os.path.abspath('../tools'))
@@ -21,7 +24,10 @@ autodoc_mock_imports = [
 project = 'futaba-rc-driver'
 copyright = '2026, Ty Meador'
 author = 'Ty Meador'
-release = '1.4.6'
+# Read from pyproject.toml so the documentation cannot name a different version
+# than the package it is built from
+with PYPROJECT_PATH.open('rb') as pyprojectFile:
+    release = tomllib.load(pyprojectFile)['project']['version']
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
