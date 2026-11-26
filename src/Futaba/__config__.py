@@ -61,6 +61,11 @@ DEFAULT_OUTPUT_RANGE: tuple[int, ...] = tuple(
 FUTABA_VENDOR_ID: int = 4104  # 0x1008
 HID_INTERFACE: int = 0x3  # coincidence
 INTERRUPT_ENDPOINT_ATTRIBUTE: int = 0x3  # coincidence
+# The interface the driver takes over from the kernel and reads frames from
+HID_INTERFACE_NUMBER: int = 0
+GET_DESCRIPTOR_REQUEST: int = 0x06  # USB standard request code
+HID_REPORT_DESCRIPTOR_TYPE: int = 0x22  # HID class descriptor type
+HID_MAX_REPORT_DESCRIPTOR_SIZE: int = 4096  # The largest the kernel itself accepts
 
 LOGLEVEL: int = logging.DEBUG
 DRIVER_PATH: Path = Path(__file__).resolve().parent

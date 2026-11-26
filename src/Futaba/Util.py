@@ -13,10 +13,14 @@ from logging.handlers import RotatingFileHandler
 from typing import Any
 
 import usb
+from hid_parser import ReportDescriptor, VariableItem
 
 from .__config__ import (
     CALIBRATION_PATH,
     FUTABA_VENDOR_ID,
+    GET_DESCRIPTOR_REQUEST,
+    HID_MAX_REPORT_DESCRIPTOR_SIZE,
+    HID_REPORT_DESCRIPTOR_TYPE,
     INTERRUPT_ENDPOINT_ATTRIBUTE,
     LOG_PATH,
 )
@@ -70,6 +74,58 @@ def findInterruptEndpoint(device: usb.core.Device) -> int | None:
                 ):
                     return endpoint.bEndpointAddress
     return None
+
+
+def readReportDescriptor(device: usb.core.Device, interfaceNumber: int) -> bytes:
+    """Ask a device for the HID report descriptor of one of its interfaces.
+
+    The kernel only lets whoever owns an interface talk to it, so its own HID driver
+    must be detached from the interface before calling this.
+
+    Args:
+        device (usb.core.Device): The device to ask
+        interfaceNumber (int): The HID interface to get the report descriptor of
+
+    Returns:
+        bytes: The raw report descriptor
+
+    """
+    return bytes(
+        device.ctrl_transfer(
+            bmRequestType=usb.util.build_request_type(
+                usb.util.CTRL_IN,
+                usb.util.CTRL_TYPE_STANDARD,
+                usb.util.CTRL_RECIPIENT_INTERFACE,
+            ),
+            bRequest=GET_DESCRIPTOR_REQUEST,
+            wValue=HID_REPORT_DESCRIPTOR_TYPE << 8,
+            wIndex=interfaceNumber,
+            # This is an upper bound: the device stops sending at the descriptor's
+            # real length, so we never need to look that length up first.
+            data_or_wLength=HID_MAX_REPORT_DESCRIPTOR_SIZE,
+        )
+    )
+
+
+def parseAxisSignedness(reportDescriptor: bytes) -> tuple[bool, ...]:
+    """Determine which of a device's axes send signed values.
+
+    Args:
+        reportDescriptor (bytes): The device's raw HID report descriptor
+        (see readReportDescriptor)
+
+    Returns:
+        tuple[bool, ...]: One flag per axis, in the order the axes appear in a data
+        frame. True when the axis sends signed values.
+
+    """
+    # HID has no "signed" flag: an axis is signed when the lowest value it declares
+    # it can send (its logical minimum) is negative.
+    return tuple(
+        axis.logical_min < 0
+        for axis in ReportDescriptor(reportDescriptor).get_input_items()
+        if isinstance(axis, VariableItem)
+    )
 
 
 def newLogger(

@@ -25,7 +25,6 @@ class FutabaDeviceDriver:
     deviceUUID: str
     frameSize: int
     manufacturer: str
-    name: str
     noiseFilter: int
     pipe: Connection
     product: str
@@ -34,6 +33,7 @@ class FutabaDeviceDriver:
     serialNumber: str
     bus: int
     address: int
+    name: str
     deviceChannels: Incomplete
     def __init__(self, device: usb.core.Device) -> None: ...
     def __eq__(self, other: object) -> bool: ...

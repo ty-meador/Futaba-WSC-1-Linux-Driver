@@ -51,6 +51,7 @@ def run(
         EVENT_MAX_VAL,
         EVENT_MIN_VAL,
         FUTABA_VENDOR_ID,
+        HID_INTERFACE_NUMBER,
     )
     from .Error import DeviceNotFoundError
     from .IPC import DataFrame
@@ -70,7 +71,12 @@ def run(
             "Warning: Cannot set process priority (Need CAP_SYS_NICE capability)"
         )
 
-    channelEventsMap, channelValueMaps, channelIndexOffsets = zip(
+    # Extract and cache channel data arrays
+    (
+        channelEventsMap,
+        channelValueMaps,
+        channelIndexOffsets,
+    ) = zip(
         *[
             (
                 getattr(uinput, channel.eventName),
@@ -91,7 +97,6 @@ def run(
         deadZone = deviceConfig.deadZone
 
     # Create a virtual device for the found device
-    channelEventsMap = tuple(channelEventsMap)
     virtualDevice = uinput.Device(
         tuple(
             [
@@ -126,9 +131,18 @@ def run(
     usbTimeoutError = usb.core.USBTimeoutError
     usbError = usb.core.USBError
 
-    if coreDevice.is_kernel_driver_active(0):
-        coreDevice.detach_kernel_driver(0)
+    if coreDevice.is_kernel_driver_active(HID_INTERFACE_NUMBER):
+        coreDevice.detach_kernel_driver(HID_INTERFACE_NUMBER)
     coreDevice.set_configuration()
+
+    channelIsSigned = utils.parseAxisSignedness(
+        utils.readReportDescriptor(coreDevice, HID_INTERFACE_NUMBER)
+    )
+    if len(channelIsSigned) != len(deviceChannels):
+        raise ValueError(
+            f"{name} describes {len(channelIsSigned)} axes but its config "
+            f"maps {len(deviceChannels)} channels"
+        )
 
     logger.info("Driver started: %s -> %s", interruptEndpoint, name)
 
@@ -170,7 +184,11 @@ def run(
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
                 indexOffset = channelIndexOffsets[channel]
-                rawValue = fromBytes(rawData[i : i + 2],byteorder="little",signed=False)
+                rawValue = fromBytes(
+                    rawData[i : i + 2],
+                    byteorder="little",
+                    signed=channelIsSigned[channel]
+                )
 
                 calibratedValue = valueMap[
                     # Clamp both ends of the axis range
@@ -220,13 +238,13 @@ def run(
     # No need to cache these methods as we are out of the main event loop by this point
     logger.debug("Releasing the USB interface...")
     try:
-        usb.util.release_interface(coreDevice, 0)
+        usb.util.release_interface(coreDevice, HID_INTERFACE_NUMBER)
     except Exception as e:
         logger.warning("Unable to release the USB interface %s", e)
 
     logger.debug("Reattaching the kernel ..")
     try:
-        coreDevice.attach_kernel_driver(0)
+        coreDevice.attach_kernel_driver(HID_INTERFACE_NUMBER)
     except Exception as e:
         logger.warning("Unable to reattach the kernel driver, %s", e)
 
