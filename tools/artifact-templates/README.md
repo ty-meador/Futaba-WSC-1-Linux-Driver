@@ -334,6 +334,7 @@ Edit device configs in `{{install_dir}}/build/Futaba/configs/`
 - Python 3.11+ with Nuitka compilation
 - Multiprocessing for device isolation
 - PyUSB for USB communication
+- hid-parser for reading how a device describes its axes
 - python-uinput for virtual device creation
 
 **Virtual Device Specification:**

@@ -114,7 +114,7 @@ def run(
     ##
     product = coreDevice.product
     frameSize = deviceConfig.frameSize
-    rawData = usb.util.create_buffer(frameSize)# Reusable buffer
+    rawData = usb.util.create_buffer(frameSize) # Reusable buffer
     emit = virtualDevice.emit
     sync = virtualDevice.syn
     fromBytes = int.from_bytes
@@ -133,123 +133,124 @@ def run(
 
     if coreDevice.is_kernel_driver_active(HID_INTERFACE_NUMBER):
         coreDevice.detach_kernel_driver(HID_INTERFACE_NUMBER)
-    coreDevice.set_configuration()
 
-    channelIsSigned = utils.parseAxisSignedness(
-        utils.readReportDescriptor(coreDevice, HID_INTERFACE_NUMBER)
-    )
-    if len(channelIsSigned) != len(deviceChannels):
-        raise ValueError(
-            f"{name} describes {len(channelIsSigned)} axes but its config "
-            f"maps {len(deviceChannels)} channels"
+    # The device has no kernel driver from here on, so however this ends, whether
+    # at start-up or in the main loop, it has to be handed back on the way out.
+    try:
+        coreDevice.set_configuration()
+
+        channelIsSigned = utils.parseAxisSignedness(
+            utils.readReportDescriptor(coreDevice, HID_INTERFACE_NUMBER),
+            len(deviceChannels),
         )
 
-    logger.info("Driver started: %s -> %s", interruptEndpoint, name)
+        logger.info("Driver started: %s -> %s", interruptEndpoint, name)
 
-    # -- MAIN LOOP --
-    # - Runs until main process sets the killswitch event
-    # - if runFlag is not set then inputs will not be processed
-    while not killswitchIsSet():
-        try:
-            # Prevent busy waiting if we aren't actively running
-            if not runFlagIsSet():
-                sleep(0.01)
-                continue
+        # -- MAIN LOOP --
+        # - Runs until main process sets the killswitch event
+        # - if runFlag is not set then inputs will not be processed
+        while not killswitchIsSet():
+            try:
+                # Prevent busy waiting if we aren't actively running
+                if not runFlagIsSet():
+                    sleep(0.01)
+                    continue
 
-            ## RUNNING ##
-            # - The transmitter may not send a new frame if the inputs remain
-            # static, causing read() to block until timeout
-            # - When frames are actively being sent, timeout length has no performance
-            # impact as read() returns immediately with data
-            # - During idle periods (static inputs), longer timeouts reduce the
-            # frequency of timeout exceptions, minimizing polling overhead
-            # - 250ms timeout reduces exception frequency during idle periods
-            # while remaining reasonable for process shutdown timing
-            bytesRead = readDevice(interruptEndpoint, rawData, timeout=250)
+                ## RUNNING ##
+                # - The transmitter may not send a new frame if the inputs remain
+                # static, causing read() to block until timeout
+                # - When frames are actively being sent, timeout length has no performance
+                # impact as read() returns immediately with data
+                # - During idle periods (static inputs), longer timeouts reduce the
+                # frequency of timeout exceptions, minimizing polling overhead
+                # - 250ms timeout reduces exception frequency during idle periods
+                # while remaining reasonable for process shutdown timing
+                bytesRead = readDevice(interruptEndpoint, rawData, timeout=250)
 
-            # rawData is a reusable buffer, which retains its old contents. This check
-            # ignores any reads that are less than the expected frame size to prevent
-            # dispatching a mix of old a new values to the kernel
-            if bytesRead != frameSize: continue
+                # rawData is a reusable buffer, which retains its old contents. This check
+                # ignores any reads that are less than the expected frame size to prevent
+                # dispatching a mix of old and new values to the kernel
+                if bytesRead != frameSize:
+                    continue
 
-            ##
-            # Usage Page (Generic Desktop) → Usage (Joystick)
-            # Usages: X, Y, Z, Rx, Ry, Rz, Dial, Slider   ← 8 channels
-            # Logical range 0–4096
-            # Report Size 16 bits × Report Count 8 → Input (Data,Var,Abs)
-            # The entire 46 bytes: exactly 8 × 16-bit axis values, nothing else.
-            # No vendor-defined fields, no status bytes, no buttons, not even padding.
-            ##
-            for i in range(0, len(rawData), 2):
-                channel = i // 2
-                valueMap = channelValueMaps[channel]
-                indexOffset = channelIndexOffsets[channel]
-                rawValue = fromBytes(
-                    rawData[i : i + 2],
-                    byteorder="little",
-                    signed=channelIsSigned[channel]
-                )
+                ##
+                # Usage Page (Generic Desktop) → Usage (Joystick)
+                # Usages: X, Y, Z, Rx, Ry, Rz, Dial, Slider   ← 8 channels
+                # Logical range 0–4096
+                # Report Size 16 bits × Report Count 8 → Input (Data,Var,Abs)
+                # The entire 46 bytes: exactly 8 × 16-bit axis values, nothing else.
+                # No vendor-defined fields, no status bytes, no buttons, not even padding.
+                ##
+                for i in range(0, len(rawData), 2):
+                    channel = i // 2
+                    valueMap = channelValueMaps[channel]
+                    indexOffset = channelIndexOffsets[channel]
+                    rawValue = fromBytes(
+                        rawData[i : i + 2],
+                        byteorder="little",
+                        signed=channelIsSigned[channel]
+                    )
 
-                calibratedValue = valueMap[
-                    # Clamp both ends of the axis range
-                    max(0,min(rawValue + indexOffset, len(valueMap) - 1))
-                ]
+                    calibratedValue = valueMap[
+                        # Clamp both ends of the axis range
+                        max(0,min(rawValue + indexOffset, len(valueMap) - 1))
+                    ]
 
-                # Pass our calibrated input to the virtual device
-                emit(channelEventsMap[channel], calibratedValue, syn=False)
+                    # Pass our calibrated input to the virtual device
+                    emit(channelEventsMap[channel], calibratedValue, syn=False)
 
-                if echoFlagIsSet() and not pipePoll(
-                    0
-                ):  # Echo back the data frames info - useful for calibration
-                    try:
-                        pipeSend(
-                            DataFrame(
-                                channelEventsMap[channel],
-                                rawValue,
-                                calibratedValue,
+                    if echoFlagIsSet() and not pipePoll(
+                        0
+                    ):  # Echo back the data frames info - useful for calibration
+                        try:
+                            pipeSend(
+                                DataFrame(
+                                    channelEventsMap[channel],
+                                    rawValue,
+                                    calibratedValue,
+                                )
                             )
-                        )
-                    except BlockingIOError:
-                        # Pipe is full - nobody's reading, disable echo
-                        clearEchoFlag()
-                        logger.warning("Echo disabled: pipe buffer full (no consumer)")
-            # Fire all channel events at once
-            sync()
+                        except BlockingIOError:
+                            # Pipe is full - nobody's reading, disable echo
+                            clearEchoFlag()
+                            logger.warning("Echo disabled: pipe buffer full (no consumer)")
+                # Fire all channel events at once
+                sync()
 
-        except usbTimeoutError:
-            pass  # Ignore, happens if device doesn't send a frame for a bit
-        except usbError as e:
-            if e.errno == 19:  # Device disconnected
-                logger.warning("device disconnected: %s", product)
+            except usbTimeoutError:
+                pass  # Ignore, happens if device doesn't send a frame for a bit
+            except usbError as e:
+                if e.errno == 19:  # Device disconnected
+                    logger.warning("device disconnected: %s", product)
+                    # Set our own killswitch and exit gracefully
+                    setKillswitch()
+                else:
+                    logger.warning(e)
+            except KeyboardInterrupt:
                 # Set our own killswitch and exit gracefully
                 setKillswitch()
-            else:
-                logger.warning(e)
-        except KeyboardInterrupt:
-            # Set our own killswitch and exit gracefully
-            setKillswitch()
+    except Exception as e:
+        # We want to capture everything and log it to a file and then re-raise it.
+        # This is because this will be running in a seperate process and as such
+        # print statements don't do much good.
+        logger.critical(e)
+        raise
+    finally:
+        # No need to cache these methods as we are out of the main event loop by this point
+        logger.debug("Releasing the USB interface...")
+        try:
+            usb.util.release_interface(coreDevice, HID_INTERFACE_NUMBER)
         except Exception as e:
-            # We want to capture everything and log it to a file and then re-raise it.
-            # This is because this will be running in a seperate process and as such
-            # print statements don't do much good.
-            logger.critical(e)
-            raise e
+            logger.warning("Unable to release the USB interface %s", e)
 
-    # No need to cache these methods as we are out of the main event loop by this point
-    logger.debug("Releasing the USB interface...")
-    try:
-        usb.util.release_interface(coreDevice, HID_INTERFACE_NUMBER)
-    except Exception as e:
-        logger.warning("Unable to release the USB interface %s", e)
+        logger.debug("Reattaching the kernel ..")
+        try:
+            coreDevice.attach_kernel_driver(HID_INTERFACE_NUMBER)
+        except Exception as e:
+            logger.warning("Unable to reattach the kernel driver, %s", e)
 
-    logger.debug("Reattaching the kernel ..")
-    try:
-        coreDevice.attach_kernel_driver(HID_INTERFACE_NUMBER)
-    except Exception as e:
-        logger.warning("Unable to reattach the kernel driver, %s", e)
-
-    logger.debug("Resetting device...")
-    try:
-        coreDevice.reset()
-    except Exception as e:
-        logger.warning("Unable to reset the USB interface, %s", e)
+        logger.debug("Resetting device...")
+        try:
+            coreDevice.reset()
+        except Exception as e:
+            logger.warning("Unable to reset the USB interface, %s", e)
