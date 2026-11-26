@@ -70,7 +70,6 @@ class FutabaDeviceDriver:
         self.deviceUUID: str = f"{device.idProduct:04X}-{device.serial_number}"
         self.frameSize: int = config["frame_size"]
         self.manufacturer: str = device.manufacturer
-        self.name: str = f"Futaba {device.product}({self.endpoint})"
         self.noiseFilter: int = config["noise_filter"]
         self.pipe: Connection = self._frontPipe
         self.product: str = device.product
@@ -79,6 +78,7 @@ class FutabaDeviceDriver:
         self.serialNumber: str = device.serial_number
         self.bus: int = device.bus
         self.address: int = device.address
+        self.name: str = f"Futaba {device.product}({self.bus}:{self.address})"
 
         self.deviceChannels = tuple(
             InputChannel(eventName, calibration, False, logger=self.logger)
@@ -123,7 +123,7 @@ class FutabaDeviceDriver:
 
     def __str__(self) -> str:
         """Generate a string representation of this device driver."""
-        return f"{self.name} Driver({self.deviceUUID})"
+        return self.name
 
     def __del__(self) -> None:
         """Destructor."""
@@ -209,9 +209,7 @@ class FutabaDeviceDriver:
         if self.workerCtl.runFlag.is_set():
             self.workerCtl.runFlag.clear()
 
-    def toggleEcho(
-        self,
-    ):
+    def toggleEcho(self):
         """Toggle echo on or off."""
         if self.workerCtl.echoFlag.is_set():
             self.disableEcho()

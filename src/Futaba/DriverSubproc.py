@@ -51,6 +51,7 @@ def run(
         EVENT_MAX_VAL,
         EVENT_MIN_VAL,
         FUTABA_VENDOR_ID,
+        HID_INTERFACE_NUMBER,
     )
     from .Error import DeviceNotFoundError
     from .IPC import DataFrame
@@ -70,7 +71,12 @@ def run(
             "Warning: Cannot set process priority (Need CAP_SYS_NICE capability)"
         )
 
-    channelEventsMap, channelValueMaps, channelIndexOffsets = zip(
+    # Extract and cache channel data arrays
+    (
+        channelEventsMap,
+        channelValueMaps,
+        channelIndexOffsets,
+    ) = zip(
         *[
             (
                 getattr(uinput, channel.eventName),
@@ -91,7 +97,6 @@ def run(
         deadZone = deviceConfig.deadZone
 
     # Create a virtual device for the found device
-    channelEventsMap = tuple(channelEventsMap)
     virtualDevice = uinput.Device(
         tuple(
             [
@@ -109,7 +114,7 @@ def run(
     ##
     product = coreDevice.product
     frameSize = deviceConfig.frameSize
-    rawData = bytearray(frameSize)  # Reusable buffer
+    rawData = usb.util.create_buffer(frameSize)# Reusable buffer
     emit = virtualDevice.emit
     sync = virtualDevice.syn
     fromBytes = int.from_bytes
@@ -126,9 +131,18 @@ def run(
     usbTimeoutError = usb.core.USBTimeoutError
     usbError = usb.core.USBError
 
-    if coreDevice.is_kernel_driver_active(0):
-        coreDevice.detach_kernel_driver(0)
+    if coreDevice.is_kernel_driver_active(HID_INTERFACE_NUMBER):
+        coreDevice.detach_kernel_driver(HID_INTERFACE_NUMBER)
     coreDevice.set_configuration()
+
+    channelIsSigned = utils.parseAxisSignedness(
+        utils.readReportDescriptor(coreDevice, HID_INTERFACE_NUMBER)
+    )
+    if len(channelIsSigned) != len(deviceChannels):
+        raise ValueError(
+            f"{name} describes {len(channelIsSigned)} axes but its config "
+            f"maps {len(deviceChannels)} channels"
+        )
 
     logger.info("Driver started: %s -> %s", interruptEndpoint, name)
 
@@ -136,7 +150,6 @@ def run(
     # - Runs until main process sets the killswitch event
     # - if runFlag is not set then inputs will not be processed
     while not killswitchIsSet():
-        rawData = bytearray()
         try:
             # Prevent busy waiting if we aren't actively running
             if not runFlagIsSet():
@@ -152,7 +165,12 @@ def run(
             # frequency of timeout exceptions, minimizing polling overhead
             # - 250ms timeout reduces exception frequency during idle periods
             # while remaining reasonable for process shutdown timing
-            rawData = readDevice(interruptEndpoint, frameSize, timeout=250)
+            bytesRead = readDevice(interruptEndpoint, rawData, timeout=250)
+
+            # rawData is a reusable buffer, which retains its old contents. This check
+            # ignores any reads that are less than the expected frame size to prevent
+            # dispatching a mix of old a new values to the kernel
+            if bytesRead != frameSize: continue
 
             ##
             # Usage Page (Generic Desktop) → Usage (Joystick)
@@ -166,18 +184,16 @@ def run(
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
                 indexOffset = channelIndexOffsets[channel]
-                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
+                rawValue = fromBytes(
+                    rawData[i : i + 2],
+                    byteorder="little",
+                    signed=channelIsSigned[channel]
+                )
 
-                # Avoid index OOB errors
-                maxInputVal = len(valueMap) - 1 - indexOffset
-                if rawValue > maxInputVal:
-                    rawValue = maxInputVal
-                # The way that we generate the calibration table means there will always be an
-                # "index 0", and it will always have the lowest possible value.
-                elif rawValue < 0:
-                    rawValue = 0
-
-                calibratedValue = valueMap[rawValue + indexOffset]
+                calibratedValue = valueMap[
+                    # Clamp both ends of the axis range
+                    max(0,min(rawValue + indexOffset, len(valueMap) - 1))
+                ]
 
                 # Pass our calibrated input to the virtual device
                 emit(channelEventsMap[channel], calibratedValue, syn=False)
@@ -222,13 +238,13 @@ def run(
     # No need to cache these methods as we are out of the main event loop by this point
     logger.debug("Releasing the USB interface...")
     try:
-        usb.util.release_interface(coreDevice, 0)
+        usb.util.release_interface(coreDevice, HID_INTERFACE_NUMBER)
     except Exception as e:
         logger.warning("Unable to release the USB interface %s", e)
 
     logger.debug("Reattaching the kernel ..")
     try:
-        coreDevice.attach_kernel_driver(0)
+        coreDevice.attach_kernel_driver(HID_INTERFACE_NUMBER)
     except Exception as e:
         logger.warning("Unable to reattach the kernel driver, %s", e)
 
