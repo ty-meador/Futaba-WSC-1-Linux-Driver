@@ -166,18 +166,12 @@ def run(
                 channel = i // 2
                 valueMap = channelValueMaps[channel]
                 indexOffset = channelIndexOffsets[channel]
-                rawValue = int(fromBytes(rawData[i : i + 2], byteorder="little"))
+                rawValue = fromBytes(rawData[i : i + 2],byteorder="little",signed=axisIsSigned)
 
-                # Avoid index OOB errors
-                maxInputVal = len(valueMap) - 1 - indexOffset
-                if rawValue > maxInputVal:
-                    rawValue = maxInputVal
-                # The way that we generate the calibration table means there will always be an
-                # "index 0", and it will always have the lowest possible value.
-                elif rawValue < 0:
-                    rawValue = 0
-
-                calibratedValue = valueMap[rawValue + indexOffset]
+                calibratedValue = valueMap[
+                    # Clamp both ends of the axis range
+                    max(0,min(rawValue + indexOffset, len(valueMap) - 1))
+                ]
 
                 # Pass our calibrated input to the virtual device
                 emit(channelEventsMap[channel], calibratedValue, syn=False)
