@@ -1,5 +1,10 @@
 # Futaba RC USB Driver
 
+> **Where this applies.** This project's one official, write-enabled repository exists only on GitLab:
+> <{{repository}}>. Issues, merge requests and releases live there and
+> nowhere else. If you are reading this on GitHub, you are on a push-only mirror kept for visibility: it is
+> overwritten from GitLab, and an issue or pull request opened there is not seen.
+
 ### Professional-grade Linux driver for Futaba RC transmitters
 
 Transform your Futaba RC transmitter into a high-precision game controller for racing simulators, flight sims, and more. Purpose-built for Linux with zero dependency hassles.
@@ -344,6 +349,11 @@ Edit device configs in `{{install_dir}}/build/Futaba/configs/`
 
 **Issues, updates, and documentation:**
 {{repository}}
+
+**Contributing and security reports:**
+[CONTRIBUTING.md]({{repository}}-/blob/main/CONTRIBUTING.md) and
+[SECURITY.md]({{repository}}-/blob/main/SECURITY.md). Security problems go in a confidential GitLab issue,
+never a public one.
 
 **Found a bug?** Please include:
 
