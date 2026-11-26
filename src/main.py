@@ -241,7 +241,7 @@ def killRunningProcess(pwd: Path):
             break
     else:
         print(
-            f"⚠ Driver (pid {pid}) did not exit after SIGTERM, leaving its pid file in place"
+            f"{BLACK_FLAG} Driver (pid {pid}) did not exit after SIGTERM, leaving its pid file in place"
         )
         return
 
